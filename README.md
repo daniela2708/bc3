@@ -24,7 +24,7 @@ Node 20 or newer. `npm run test:e2e` needs a local Chrome or Chromium (set `CHRO
 
 | Variable | Required | What it is |
 |---|---|---|
-| `VITE_ACCESS_PASSWORD_HASH` | Yes | Salted SHA-256 hash (64 hex characters) of the demo password. Create it with `npm run set-access-password` (local) or set it in Vercel → Project Settings → Environment Variables. **Without a valid value nobody can enter** (the gate fails closed; there is no default password). |
+| `VITE_ACCESS_PASSWORD_HASH` (or `ACCESS_PASSWORD_HASH`) | Yes | Salted SHA-256 hash (64 hex characters) of the demo password. Either name works; `vite.config.ts` passes only this value to the build. Create it with `npm run set-access-password` (local) or set it in Vercel → Project Settings → Environment Variables. **Without a valid value nobody can enter** (the gate fails closed; there is no default password). |
 
 The gate is the UC5 mechanism: only the hash is embedded, the check runs in constant time, and the session ends when the tab closes or with **Lock**. It is a demo barrier, not security: the hash ships in the public bundle, so use a long, unique password and keep the data synthetic. Real protection would need platform-level authentication (for example Vercel Deployment Protection).
 
@@ -211,4 +211,4 @@ scripts/set-access-password.mjs   writes the password hash to .env.local
 
 ## Deploy (not done yet)
 
-Nothing has been pushed or deployed. When approved: import the repository in Vercel (`vercel.json` sets Vite, `npm ci`, `npm run build`, `dist` and the security headers), set `VITE_ACCESS_PASSWORD_HASH`, and deploy.
+Nothing has been pushed or deployed. When approved: import the repository in Vercel (`vercel.json` sets Vite, `npm ci`, `npm run build`, `dist` and the security headers), set `VITE_ACCESS_PASSWORD_HASH` or `ACCESS_PASSWORD_HASH` (Production and Preview), and redeploy after any change: the value is fixed at build time.

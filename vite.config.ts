@@ -1,5 +1,5 @@
 /// <reference types="vitest" />
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 /**
@@ -20,7 +20,21 @@ function devCsp(): Plugin {
   };
 }
 
-export default defineConfig({
+/**
+ * The demo access gate reads one build-time value: the salted hash of the password. Vite only exposes variables
+ * prefixed VITE_, but the hosting dashboard may hold it as ACCESS_PASSWORD_HASH, so both names are accepted.
+ * Only this single value reaches the bundle (it is public by design); no other variable is exposed.
+ */
+function accessHash(mode: string): string {
+  const env = loadEnv(mode, '.', '');
+  const raw = env.VITE_ACCESS_PASSWORD_HASH || env.ACCESS_PASSWORD_HASH || '';
+  return /^[0-9a-fA-F]{64}$/.test(raw.trim()) ? raw.trim().toLowerCase() : '';
+}
+
+export default defineConfig(({ mode }) => ({
+  define: {
+    'import.meta.env.VITE_ACCESS_PASSWORD_HASH': JSON.stringify(accessHash(mode)),
+  },
   plugins: [react(), devCsp()],
   build: {
     chunkSizeWarningLimit: 600,
@@ -36,4 +50,4 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts'],
   },
-});
+}));
