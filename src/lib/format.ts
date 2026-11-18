@@ -98,12 +98,6 @@ export function weekTick(w: number): string {
   return `${mm}/${dd}/${yyyy.slice(2)}`;
 }
 
-/** Promo ROI: margin dollars returned per dollar Weis spent, e.g. 0.47×. */
-export function ratio(n: N): string {
-  if (!ok(n)) return DASH;
-  const r = Number(n.toFixed(2));
-  return `${r < 0 ? MINUS : ''}${dec2.format(Math.abs(r))}×`;
-}
 
 /** Signed money: +$1.2K / −$350 */
 export function signedMoney(n: N, compact = true): string {

@@ -16,13 +16,10 @@ import {
   postPromoDip,
   promoDepth,
   promoInvestment,
-  promoRoi,
   repeatRate,
   safeDiv,
   spendChange,
   sumStrict,
-  vendorFundedPct,
-  weisFundedCost,
   yoyGrowth,
 } from './kpis';
 
@@ -104,22 +101,11 @@ describe('cannibalization', () => {
   });
 });
 
-describe('funding and ROI', () => {
-  it('investment, vendor-funded %, Weis-funded cost', () => {
+describe('promo investment (internal base of vendor funding)', () => {
+  it('is the markdown given up, never negative', () => {
     expect(promoInvestment(10, 7, 100)).toBe(300);
     expect(promoInvestment(7, 10, 100)).toBe(0);
-    expect(vendorFundedPct(120, 300)).toBeCloseTo(0.4);
-    expect(vendorFundedPct(120, 0)).toBeNull();
-    expect(weisFundedCost(300, 120)).toBe(180);
-  });
-  it('ROI = net incremental GM ÷ Weis-funded cost', () => {
-    expect(promoRoi(90, 180)).toBeCloseTo(0.5);
-    expect(promoRoi(-90, 180)).toBeCloseTo(-0.5);
-  });
-  it('ROI is undefined (null) when the vendor paid everything or the cost is missing', () => {
-    expect(promoRoi(90, 0)).toBeNull();
-    expect(promoRoi(90, -5)).toBeNull();
-    expect(promoRoi(90, null)).toBeNull();
+    expect(promoInvestment(10, 7, null)).toBeNull();
   });
 });
 

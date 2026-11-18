@@ -3,7 +3,8 @@ import { STORE_SHARE } from '../data/generate';
 import { DEPTS, PRICE_GROUPS } from '../data/products';
 import { EVENTS } from '../data/promos';
 import { STORES } from '../data/stores';
-import { baselineWindow, cannGroup, derive, emptyAgg, eventAgg, sumAggs, type EventCtx } from './metrics';
+import { AS_OF_DAY } from '../data/calendar';
+import { baselineWindow, cannGroup, derive, emptyAgg, eventAgg, POST_PROMO_WINDOW_DAYS, sumAggs, type EventCtx } from './metrics';
 
 const ctx: EventCtx = { baselineWeeks: 4, level: 'category', itemMask: null, storeShare: null };
 const close = (a: number | null, b: number | null) => {
@@ -14,19 +15,20 @@ const close = (a: number | null, b: number | null) => {
 
 describe('every event is internally coherent', () => {
   for (const basis of ['net', 'gross'] as const) {
-    it(`incremental, lift, margin, funding and ROI tie out (${basis})`, () => {
+    it(`incremental, lift, margin and funding tie out (${basis})`, () => {
       for (const e of EVENTS) {
-        const m = derive(eventAgg(e, ctx), basis);
+        const a = eventAgg(e, ctx);
+        const m = derive(a, basis);
         close(m.incSales, m.sales - m.baseSales);
         if (m.baseSales > 0) close(m.salesLift, m.incSales! / m.baseSales);
         close(m.incGm, m.gm! - m.baseGm!);
         close(m.netGm, m.gm! + m.funding);
         close(m.netIncSales, m.incSales! + m.cannSales!);
         close(m.netIncGm, m.incGm! + m.cannGm! + m.funding);
-        close(m.weisCost, m.invest - m.funding);
-        close(m.funding, m.fundingByType.scan + m.fundingByType.bill + m.fundingByType.other);
-        if (m.weisCost! > 0.01) close(m.roi, m.netIncGm! / m.weisCost!);
-        expect(m.funding).toBeLessThanOrEqual(m.invest + 1e-6);
+        // Vendor funding is an internal input: every type counts, each allowance once.
+        close(m.funding, a.fund.scan + a.fund.bill + a.fund.other);
+        close(m.funding, a.invest * e.fundingRate);
+        expect(m.funding).toBeLessThanOrEqual(a.invest + 1e-6);
         expect(m.net).toBeLessThan(m.gross);
       }
     });
@@ -53,7 +55,6 @@ describe('every event is internally coherent', () => {
     expect(m.sales).toBe(0);
     expect(m.salesLift).toBeNull();
     expect(m.gmPct).toBeNull();
-    expect(m.roi).toBeNull();
     expect(m.unitLift).toEqual({ ea: null, lb: null });
     expect(m.yoy).toEqual({ abs: null, pct: null });
     expect(derive(emptyAgg(), 'gross').avgDepth).toBeNull();
@@ -109,40 +110,42 @@ describe('store filter', () => {
   });
 });
 
-describe('Funding Type filter', () => {
-  const mixed = EVENTS.find((e) => (e.fundingMix.scan ?? 0) > 0 && (e.fundingMix.bill ?? 0) > 0)!;
-  it('funding amounts count only the filtered type', () => {
-    const all = derive(eventAgg(mixed, ctx), 'net');
-    const bill = derive(eventAgg(mixed, { ...ctx, fundingTypes: ['bill'] }), 'net');
-    expect(bill.funding).toBeCloseTo(all.fundingByType.bill, 6);
-    expect(bill.funding).toBeLessThan(all.funding);
-    expect(bill.fundingByType.scan).toBe(0);
-    expect(bill.fundingByType.bill).toBeCloseTo(all.fundingByType.bill, 6);
-    close(bill.vendorPct, bill.funding / bill.invest);
-    close(bill.weisCost, bill.invest - bill.funding);
-    expect(bill.weisCost!).toBeGreaterThan(all.weisCost!);
+describe('vendor funding is internal, not a KPI', () => {
+  it('Metrics no longer expose Promo ROI, Vendor-Funded % or Weis-Funded Promo Cost $', () => {
+    const m = derive(eventAgg(EVENTS[0], ctx), 'net') as unknown as Record<string, unknown>;
+    for (const k of ['roi', 'vendorPct', 'weisCost', 'weisCostAll', 'fundingAll', 'fundingByType', 'invest']) expect(k in m).toBe(false);
   });
-  it('Net GM $, Net Incremental GM $ and Promo ROI keep all vendor funding (definition #3)', () => {
-    const all = derive(eventAgg(mixed, ctx), 'net');
-    const bill = derive(eventAgg(mixed, { ...ctx, fundingTypes: ['bill'] }), 'net');
-    expect(bill.fundingAll).toBeCloseTo(all.funding, 6);
-    close(bill.netGm, all.netGm);
-    close(bill.netIncGm, all.netIncGm);
-    expect(bill.roi).toBeCloseTo(all.roi!, 6);
-    close(bill.weisCostAll, all.weisCost);
-  });
-  it('a type the event does not use gives zero funding and a fully Weis-funded cost', () => {
-    const scanOnly = EVENTS.find((e) => e.fundingMix.scan === 1 && e.fundingRate > 0)!;
-    const other = derive(eventAgg(scanOnly, { ...ctx, fundingTypes: ['other'] }), 'net');
-    expect(other.funding).toBe(0);
-    expect(other.vendorPct).toBe(0);
-    close(other.weisCost, other.invest);
-  });
-  it('sums the filtered type across events (ratio of totals)', () => {
-    const list = EVENTS.slice(0, 80);
-    const f = derive(sumAggs(list.map((e) => eventAgg(e, { ...ctx, fundingTypes: ['scan'] }))), 'net');
-    const parts = list.reduce((a, e) => a + derive(eventAgg(e, ctx), 'net').fundingByType.scan, 0);
-    expect(f.funding).toBeCloseTo(parts, 4);
-    expect(f.fundingByType.bill + f.fundingByType.other).toBe(0);
+  it('a context with a funding-type restriction is ignored (all vendor funding counts)', () => {
+    const mixed = EVENTS.find((e) => (e.fundingMix.scan ?? 0) > 0 && (e.fundingMix.bill ?? 0) > 0)!;
+    const legacy = { ...ctx, fundingTypes: ['bill'] } as unknown as EventCtx;
+    close(derive(eventAgg(mixed, legacy), 'net').funding, derive(eventAgg(mixed, ctx), 'net').funding);
   });
 });
+
+describe('Post-Promo Dip % (4-week window, level 2)', () => {
+  it('uses a 28-day window', () => {
+    expect(POST_PROMO_WINDOW_DAYS).toBe(28);
+  });
+  it('is null until the 28 days after the promo have passed, even when a week has', () => {
+    const recent = EVENTS.filter((e) => e.end + 7 <= AS_OF_DAY && e.end + POST_PROMO_WINDOW_DAYS > AS_OF_DAY);
+    expect(recent.length).toBeGreaterThan(0);
+    for (const e of recent) {
+      const a = eventAgg(e, ctx);
+      expect(a.postN).toBe(0);
+      expect(derive(a, 'net').dip).toEqual({ ea: null, lb: null });
+    }
+  });
+  it('is measured once the window has passed, against 28 days of baseline', () => {
+    const e = EVENTS.find((x) => x.end + POST_PROMO_WINDOW_DAYS <= AS_OF_DAY && x.end + POST_PROMO_WINDOW_DAYS + 7 > AS_OF_DAY)!;
+    const a = eventAgg(e, ctx);
+    expect(a.postN).toBe(1);
+    const daily = (a.bUnits.ea + a.bUnits.lb) / a.promoDays;
+    expect(a.postBase.ea + a.postBase.lb).toBeCloseTo(daily * POST_PROMO_WINDOW_DAYS, 4);
+    expect(uomFirstOf(derive(a, 'net').dip)).not.toBeNull();
+  });
+  it('an empty selection has no dip', () => {
+    expect(derive(sumAggs([]), 'net').dip).toEqual({ ea: null, lb: null });
+  });
+});
+
+const uomFirstOf = (v: { ea: number | null; lb: number | null }) => v.ea ?? v.lb;

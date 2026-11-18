@@ -10,11 +10,11 @@ import { useFilters } from '../lib/filterStore';
 import { count, moneyCompact, moneyUnit, pct, pctChange, signedMoney } from '../lib/format';
 import { derive, sumAggs, type Agg } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
-import { columnsOf, EmptyState, performanceRows, roiText, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
+import { columnsOf, EmptyState, performanceRows, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
 
 const STORY = 'As a Category Manager, I want to review historical promotions for the same items so that I can determine the best times / depths / ad types to run the promotion.';
 const DEFAULT_PG = pgByName('Coca-Cola 12 pk 12 oz Cans').idx;
-const COLS = ['dates', 'type', 'depth', 'ad', 'avgRetail', 'gross', 'salesLift', 'unitLift', 'incGm', 'netIncGm', 'roi'];
+const COLS = ['dates', 'type', 'depth', 'ad', 'avgRetail', 'gross', 'salesLift', 'unitLift', 'incGm', 'netIncGm'];
 
 export default function HistoryView({ openDefinitions }: ViewProps) {
   const { state, update } = useFilters();
@@ -69,11 +69,10 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
     { label: 'Promo Event Count', info: 'Times the item or price group was promoted in the period.', value: count(events.length) },
     { label: 'Promo Depth %', info: 'Average (Regular retail − Promo retail) ÷ Regular retail across the events.', value: pct(all.avgDepth, 0), sub: 'average across events' },
     { label: 'Average Retail Price per Unit', info: 'Promo Gross Sales $ ÷ Promo Units (per lb for random-weight items).', value: moneyUnit(uomFirst(all.avgRetail)), sub: all.avgRetail.lb !== null ? 'per lb' : 'per unit' },
-    { label: 'Sales Lift %', info: 'Incremental Sales $ ÷ Baseline Sales $, all events.', value: pctChange(all.salesLift), pending: 6 },
-    { label: 'Unit Lift %', info: 'Incremental Units ÷ Baseline Units, all events.', value: uomPct(all.unitLift, true), pending: 6 },
+    { label: 'Sales Lift %', info: 'Incremental Sales $ ÷ Baseline Sales $, all events.', value: pctChange(all.salesLift), pending: 4 },
+    { label: 'Unit Lift %', info: 'Incremental Units ÷ Baseline Units, all events.', value: uomPct(all.unitLift, true), pending: 4 },
     { label: 'Incremental GM $', info: 'Promo GM $ − Baseline GM $, before cannibalization and funding.', value: signedMoney(all.incGm) },
-    { label: 'Net Incremental GM $', info: 'Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $.', value: signedMoney(all.netIncGm), pending: 3 },
-    { label: 'Promo ROI', info: 'Net Incremental GM $ ÷ Weis-Funded Promo Cost $.', value: roiText(all), pending: 3 },
+    { label: 'Net Incremental GM $', info: 'Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $.', value: signedMoney(all.netIncGm), pending: 7 },
   ];
 
   const lift = (rows: typeof byDepth) => rows.map((r) => ({ label: `${r.label} (${r.n})`, value: r.m.salesLift ?? 0 }));
@@ -100,13 +99,13 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
       </section>
 
       <ChartGrid cols={2}>
-        <ChartCard title="Sales Lift % by Promo Depth Band" subtitle={<>Number of events in brackets <Pending q={9} /></>} table={tbl(byDepth, 'Depth band')} height={hbarHeight(byDepth.length)}>
+        <ChartCard title="Sales Lift % by Promo Depth Band" subtitle={<>Number of events in brackets <Pending q={10} /></>} table={tbl(byDepth, 'Depth band')} height={hbarHeight(byDepth.length)}>
           <HBars data={lift(byDepth)} format={(v) => pctChange(v)} valueLabel="Sales Lift %" labelWidth={130} />
         </ChartCard>
         <ChartCard title="Net Incremental GM $ by Promo Depth Band" subtitle="Margin after cannibalization and vendor funding" table={tbl(byDepth, 'Depth band')} height={hbarHeight(byDepth.length)}>
           <HBars data={gm(byDepth)} format={moneyCompact} valueLabel="Net Incremental GM $" diverging labelWidth={130} />
         </ChartCard>
-        <ChartCard title="Sales Lift % by Ad Type / Vehicle" subtitle={<>Number of events in brackets <Pending q={9} /></>} table={tbl(byAd, 'Ad type')} height={hbarHeight(byAd.length)}>
+        <ChartCard title="Sales Lift % by Ad Type / Vehicle" subtitle={<>Number of events in brackets <Pending q={10} /></>} table={tbl(byAd, 'Ad type')} height={hbarHeight(byAd.length)}>
           <HBars data={lift(byAd)} format={(v) => pctChange(v)} valueLabel="Sales Lift %" labelWidth={130} />
         </ChartCard>
         <ChartCard title="Net Incremental GM $ by Ad Type / Vehicle" subtitle="Margin after cannibalization and vendor funding" table={tbl(byAd, 'Ad type')} height={hbarHeight(byAd.length)}>
@@ -161,11 +160,11 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
 function Heading({ children }: { children?: React.ReactNode }) {
   return (
     <SectionHeading
-      eyebrow="Should Have · View 5 of 6"
+      eyebrow="Should Have · View 4 of 5"
       title="Promo History"
       question="When, how deep and with which ad type should this item be promoted?"
       story={STORY}
-      validate="Ad Type / Vehicle and Promo Depth Band values follow the workbook (#9). Baseline window (#6)."
+      validate="Ad Type / Vehicle and Promo Depth Band values follow the workbook; the attributes and the objective of this view are pending (#10). Baseline window (#4)."
     >
       {children}
     </SectionHeading>

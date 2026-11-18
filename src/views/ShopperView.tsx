@@ -110,15 +110,15 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
           {vsUsual(all.buyersChange)}
         </>
       ),
-      pending: 17,
+      pending: 12,
     },
-    { label: 'Avg Basket Size $', info: 'Average total transaction dollars for transactions that include the promoted item.', value: moneyUnit(all.basket), sub: vsUsual(all.basketChange), pending: 17 },
-    { label: 'Promo Buyer Spend Change %', info: "Promo buyers' spend during the event vs. their usual spend.", value: <Var value={all.spendChange} kind="pct" />, pending: 17 },
-    { label: 'Units per Basket', info: 'Average units in transactions that include the promoted item.', value: all.upb === null ? '—' : all.upb.toFixed(1), sub: vsUsual(all.upbChange), pending: 17 },
-    { label: 'New-to-Category Buyers %', info: 'Share of promo buyers with no category purchase in the 52-week look-back.', value: pct(all.newToCat), pending: 17 },
-    { label: 'Category Trips', info: 'Trips by promo buyers that included any item in the category, vs. their usual.', value: count(all.catTrips), sub: vsUsual(all.catTripsChange), pending: 17 },
-    { label: 'Transaction Count', info: 'Total store transactions on promo days (store traffic indicator). Days shared by several events count once.', value: count(all.storeTxns), pending: 17 },
-    { label: 'Repeat Purchase Rate %', info: `Promo buyers who bought the item again at regular price within ${REPEAT_WINDOW_DAYS} days after the promotion. — until enough days have passed.`, value: pct(all.repeatRate), pending: 17 },
+    { label: 'Avg Basket Size $', info: 'Average total transaction dollars for transactions that include the promoted item.', value: moneyUnit(all.basket), sub: vsUsual(all.basketChange), pending: 12 },
+    { label: 'Promo Buyer Spend Change %', info: "Promo buyers' spend during the event vs. their usual spend.", value: <Var value={all.spendChange} kind="pct" />, pending: 12 },
+    { label: 'Units per Basket', info: 'Average units in transactions that include the promoted item.', value: all.upb === null ? '—' : all.upb.toFixed(1), sub: vsUsual(all.upbChange), pending: 12 },
+    { label: 'New-to-Category Buyers %', info: 'Share of promo buyers with no category purchase in the 52-week look-back.', value: pct(all.newToCat), pending: 11 },
+    { label: 'Category Trips', info: 'Trips by promo buyers that included any item in the category, vs. their usual.', value: count(all.catTrips), sub: vsUsual(all.catTripsChange), pending: 12 },
+    { label: 'Transaction Count', info: 'Total store transactions on promo days (store traffic indicator). Days shared by several events count once.', value: count(all.storeTxns), pending: 12 },
+    { label: 'Repeat Purchase Rate %', info: `Level 2 (not MVP). Promo buyers who bought the item again at regular price within ${REPEAT_WINDOW_DAYS} days after the promotion. — until enough days have passed.`, value: pct(all.repeatRate), pending: 12 },
   ];
 
   const cols: HierCol[] = [
@@ -172,7 +172,7 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
         <header className="table-head">
           <div>
             <h3 className="chart-title">
-              All events <Pending q={17} />
+              All events <Pending q={12} />
             </h3>
             <p className="chart-sub">
               The same aggregates for every event, plus Transaction Count and Repeat Purchase Rate %.{' '}
@@ -191,12 +191,12 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
 function Heading({ children }: { children?: React.ReactNode }) {
   return (
     <SectionHeading
-      eyebrow="Should Have · View 6 of 6"
+      eyebrow="Should Have · View 5 of 5"
       title="Promo Shopper Impact"
       question="Did the promotion grow baskets and the category, not just the promoted item?"
       story={STORY}
-      badge={<Pending q={17} />}
-      validate="KPI definitions use the workbook text (#17). Rewards and loyalty campaigns are out of scope."
+      badge={<Pending q={12} />}
+      validate="Source pending: Symphony AI vs. Weis Club Card data (#12); Nov 17: no Symphony AI feed (Excel exports only), so the intent is to calculate from Club Card data. New-to-category logic from a third-party system (#11). The view will be trimmed once the 6–8 core metrics are agreed (#9). Rewards and loyalty campaigns are out of scope."
     >
       {children}
     </SectionHeading>

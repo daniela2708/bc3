@@ -1,4 +1,4 @@
-// End-to-end check of the production build (adapted from UC2): access gate, the six views, typed dates and the
+// End-to-end check of the production build (adapted from UC2): access gate, the five views, typed dates and the
 // pasted UPC list.
 //
 //   npm run test:e2e                          builds a throwaway copy with a one-time password, serves it, runs the checks
@@ -27,7 +27,6 @@ const TABS = [
   ['hotbuy', 'Hot Buy Performance'],
   ['other', 'Other Promo Performance'],
   ['trend', 'Promo Run Trend'],
-  ['funding', 'Promo Funding'],
   ['history', 'Promo History'],
   ['shopper', 'Promo Shopper Impact'],
 ];
@@ -183,16 +182,26 @@ async function main() {
   // 5. Labels added after review: baseline note, SKU-row dash tooltip, buyer-count sum label, funding filter note.
   await send('Page.navigate', { url: `${base}/?tab=hotbuy` });
   await until(`!!document.querySelector('.baseline-note')`, 'baseline note');
-  check('Baseline note with Definition pending #6', await evaluate(`(() => { const n = document.querySelector('.baseline-note'); return n.textContent.includes('Baseline includes prior promo weeks in the window') && n.textContent.includes('Definition pending #6'); })()`));
+  check('Baseline note with Definition pending #4', await evaluate(`(() => { const n = document.querySelector('.baseline-note'); return n.textContent.includes('Baseline includes prior promo weeks in the window') && n.textContent.includes('Definition pending #4'); })()`));
   await evaluate(`document.querySelector('table.hier tbody tr:not(.total-row) button[aria-expanded]').click(), 1`);
   await until(`!!document.querySelector('tr.sku-row .pg-only')`, 'SKU row dash');
   check('SKU-row cannibalization dash has the tooltip', await evaluate(`[...document.querySelectorAll('tr.sku-row .pg-only')].every((e) => e.title === 'Measured at price group level')`));
   await send('Page.navigate', { url: `${base}/?tab=shopper` });
   await until(`!!document.querySelector('.sum-label')`, 'buyer count sum label');
   check('Promo Buyer Count total is labelled as a sum across events', await evaluate(`document.querySelector('.sum-label').textContent.includes('Sum across events (not unique households)') && !!document.querySelector('.sum-label .tip')`));
+  // 6. Nov 17 review: Promo Funding removed, Promo Run Trend is Must Have with a level-2 section.
   await send('Page.navigate', { url: `${base}/?tab=funding&fu=bill` });
-  await until(`document.querySelector('.banner-stack')?.textContent.includes('Bill-back only')`, 'funding filter note');
-  check('Funding Type filter note is shown', true);
+  await until(`!!document.querySelector('#section-title')`, 'fallback view for tab=funding');
+  check(
+    'tab=funding falls back to Hot Buy Performance and no funding UI remains',
+    await evaluate(`document.querySelector('#section-title').textContent.includes('Hot Buy Performance') && document.querySelectorAll('[role=tab]').length === 5 && ![...document.querySelectorAll('[role=tab]')].some((t) => t.textContent.includes('Funding')) && !document.body.textContent.includes('Funding Type') && !document.body.textContent.includes('Promo ROI') && !location.search.includes('fu=')`),
+  );
+  await send('Page.navigate', { url: `${base}/?tab=trend` });
+  await until(`!!document.querySelector('.secondary-title')`, 'Run Trend secondary section');
+  check(
+    'Promo Run Trend is Must Have; the before / during / after section is Level 2',
+    await evaluate(`document.querySelector('.eyebrow').textContent.includes('Must Have') && document.querySelector('.eyebrow').textContent.includes('of 5') && document.querySelector('.secondary-title').textContent.includes('Level 2 · not MVP') && !document.body.textContent.includes('View content pending')`),
+  );
 
   check('No console errors or exceptions', errors.length === 0, errors.slice(0, 3).join(' | '));
   if (process.env.E2E_DEBUG) console.log(debug.join('\n'));

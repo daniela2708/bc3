@@ -25,6 +25,8 @@ const DOW = [0.16, 0.12, 0.115, 0.125, 0.14, 0.16, 0.18];
 /** Price level by fiscal year (current retail = FY2026). */
 const PRICE_LEVEL: Record<number, number> = { 2024: 0.94, 2025: 0.97, 2026: 1 };
 const BASE_DISCOUNT = 0.018;
+/** Pantry loading lasts about 4 weeks after a promo (generator input; the KPI window is POST_PROMO_WINDOW_DAYS). */
+const DIP_DAYS = 28;
 const PROMO_DISCOUNT = 0.03;
 
 const HOLIDAY_LIFT: Record<string, Partial<Record<HolidayId, number>>> = {
@@ -74,7 +76,8 @@ function build(): Model {
   });
 
   // Promo effects: lift on the promoted price group, cannibalization or halo on the rest of the category, and the
-  // post-promo dip (pantry loading) in the ad week after the event.
+  // post-promo dip (pantry loading) over the 4 weeks after the event: full for two weeks, then fading to zero.
+  const dipShape = (k: number) => (k <= 14 ? 1 : (DIP_DAYS - k) / (DIP_DAYS - 14));
   for (const e of EVENTS) {
     const pg = PRICE_GROUPS[e.pg];
     const members = new Set(pg.items);
@@ -94,7 +97,10 @@ function build(): Model {
         mult[j * ND + day] *= Math.max(0.2, 1 - c);
       }
     }
-    for (let day = e.end + 1; day <= Math.min(e.end + 7, ND - 1); day++) for (const i of pg.items) mult[i * ND + day] *= 1 - e.dip;
+    for (let day = e.end + 1; day <= Math.min(e.end + DIP_DAYS, ND - 1); day++) {
+      const w = dipShape(day - e.end);
+      for (const i of pg.items) mult[i * ND + day] *= 1 - e.dip * w;
+    }
   }
 
   for (const it of ITEMS) {

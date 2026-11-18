@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AS_OF_DAY, adWeekOfDay, adWeekStart, dayFromYMD, LAST_COMPLETE_AD_WEEK, snapToThursday, weekday } from '../data/calendar';
 import { EVENTS } from '../data/promos';
 import { ITEMS } from '../data/products';
-import { BASE_TIME, DEFAULT_STATE, fromQuery, resolveTime, toQuery, usesFilter, type FilterState } from './filters';
+import { BASE_TIME, DEFAULT_STATE, fromQuery, resolveTime, TABS, toQuery, usesFilter, type FilterState } from './filters';
 import { getScope, itemMaskOf, storeShareOf } from './selectors';
 
 const state = (patch: Partial<FilterState>): FilterState => ({ ...structuredClone(DEFAULT_STATE), ...patch });
@@ -46,9 +46,9 @@ describe('time resolution', () => {
 
 describe('URL state', () => {
   it('round-trips the filters', () => {
-    const s = state({ tab: 'funding', dept: 0, cat: 0, item: 1, vb: 'v:2', promoType: 'TPR', funding: 'bill', baseline: 13, level: 'brand', basis: 'gross', time: { ...BASE_TIME, mode: 'custom', from: 100, to: 400 } });
+    const s = state({ tab: 'history', dept: 0, cat: 0, item: 1, vb: 'v:2', promoType: 'TPR', baseline: 13, level: 'brand', basis: 'gross', time: { ...BASE_TIME, mode: 'custom', from: 100, to: 400 } });
     const back = fromQuery(toQuery(s), EVENTS.length);
-    expect(back).toMatchObject({ tab: 'funding', dept: 0, cat: 0, item: 1, vb: 'v:2', promoType: 'TPR', funding: 'bill', baseline: 13, level: 'brand', basis: 'gross' });
+    expect(back).toMatchObject({ tab: 'history', dept: 0, cat: 0, item: 1, vb: 'v:2', promoType: 'TPR', baseline: 13, level: 'brand', basis: 'gross' });
     expect(back.time).toMatchObject({ mode: 'custom', from: 100, to: 400 });
   });
   it('falls back to defaults for invalid, out-of-range or hostile values', () => {
@@ -64,6 +64,16 @@ describe('URL state', () => {
     expect(s.promoType).toBe('all');
     expect(s.cols.a).toEqual([]);
     expect(fromQuery('x'.repeat(3000), EVENTS.length)).toEqual(DEFAULT_STATE);
+  });
+  it('Promo Funding is gone: tab=funding and funding filters fall back to the defaults', () => {
+    expect(TABS.map((t) => t.id)).toEqual(['hotbuy', 'other', 'trend', 'history', 'shopper']);
+    expect(fromQuery('tab=funding', EVENTS.length)).toEqual(DEFAULT_STATE);
+    expect(fromQuery('tab=funding&fu=bill&funding=scan', EVENTS.length)).toEqual(DEFAULT_STATE);
+    const s = fromQuery('tab=other&fu=bill&fundingType=other', EVENTS.length);
+    expect(s).toEqual({ ...DEFAULT_STATE, tab: 'other' });
+    expect('funding' in s).toBe(false);
+    expect(toQuery(s)).not.toMatch(/(^|&)(fu|funding)=/);
+    expect(usesFilter('history', 'funding' as never)).toBe(false);
   });
   it('never puts a pasted UPC list in the URL', () => {
     expect(toQuery(state({ codes: [1, 2, 3] }))).not.toMatch(/codes|upc/);
@@ -96,13 +106,10 @@ describe('scope', () => {
     expect(sc.events.every((e) => EVENTS[e].pg === item.pg)).toBe(true);
     expect(sc.itemFiltered).toBe(true);
   });
-  it('the Funding Type filter reaches the metrics on Promo Funding only', () => {
+  it('a funding filter no longer narrows the events', () => {
     const all = { time: { ...BASE_TIME, mode: 'all' as const } };
-    const fund = getScope(state({ tab: 'funding', funding: 'bill', ...all }));
-    expect(fund.ctx.fundingTypes).toEqual(['bill']);
-    expect(fund.events.every((e) => (EVENTS[e].fundingMix.bill ?? 0) > 0)).toBe(true);
-    expect(getScope(state({ tab: 'hotbuy', funding: 'bill', ...all })).ctx.fundingTypes).toBeNull();
-    expect(getScope(state({ tab: 'funding', ...all })).ctx.fundingTypes).toBeNull();
+    const legacy = { ...state({ tab: 'hotbuy', ...all }), funding: 'bill' } as unknown as FilterState;
+    expect(getScope(legacy).events).toEqual(getScope(state({ tab: 'hotbuy', ...all })).events);
   });
   it('an empty pasted list filters nothing', () => {
     expect(itemMaskOf(state({ codes: [] }))).toBeNull();

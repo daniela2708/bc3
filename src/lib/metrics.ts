@@ -1,6 +1,6 @@
 /**
  * Event measures: raw sums for one promo event (promo window, baseline window, cannibalization group, category,
- * post-promo week and last year), the aggregation of many events (ratio of totals) and the derivation of every KPI
+ * the 4 weeks after the promo and last year), the aggregation of many events (ratio of totals) and the derivation of every KPI
  * from those totals with the formulas in kpis.ts.
  */
 import { AS_OF_DAY, LY_OFFSET_DAYS } from '../data/calendar';
@@ -20,15 +20,15 @@ import {
   netIncrementalGm,
   netIncrementalSales,
   postPromoDip,
-  promoRoi,
   safeDiv,
-  vendorFundedPct,
-  weisFundedCost,
   yoyGrowth,
   type Growth,
 } from './kpis';
 
-/** Which items count as the "group" for cannibalization (question #5). */
+/** Days after the promo ends that Post-Promo Dip % measures (4 weeks, agreed Nov 17). Level 2 KPI. */
+export const POST_PROMO_WINDOW_DAYS = 28;
+
+/** Which items count as the "group" for cannibalization (question #3). */
 export type CannLevel = 'brand' | 'brandcat' | 'category';
 export const CANN_LEVELS: { id: CannLevel; label: string; tip: string }[] = [
   { id: 'brand', label: 'Brand', tip: 'Other items of the same brand, in any category.' },
@@ -62,10 +62,12 @@ export interface Agg {
   bUnits: U;
   /** Events whose baseline window was cut short by the start of the data (FY2024). */
   partialBaseline: number;
-  /** All vendor funding of the events, by type (Net GM $, Net Incremental GM $ and Promo ROI use it; #3). */
+  /**
+   * All vendor promo funding of the events, by type: an internal input of Net GM $ and Net Incremental GM $ (#7),
+   * not a KPI of its own. Each allowance is counted once (a CNS store shipment recap is the same allowance as the
+   * off-invoice one, not a second one).
+   */
   fund: Record<FundingType, number>;
-  /** Funding of the types picked in the Funding Type filter (equals `fund` when the filter is off). */
-  fundSel: Record<FundingType, number>;
   /** Change vs baseline of the cannibalization group; null on SKU rows (measured for the price group). */
   cGross: number | null;
   cNet: number | null;
@@ -100,7 +102,6 @@ export function emptyAgg(): Agg {
     bUnits: u0(),
     partialBaseline: 0,
     fund: { scan: 0, bill: 0, other: 0 },
-    fundSel: { scan: 0, bill: 0, other: 0 },
     cGross: 0,
     cNet: 0,
     cCost: 0,
@@ -135,7 +136,6 @@ export function addAgg(a: Agg, b: Agg): Agg {
     bUnits: uAdd(a.bUnits, b.bUnits),
     partialBaseline: a.partialBaseline + b.partialBaseline,
     fund: { scan: a.fund.scan + b.fund.scan, bill: a.fund.bill + b.fund.bill, other: a.fund.other + b.fund.other },
-    fundSel: { scan: a.fundSel.scan + b.fundSel.scan, bill: a.fundSel.bill + b.fundSel.bill, other: a.fundSel.other + b.fundSel.other },
     cGross: addNull(a.cGross, b.cGross),
     cNet: addNull(a.cNet, b.cNet),
     cCost: addNull(a.cCost, b.cCost),
@@ -166,8 +166,6 @@ export interface EventCtx {
   itemMask: Uint8Array | null;
   /** Share of chain volume in the selected stores, by department; null = whole chain. */
   storeShare: Float64Array | null;
-  /** Funding Type filter: the funding amounts shown count only these types; null or absent = every type. */
-  fundingTypes?: FundingType[] | null;
 }
 
 interface Sums {
@@ -244,8 +242,6 @@ export function eventAgg(e: PromoEvent, ctx: EventCtx, onlyItem?: number): Agg {
   a.bUnits = uOf(pg.uom, base(b.units));
   a.partialBaseline = bw.partial ? 1 : 0;
   a.fund = fund;
-  a.fundSel = { scan: 0, bill: 0, other: 0 };
-  for (const t of FUNDING_TYPES) a.fundSel[t.id] = !ctx.fundingTypes || ctx.fundingTypes.includes(t.id) ? fund[t.id] : 0;
   a.depthSum = e.depth;
 
   if (onlyItem === undefined) {
@@ -263,11 +259,12 @@ export function eventAgg(e: PromoEvent, ctx: EventCtx, onlyItem?: number): Agg {
     a.cUnits = null;
   }
 
-  if (e.end + 7 <= AS_OF_DAY) {
-    const after = sums(items, e.end + 1, e.end + 7);
+  // Post-Promo Dip % needs the whole 4-week window; until it has passed the event carries no post-promo data (—).
+  if (e.end + POST_PROMO_WINDOW_DAYS <= AS_OF_DAY) {
+    const after = sums(items, e.end + 1, e.end + POST_PROMO_WINDOW_DAYS);
     a.postN = 1;
     a.postUnits = uOf(pg.uom, after.units * f);
-    a.postBase = uOf(pg.uom, (baselineFromWindow(b.units, bw.days, 7) ?? 0) * f);
+    a.postBase = uOf(pg.uom, (baselineFromWindow(b.units, bw.days, POST_PROMO_WINDOW_DAYS) ?? 0) * f);
   }
   if (e.start - LY_OFFSET_DAYS >= 0) {
     a.lyN = 1;
@@ -317,19 +314,9 @@ export interface Metrics {
   gmPct: number | null;
   baseGm: number | null;
   incGm: number | null;
-  /** Vendor Promo Funding $ of the filtered funding types (all types when the filter is off). */
+  /** All vendor promo funding: internal input of Net GM $ and Net Incremental GM $ (#7), not shown as a KPI. */
   funding: number;
-  fundingByType: Record<FundingType, number>;
-  /** All vendor funding, whatever the Funding Type filter (definition #3). */
-  fundingAll: number;
   netGm: number | null;
-  invest: number;
-  /** Vendor-Funded % and Weis-Funded Promo Cost $ of the filtered funding types. */
-  vendorPct: number | null;
-  weisCost: number | null;
-  /** Weis-Funded Promo Cost $ after all vendor funding: the Promo ROI denominator. */
-  weisCostAll: number | null;
-  roi: number | null;
   cannSales: number | null;
   cannGm: number | null;
   cannRate: ByUom;
@@ -355,13 +342,10 @@ export function derive(a: Agg, basis: Basis): Metrics {
   const gm = grossMargin(sales, a.cost);
   const baseGm = grossMargin(baseSales, a.bCost);
   const incGm = incrementalGm(gm, baseGm);
-  const fundingAll = a.fund.scan + a.fund.bill + a.fund.other;
-  const funding = a.fundSel.scan + a.fundSel.bill + a.fundSel.other;
+  const funding = a.fund.scan + a.fund.bill + a.fund.other;
   const cannGm = cSales === null || a.cCost === null ? null : cSales - a.cCost;
   const incSales = incremental(sales, baseSales);
-  const netIncGm = netIncrementalGm(incGm, cannGm, fundingAll);
-  const weisCost = weisFundedCost(a.invest, funding);
-  const weisCostAll = weisFundedCost(a.invest, fundingAll);
+  const netIncGm = netIncrementalGm(incGm, cannGm, funding);
   const has = (k: Uom) => a.units[k] > 0 || a.bUnits[k] > 0;
   const incU = (k: Uom) => (has(k) ? incremental(a.units[k], a.bUnits[k]) : null);
   return {
@@ -381,14 +365,7 @@ export function derive(a: Agg, basis: Basis): Metrics {
     baseGm,
     incGm,
     funding,
-    fundingByType: a.fundSel,
-    fundingAll,
-    netGm: netGrossMargin(gm, fundingAll),
-    invest: a.invest,
-    vendorPct: vendorFundedPct(funding, a.invest),
-    weisCost,
-    weisCostAll,
-    roi: promoRoi(netIncGm, weisCostAll),
+    netGm: netGrossMargin(gm, funding),
     cannSales: cSales,
     cannGm,
     cannRate: byUom((k) => (a.cUnits && has(k) ? cannibalizationRate(a.cUnits[k], incU(k)) : null)),

@@ -6,29 +6,30 @@ import { PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
 import { moneyCompact, pct, pctChange } from '../lib/format';
 import type { Metrics } from '../lib/metrics';
-import { eventDates, roiText, unitsText, uomPct } from './common';
+import { eventDates, unitsText, uomPct } from './common';
 
 export interface RunRow {
   key: string;
   label: string;
   cell: (m: Metrics) => ReactNode;
   pending?: number;
+  /** Level 2: useful but not part of the MVP. */
+  level2?: boolean;
 }
 
 export const RUN_ROWS: RunRow[] = [
   { key: 'gross', label: 'Gross Sales $', cell: (m) => moneyCompact(m.gross) },
   { key: 'net', label: 'Net Customer Sales $', cell: (m) => moneyCompact(m.net) },
   { key: 'units', label: 'Volume', cell: (m) => unitsText(m.units) },
-  { key: 'gm', label: 'Promo GM $', cell: (m) => moneyCompact(m.gm) },
-  { key: 'gmPct', label: 'Promo GM %', cell: (m) => pct(m.gmPct), pending: 7 },
+  { key: 'gm', label: 'Promo GM $', cell: (m) => moneyCompact(m.gm), pending: 15 },
+  { key: 'gmPct', label: 'Promo GM %', cell: (m) => pct(m.gmPct), pending: 5 },
   { key: 'salesLift', label: 'Sales Lift %', cell: (m) => pctChange(m.salesLift) },
   { key: 'unitLift', label: 'Unit Lift %', cell: (m) => uomPct(m.unitLift, true) },
   { key: 'incGm', label: 'Incremental GM $', cell: (m) => moneyCompact(m.incGm) },
-  { key: 'netIncGm', label: 'Net Incremental GM $', cell: (m) => moneyCompact(m.netIncGm), pending: 3 },
+  { key: 'netIncGm', label: 'Net Incremental GM $', cell: (m) => moneyCompact(m.netIncGm), pending: 7 },
   { key: 'ly', label: 'LY Gross Sales $', cell: (m) => moneyCompact(m.ly) },
   { key: 'yoy', label: 'YoY Gross Sales $ / %', cell: (m) => (m.yoy.abs === null ? '—' : `${moneyCompact(m.yoy.abs)} · ${pctChange(m.yoy.pct)}`) },
-  { key: 'dip', label: 'Post-Promo Dip %', cell: (m) => uomPct(m.dip, true), pending: 4 },
-  { key: 'roi', label: 'Promo ROI', cell: (m) => roiText(m), pending: 3 },
+  { key: 'dip', label: 'Post-Promo Dip % (4 weeks)', cell: (m) => uomPct(m.dip, true), level2: true },
 ];
 
 export function runLabel(e: number): string {
@@ -83,6 +84,7 @@ export function RunsCompare({ runs, metrics, rows = RUN_ROWS, selected, onSelect
                 <th scope="row" className="left">
                   {r.label}
                   {r.pending && <span className="pending-dot" title={`Definition pending #${r.pending}`}>*</span>}
+                  {r.level2 && <span className="pending-dot level2-dot" title="Level 2 · not MVP">†</span>}
                 </th>
                 {metrics.map((m, i) => (
                   <td key={runs[i]} className={runs[i] === selected ? 'is-selected' : undefined}>
@@ -94,7 +96,7 @@ export function RunsCompare({ runs, metrics, rows = RUN_ROWS, selected, onSelect
           </tbody>
         </table>
       </div>
-      <p className="table-note">* Definition pending (see KPI definitions).</p>
+      <p className="table-note">* Definition pending (see KPI definitions). † Level 2 · not MVP.</p>
     </>
   );
 }

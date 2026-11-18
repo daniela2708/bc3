@@ -88,12 +88,16 @@ describe('planted demo stories', () => {
     expect(m.salesLift!).toBeLessThan(0);
     expect(m.incGm!).toBeLessThan(0);
   });
-  it('Tide Hot Buy: fully vendor funded, so ROI is not defined', () => {
-    const m = derive(eventAgg(runsOf('Tide Liquid Detergent 92 oz', 'HB').find((e) => e.planted)!, ctx), 'net');
-    expect(m.vendorPct!).toBeCloseTo(1, 6);
-    expect(m.roi).toBeNull();
+  it('Tide Hot Buy: fully vendor funded, so a negative Incremental GM becomes a positive Net Incremental GM', () => {
+    const e = runsOf('Tide Liquid Detergent 92 oz', 'HB').find((x) => x.planted)!;
+    const a = eventAgg(e, ctx);
+    const m = derive(a, 'net');
+    expect(m.funding).toBeCloseTo(a.invest, 6);
+    expect(m.incGm!).toBeLessThan(0);
+    expect(m.netIncGm!).toBeGreaterThan(0);
+    expect(m.netGm! - m.gm!).toBeCloseTo(m.funding, 6);
   });
-  it('Bounty Hot Buy: pantry loading after the promo', () => {
+  it('Bounty Hot Buy: pantry loading in the 4 weeks after the promo', () => {
     for (const e of runsOf('Bounty Select-A-Size 6 Double Rolls', 'HB').filter((x) => x.planted)) expect(derive(eventAgg(e, ctx), 'net').dip.ea!).toBeLessThan(-0.3);
   });
   it("M&M's October Hot Buy: the Halloween item drives the price group", () => {
@@ -123,10 +127,13 @@ describe('planted demo stories', () => {
       expect(during / base - 1).toBeGreaterThan(0.08);
     }
   });
-  it('Weis Quality Water Price Lock is fully Weis-funded', () => {
+  it('Weis Quality Water Price Lock: own brand, no vendor funding, so Net GM $ equals Promo GM $', () => {
     const e = runsOf('Weis Quality Water 24 pk 16.9 oz', 'PL').find((x) => x.planted)!;
-    const m = derive(eventAgg(e, ctx), 'net');
+    const a = eventAgg(e, ctx);
+    const m = derive(a, 'net');
+    expect(e.adWeeks).toBeGreaterThanOrEqual(4);
+    expect(a.invest).toBeGreaterThan(0);
     expect(m.funding).toBe(0);
-    expect(m.weisCost!).toBeCloseTo(m.invest, 6);
+    expect(m.netGm).toBe(m.gm);
   });
 });

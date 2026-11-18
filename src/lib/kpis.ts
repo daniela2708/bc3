@@ -31,7 +31,7 @@ export function sumStrict(...parts: Num[]): number | null {
 
 // ---------------------------------------------------------------- Baseline
 
-/** Baseline windows offered by the control, in weeks (default 4, adjustable; question #6). */
+/** Baseline windows offered by the control, in weeks (default 4, adjustable; question #4). */
 export const BASELINE_WEEKS = [2, 4, 8, 13, 52] as const;
 export type BaselineWeeks = (typeof BASELINE_WEEKS)[number];
 export const DEFAULT_BASELINE_WEEKS: BaselineWeeks = 4;
@@ -70,12 +70,12 @@ export function promoDepth(regularRetail: Num, promoRetail: Num): number | null 
 
 // ---------------------------------------------------------------- Margin
 
-/** Gross Margin $ = Sales − Cost of goods sold (same GM definition as UC2, on the selected sales basis). */
+/** Gross Margin $ = Sales − Cost of goods sold (same GM definition as UC2, on the selected sales basis; cost #15). */
 export function grossMargin(sales: Num, cogs: Num): number | null {
   return diff(sales, cogs);
 }
 
-/** Promo Gross Margin % = Promo Gross Margin $ ÷ Promo Sales $ (Net Customer Sales by default; question #7). */
+/** Promo Gross Margin % = Promo Gross Margin $ ÷ Promo Sales $ (Net Customer Sales by default; question #5; cost #15). */
 export function grossMarginPct(gm: Num, sales: Num): number | null {
   return safeDiv(gm, sales);
 }
@@ -85,7 +85,7 @@ export function incrementalGm(promoGm: Num, baselineGm: Num): number | null {
   return diff(promoGm, baselineGm);
 }
 
-/** Net Gross Margin $ = Promo Gross Margin $ + Vendor Promo Funding $ (all funding types; question #3). */
+/** Net Gross Margin $ = Promo Gross Margin $ + Vendor Promo Funding $ (all funding types; question #7). */
 export function netGrossMargin(promoGm: Num, vendorFunding: Num): number | null {
   return sumStrict(promoGm, vendorFunding);
 }
@@ -110,34 +110,18 @@ export function netIncrementalGm(incGm: Num, cannibalizedGm: Num, vendorFunding:
 
 // ---------------------------------------------------------------- Funding
 
-/** Promo Investment $ = (Regular retail − Promo retail) × Promo Units. */
+/**
+ * Promo Investment $ = (Regular retail − Promo retail) × Promo Units. Not shown in the prototype (where it belongs is
+ * pending); it is the base the generator applies vendor funding to.
+ */
 export function promoInvestment(regularRetail: Num, promoRetail: Num, promoUnits: Num): number | null {
   if (!ok(regularRetail) || !ok(promoRetail) || !ok(promoUnits)) return null;
   return Math.max(0, regularRetail - promoRetail) * promoUnits;
 }
 
-/** Vendor-Funded % = Vendor Promo Funding $ ÷ Promo Investment $. */
-export function vendorFundedPct(funding: Num, investment: Num): number | null {
-  return safeDiv(funding, investment);
-}
-
-/** Weis-Funded Promo Cost $ = Promo Investment $ − Vendor Promo Funding $. */
-export function weisFundedCost(investment: Num, funding: Num): number | null {
-  return diff(investment, funding);
-}
-
-/**
- * Promo ROI = Net Incremental Gross Margin $ ÷ Weis-Funded Promo Cost $. Null when Weis paid nothing (fully
- * vendor funded): the ratio is undefined, not infinite.
- */
-export function promoRoi(netIncGm: Num, weisCost: Num): number | null {
-  if (!ok(weisCost) || weisCost <= 0.005) return null;
-  return safeDiv(netIncGm, weisCost);
-}
-
 // ---------------------------------------------------------------- Trend
 
-/** Post-Promo Dip % = (Units after the promo − Baseline Units for the same days) ÷ Baseline Units. */
+/** Post-Promo Dip % = (Units in the 4 weeks after the promo − Baseline Units for the same days) ÷ Baseline Units. Level 2. */
 export function postPromoDip(unitsAfter: Num, baselineUnitsSameDays: Num): number | null {
   return lift(unitsAfter, baselineUnitsSameDays);
 }

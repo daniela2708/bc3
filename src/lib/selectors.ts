@@ -71,7 +71,6 @@ export function candidateEvents(s: FilterState, range: ResolvedRange, mask: Uint
     if (on('pg') && s.pg >= 0 && e.pg !== s.pg) continue;
     if (on('adType') && s.adType !== 'all' && e.adType !== s.adType) continue;
     if (on('depthBand') && s.depthBand !== 'all' && depthBandOf(e.depth) !== s.depthBand) continue;
-    if (on('funding') && s.funding !== 'all' && !(e.fundingMix[s.funding] ?? 0)) continue;
     if (mask && !PRICE_GROUPS[e.pg].items.some((i) => mask[i])) continue;
     out.push(e.idx);
   }
@@ -89,7 +88,7 @@ export function getScope(s: FilterState): Scope {
   return {
     range,
     events,
-    ctx: { baselineWeeks: s.baseline, level: s.level, itemMask: mask, storeShare: storeShareOf(s), fundingTypes: usesFilter(s.tab, 'funding') && s.funding !== 'all' ? [s.funding] : null },
+    ctx: { baselineWeeks: s.baseline, level: s.level, itemMask: mask, storeShare: storeShareOf(s) },
     itemFiltered: narrows,
     types,
   };

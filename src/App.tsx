@@ -7,7 +7,6 @@ import { actions, FilterProvider, useFilters } from './lib/filterStore';
 import { PerformanceView } from './views/PerformanceView';
 
 const RunTrendView = lazy(() => import('./views/RunTrendView'));
-const FundingView = lazy(() => import('./views/FundingView'));
 const HistoryView = lazy(() => import('./views/HistoryView'));
 const ShopperView = lazy(() => import('./views/ShopperView'));
 
@@ -47,8 +46,6 @@ function Shell() {
         return <PerformanceView variant="other" openDefinitions={openDefinitions} />;
       case 'trend':
         return <RunTrendView openDefinitions={openDefinitions} />;
-      case 'funding':
-        return <FundingView openDefinitions={openDefinitions} />;
       case 'history':
         return <HistoryView openDefinitions={openDefinitions} />;
       case 'shopper':

@@ -111,16 +111,16 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
       info: `Incremental ÷ Baseline, on ${basisWord(basis)} and on units. Baseline = ${state.baseline}-week average before each event.`,
       value: pctChange(all.salesLift),
       sub: <>Units {uomPct(all.unitLift, true)}</>,
-      pending: 6,
+      pending: 4,
     },
-    { label: 'Promo GM $ / %', info: `${basisWord(basis)} − cost of goods sold, before vendor funding. GM % = GM $ ÷ ${basisWord(basis)}.`, value: moneyCompact(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 7 },
+    { label: 'Promo GM $ / %', info: `${basisWord(basis)} − cost of goods sold, before vendor funding. GM % = GM $ ÷ ${basisWord(basis)}. Cost logic pending (#15); GM % denominator pending (#5).`, value: moneyCompact(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 15 },
     { label: 'Incremental GM $', info: 'Promo GM $ − Baseline GM $ (before cannibalization and vendor funding).', value: signedMoney(all.incGm), sub: <>Baseline GM {moneyCompact(all.baseGm)}</> },
     {
       label: 'Net Incremental GM $',
       info: 'Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (all funding types). The main "did it pay off" number.',
       value: signedMoney(all.netIncGm),
-      sub: <>Funding {moneyCompact(all.funding)} · {losers.length} of {perEvent.length} below zero</>,
-      pending: 3,
+      sub: <>{losers.length} of {perEvent.length} below zero</>,
+      pending: 7,
     },
   ];
 
@@ -221,7 +221,7 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
             title={`${hb ? 'Category / subcategory' : 'Category'} bridge`}
             subtitle={
               <span className="chart-sub-tools">
-                {bridgeScope === 'event' ? `${PRICE_GROUPS[selEvent.pg].name} in ${CATS[PRICE_GROUPS[selEvent.pg].cat].name}` : `All ${scope.events.length} events in the table`} · {levelWord} level <Pending q={5} />
+                {bridgeScope === 'event' ? `${PRICE_GROUPS[selEvent.pg].name} in ${CATS[PRICE_GROUPS[selEvent.pg].cat].name}` : `All ${scope.events.length} events in the table`} · {levelWord} level <Pending q={3} />
                 <Segmented<'event' | 'all'>
                   small
                   label="Bridge scope"
@@ -262,11 +262,11 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
 function Heading({ hb, children }: { hb: boolean; children?: React.ReactNode }) {
   return (
     <SectionHeading
-      eyebrow={hb ? 'Must Have · View 1 of 6' : 'Must Have · View 2 of 6'}
+      eyebrow={hb ? 'Must Have · View 1 of 5' : 'Must Have · View 2 of 5'}
       title={hb ? 'Hot Buy Performance' : 'Other Promo Performance'}
       question={hb ? 'Did each Hot Buy pay off, for the item and for the category?' : 'How did TPRs, BOGOs, price locks and other reductions perform, and which items drove the result?'}
       story={hb ? HB_STORY : OTHER_STORY}
-      validate="Baseline window (#6), cannibalization level (#5), Promo GM % denominator (#7) and which vendor funding Net GM $ adds (#3)."
+      validate="Baseline window (#4), cannibalization level and source (#3, #19), Promo GM % denominator (#5), cost logic (#15) and which vendor funding Net GM $ adds (#7)."
     >
       {children}
     </SectionHeading>

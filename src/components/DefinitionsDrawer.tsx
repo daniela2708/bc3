@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { KPI_DEFINITIONS, OPEN_QUESTIONS } from '../lib/definitions';
+import { KPI_DEFINITIONS, kpiStatus, OPEN_QUESTIONS } from '../lib/definitions';
 import { sanitizeSearch, SEARCH_MAX, TABS } from '../lib/filters';
 
 const TAB_LABEL = Object.fromEntries(TABS.map((t) => [t.id, t.label]));
@@ -39,7 +39,7 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
           <h2 id="defs-title">KPI definitions</h2>
           <div className="defs-intro">
             <p>
-              Definitions from the UC3 requirements workbook, for validation with Weis. Every rate is a ratio of totals. Items marked Definition pending depend on an open question in the tracker; the assumption the prototype uses is listed at the end. Illustrative data only.
+              Definitions from the UC3 requirements workbook (v3, updated with the Nov 17 technical requirements review), for validation with Weis. Every rate is a ratio of totals. Items marked Definition pending depend on an open question (numbers follow the workbook tab “UC #3 - Open Questions”); the assumption the prototype uses is listed at the end. Level 2 items are useful but not part of the MVP. Illustrative data only.
             </p>
             <input
               className="text-input defs-search"
@@ -74,7 +74,7 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
                   <td className="defs-views">{d.views.map((v) => TAB_LABEL[v]).join(' · ')}</td>
                   <td>
                     {d.priority}
-                    <span className="defs-recon">{d.pending ? `Definition pending #${d.pending}` : d.id === 'score' ? 'Placeholder' : 'From the workbook'}</span>
+                    <span className="defs-recon">{kpiStatus(d) === 'Workbook' ? 'From the workbook' : kpiStatus(d)}</span>
                   </td>
                 </tr>
               ))}
@@ -87,11 +87,13 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
               )}
             </tbody>
           </table>
-          <h3 className="defs-q-title">Definitions pending and the assumption used</h3>
+          <h3 className="defs-q-title">Open questions and the assumption used</h3>
           <ul className="defs-questions">
             {OPEN_QUESTIONS.map((q) => (
-              <li key={q.id}>
-                <span className="chip amber">#{q.id} · Open</span>
+              <li key={q.id ?? q.title}>
+                <span className={`chip ${q.status === 'Answered' || q.status === 'Note' ? 'neutral' : 'amber'}`}>
+                  {q.id === null ? 'Note' : `#${q.id} · ${q.status}`}
+                </span>
                 <b>{q.title}:</b> {q.assumption}
               </li>
             ))}

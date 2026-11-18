@@ -30,20 +30,19 @@ import {
   type HolidayId,
 } from '../data/calendar';
 import { BRANDS, CATS, DEPTS, ITEMS, PRICE_GROUPS, SUBS, VENDORS } from '../data/products';
-import { AD_TYPES, DEPTH_BANDS, FUNDING_TYPES, PROMO_TYPES, type AdType, type DepthBand, type FundingType, type PromoType } from '../data/promos';
+import { AD_TYPES, DEPTH_BANDS, PROMO_TYPES, type AdType, type DepthBand, type PromoType } from '../data/promos';
 import { DISTRICTS, STORE_BY_ID, STORES } from '../data/stores';
 import { BASELINE_WEEKS, DEFAULT_BASELINE_WEEKS, type BaselineWeeks } from './kpis';
 import { DEFAULT_BASIS, type Basis, type CannLevel } from './metrics';
 
 // ---------------------------------------------------------------- Views
 
-export type TabId = 'hotbuy' | 'other' | 'trend' | 'funding' | 'history' | 'shopper';
-/** The six views, in the order of the requirements (Must Have first). */
+export type TabId = 'hotbuy' | 'other' | 'trend' | 'history' | 'shopper';
+/** The five views, in the order of the requirements. Promo Funding was removed (question #2, answered Nov 17). */
 export const TABS: { id: TabId; label: string }[] = [
   { id: 'hotbuy', label: 'Hot Buy Performance' },
   { id: 'other', label: 'Other Promo Performance' },
   { id: 'trend', label: 'Promo Run Trend' },
-  { id: 'funding', label: 'Promo Funding' },
   { id: 'history', label: 'Promo History' },
   { id: 'shopper', label: 'Promo Shopper Impact' },
 ];
@@ -59,7 +58,6 @@ export type FilterKey =
   | 'event'
   | 'adType'
   | 'depthBand'
-  | 'funding'
   | 'holiday'
   | 'location';
 
@@ -68,7 +66,6 @@ const VIEW_FILTERS: Record<TabId, FilterKey[]> = {
   hotbuy: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'event', 'location'],
   other: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'event'],
   trend: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'event'],
-  funding: ['dept', 'cat', 'item', 'vb', 'promoType', 'event', 'funding'],
   history: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'adType', 'depthBand', 'holiday'],
   shopper: ['dept', 'cat', 'sub', 'pg', 'item', 'promoType', 'event'],
 };
@@ -145,8 +142,6 @@ export function tabDefaultTime(tab: TabId): TimeSel {
     case 'history':
       // Run comparisons and promo history use all available promo history.
       return { ...BASE_TIME, mode: 'all' };
-    case 'funding':
-      return { ...BASE_TIME, mode: 'todate', toDate: 'ytd' };
     default:
       return { ...BASE_TIME };
   }
@@ -284,7 +279,6 @@ export interface FilterState {
   event: number;
   adType: 'all' | AdType;
   depthBand: 'all' | DepthBand;
-  funding: 'all' | FundingType;
   region: number;
   districts: string[];
   stores: number[];
@@ -311,7 +305,6 @@ export const DEFAULT_STATE: FilterState = {
   event: -1,
   adType: 'all',
   depthBand: 'all',
-  funding: 'all',
   region: 0,
   districts: [],
   stores: [],
@@ -440,7 +433,6 @@ export function toQuery(s: FilterState): string {
   if (s.event >= 0) p.set('ev', String(s.event));
   if (s.adType !== 'all') p.set('ad', s.adType);
   if (s.depthBand !== 'all') p.set('db', s.depthBand);
-  if (s.funding !== 'all') p.set('fu', s.funding);
   if (s.region > 0) p.set('reg', String(s.region));
   if (s.districts.length) p.set('dist', s.districts.join(','));
   if (s.stores.length) p.set('st', s.stores.join(','));
@@ -500,7 +492,6 @@ export function fromQuery(query: string, eventCount: number): FilterState {
   s.event = intIn(p.get('ev'), 0, eventCount - 1) ?? -1;
   s.adType = oneOf(p.get('ad'), AD_TYPES.map((a) => a.id)) ?? 'all';
   s.depthBand = oneOf(p.get('db'), DEPTH_BANDS.map((d) => d.id)) ?? 'all';
-  s.funding = oneOf(p.get('fu'), FUNDING_TYPES.map((f) => f.id)) ?? 'all';
   s.region = intIn(p.get('reg'), 1, 3) ?? 0;
   const dist = (p.get('dist') ?? '').split(',').filter((d) => DISTRICTS.some((x) => x.id === d && (s.region === 0 || x.region === s.region)));
   s.districts = [...new Set(dist)].slice(0, DISTRICTS.length);

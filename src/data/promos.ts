@@ -73,6 +73,7 @@ export interface PromoEvent {
   planted?: string;
 }
 
+/* Pantry-loading dips (dip) are the depth of the drop in the first two weeks after the event; see generate.ts. */
 const TYPE_CODE: Record<PromoType, string> = { HB: 'HB', TPR: 'TPR', BOGO: 'BOGO', PL: 'PL', OTH: 'OTH' };
 const AD_LIFT: Record<AdType, number> = { front: 1.25, inside: 1, digital: 0.9, display: 1.1, none: 0.7 };
 /** Perishables and impulse items pantry-load less than shelf-stable stock-up items. */
@@ -129,8 +130,8 @@ function plantedDrafts(): Draft[] {
   out.push({ pg: pgByName('Tide Liquid Detergent 92 oz').idx, type: 'HB', startAw: aw(2026, 10, 8), weeks: 1, depth: 0.25, adType: 'front', lift: 1.4, cannSub: 0.16, cannOther: 0.01, cannBrand: 0, dip: 0.15, fundingRate: 1, fundingMix: { scan: 1 }, planted: 'tide' });
 
   const bounty = pgByName('Bounty Select-A-Size 6 Double Rolls').idx;
-  out.push({ pg: bounty, type: 'HB', startAw: aw(2025, 4, 17), weeks: 1, depth: 0.33, adType: 'front', lift: 2.1, cannSub: 0.22, cannOther: 0.04, cannBrand: 0, dip: 0.4, fundingRate: 0.6, fundingMix: { scan: 0.7, other: 0.3 }, planted: 'bounty' });
-  out.push({ pg: bounty, type: 'HB', startAw: aw(2026, 4, 16), weeks: 1, depth: 0.33, adType: 'front', lift: 2.2, cannSub: 0.24, cannOther: 0.04, cannBrand: 0, dip: 0.46, fundingRate: 0.6, fundingMix: { scan: 0.7, other: 0.3 }, planted: 'bounty' });
+  out.push({ pg: bounty, type: 'HB', startAw: aw(2025, 4, 17), weeks: 1, depth: 0.33, adType: 'front', lift: 2.1, cannSub: 0.22, cannOther: 0.04, cannBrand: 0, dip: 0.55, fundingRate: 0.6, fundingMix: { scan: 0.7, other: 0.3 }, planted: 'bounty' });
+  out.push({ pg: bounty, type: 'HB', startAw: aw(2026, 4, 16), weeks: 1, depth: 0.33, adType: 'front', lift: 2.2, cannSub: 0.24, cannOther: 0.04, cannBrand: 0, dip: 0.55, fundingRate: 0.6, fundingMix: { scan: 0.7, other: 0.3 }, planted: 'bounty' });
 
   const mm = pgByName("M&M's Sharing Size").idx;
   for (const [y, m, d] of [

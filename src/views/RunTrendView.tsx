@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Banner, BannerStack, KeyFigures, SectionHeading, type Tile } from '../components/Blocks';
 import { C, ChartCard, ChartGrid, DailyVsBaseline, SignedColumns, TrendLines } from '../components/Charts';
-import { Pending, Segmented } from '../components/ui';
+import { Level2, Pending, Segmented } from '../components/ui';
 import { shortDay } from '../data/calendar';
 import { ITEMS, pgByName, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL, type PromoType } from '../data/promos';
 import { useFilters } from '../lib/filterStore';
 import { count, moneyCompact, pct, pctChange, signedMoney, volume } from '../lib/format';
-import { dailySeries, derive, eventAgg, sumAggs } from '../lib/metrics';
+import { dailySeries, derive, eventAgg, POST_PROMO_WINDOW_DAYS, sumAggs } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
 import { EmptyState, unitsText, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
 import { RunsCompare, runLabel } from './RunsCompare';
@@ -51,7 +51,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
   const units = useMemo(() => {
     if (sel < 0) return null;
     const e = EVENTS[sel];
-    const s = dailySeries(e, scope.ctx, e.start - 28, e.end + 14);
+    const s = dailySeries(e, scope.ctx, e.start - 28, e.end + POST_PROMO_WINDOW_DAYS);
     return s.days.map((d) => ({
       x: shortDay(d.day),
       actual: d.units,
@@ -79,9 +79,9 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
     { label: 'Promo Event Count', info: 'Number of runs of this promotion (same price group and promo type) in the period.', value: count(runs.length), sub: `${PROMO_LABEL[runType!]} runs` },
     { label: 'Total Gross Sales', info: 'Gross sales of the promoted items on promo days, all runs.', value: moneyCompact(all.gross) },
     { label: 'Total Volume', info: 'Units or pounds sold on promo days, all runs.', value: unitsText(all.units) },
-    { label: 'Gross Margin $ / %', info: 'Promo GM $ before vendor funding; GM % on the selected sales basis.', value: moneyCompact(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 7 },
-    { label: 'Sales / Unit Lift %', info: 'Incremental ÷ Baseline, all runs (ratio of totals).', value: pctChange(all.salesLift), sub: <>Units {uomPct(all.unitLift, true)}</>, pending: 6 },
-    { label: 'Net Incremental GM $', info: 'Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $.', value: signedMoney(all.netIncGm), sub: <>Incremental GM {signedMoney(all.incGm)}</>, pending: 3 },
+    { label: 'Gross Margin $ / %', info: 'Promo GM $ before vendor funding; GM % on the selected sales basis. Cost logic pending (#15); GM % denominator pending (#5).', value: moneyCompact(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 15 },
+    { label: 'Sales / Unit Lift %', info: 'Incremental ÷ Baseline, all runs (ratio of totals).', value: pctChange(all.salesLift), sub: <>Units {uomPct(all.unitLift, true)}</>, pending: 4 },
+    { label: 'Net Incremental GM $', info: 'Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $.', value: signedMoney(all.netIncGm), sub: <>Incremental GM {signedMoney(all.incGm)}</>, pending: 7 },
     { label: 'YoY Gross Sales Growth', info: 'Promo-day gross sales vs. the same days last year (364 days earlier), runs with last-year history.', value: pctChange(all.yoy.pct), sub: <>LY {moneyCompact(all.ly)} · {signedMoney(all.yoy.abs)}</> },
   ];
 
@@ -146,7 +146,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
         </ChartCard>
         <ChartCard
           title="Net Incremental GM $ per run"
-          subtitle={<>After cannibalization and vendor funding <Pending q={3} /></>}
+          subtitle={<>After cannibalization and vendor funding <Pending q={7} /></>}
           table={{ head: ['Run', 'Net Incremental GM $'], rows: runs.map((e, i) => [runLabel(e), Math.round(metrics[i].netIncGm ?? 0)]) }}
           height={240}
         >
@@ -156,10 +156,10 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
 
       <section className="secondary-section" aria-label="Before, during and after each promo">
         <h3 className="secondary-title">
-          Before, during and after each promo <Pending q={4} label="Secondary section · definition pending" />
+          Before, during and after each promo <Level2 />
         </h3>
         <p className="chart-sub">
-          Carried over from the earlier definition of this view (“Post-Promo Trend”). Post-Promo Dip % compares units in the ad week after the promo with baseline units for the same days; a negative value suggests pantry loading.{' '}
+          Useful but outside the MVP (Nov 17 review). Post-Promo Dip % compares units in the 4 weeks after the promo with baseline units for the same days; a negative value suggests pantry loading. It shows — until the 4 weeks have passed. Whether the window varies by promo type will be reviewed on the prototype.{' '}
           <button type="button" className="btn-link" onClick={() => openDefinitions('dip')}>
             Definition
           </button>
@@ -167,7 +167,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
         <ChartGrid cols={2}>
           <ChartCard
             title={`Daily ${uom === 'lb' ? 'pounds' : 'units'} vs. baseline · ${runLabel(sel)}`}
-            subtitle={`${EVENTS[sel].id} · four weeks before, the promo and two weeks after`}
+            subtitle={`${EVENTS[sel].id} · four weeks before, the promo and four weeks after`}
             legend={[
               { label: uom === 'lb' ? 'Pounds' : 'Units', color: C.s1 },
               { label: 'Baseline (daily average)', color: C.axis },
@@ -177,7 +177,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
           >
             <DailyVsBaseline data={units ?? []} format={(v) => volume(v, uom)} tickFormat={(v) => volume(v, uom)} actualLabel={uom === 'lb' ? 'Pounds' : 'Units'} />
           </ChartCard>
-          <ChartCard title="Post-Promo Dip % per run" subtitle="Units in the week after vs. baseline (— when the week has not ended yet)" table={{ head: ['Run', 'Post-Promo Dip %'], rows: runs.map((e, i) => [runLabel(e), pctChange(uomFirst(metrics[i].dip))]) }} height={240}>
+          <ChartCard title="Post-Promo Dip % per run" subtitle="Units in the 4 weeks after vs. baseline (— until the 4 weeks have passed)" table={{ head: ['Run', 'Post-Promo Dip %'], rows: runs.map((e, i) => [runLabel(e), pctChange(uomFirst(metrics[i].dip))]) }} height={240}>
             <SignedColumns data={runs.map((e, i) => ({ x: shortDay(EVENTS[e].start), value: uomFirst(metrics[i].dip), tip: [{ label: `${runLabel(e)} · Post-Promo Dip %`, value: pctChange(uomFirst(metrics[i].dip)) }] }))} format={(v) => pct(v, 0)} valueLabel="Post-Promo Dip %" />
           </ChartCard>
         </ChartGrid>
@@ -189,12 +189,11 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
 function Heading({ children }: { children?: React.ReactNode }) {
   return (
     <SectionHeading
-      eyebrow="Nice to have · View 3 of 6"
+      eyebrow="Must Have · View 3 of 5"
       title="Promo Run Trend"
       question="Is the same promotion trending up or down each time it runs?"
       story={STORY}
-      badge={<Pending q={4} label="View content pending" />}
-      validate="The KPI sheet still calls this view “Post-Promo Trend”; the newer user story (run comparison) is used (#4). Baseline window (#6)."
+      validate="Baseline window (#4), cost logic (#15), Promo GM % denominator (#5) and which vendor funding Net GM $ adds (#7). Last Year Gross Sales and YoY growth come from user story 3 (no KPI row yet)."
     >
       {children}
     </SectionHeading>

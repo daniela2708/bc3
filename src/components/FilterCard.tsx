@@ -2,7 +2,7 @@ import { CalendarDays, RotateCcw } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AS_OF_DAY, dayFromISO, dayFromUS, formatDay, FISCAL_YEARS, HOLIDAYS, holidayAvailable, isoFromDay, snapToSunday, snapToThursday } from '../data/calendar';
 import { BRANDS, DEPTS, VENDORS } from '../data/products';
-import { AD_TYPES, DEPTH_BANDS, EVENTS, eventLabel, FUNDING_TYPES, PROMO_TYPES } from '../data/promos';
+import { AD_TYPES, DEPTH_BANDS, EVENTS, eventLabel, PROMO_TYPES } from '../data/promos';
 import { REGIONS } from '../data/stores';
 import {
   categoriesOf,
@@ -316,14 +316,6 @@ export function FilterCard() {
           options={[{ value: 'all', label: 'All depths' }, ...DEPTH_BANDS.map((d) => ({ value: d.id, label: d.label }))]}
           onChange={(v) => update((s) => ({ ...s, depthBand: v as typeof s.depthBand, sel: -1 }))}
           disabledReason={offReason(tab, 'depthBand')}
-        />
-        <Select
-          className="w-type"
-          label="Funding Type"
-          value={state.funding}
-          options={[{ value: 'all', label: 'All funding types' }, ...FUNDING_TYPES.map((f) => ({ value: f.id, label: f.label }))]}
-          onChange={(v) => update((s) => ({ ...s, funding: v as typeof s.funding, sel: -1 }))}
-          disabledReason={offReason(tab, 'funding')}
         />
         <Select
           className="w-region"

@@ -24,6 +24,15 @@ export function Pending({ q, label = 'Definition pending' }: { q?: number; label
   );
 }
 
+/** "Level 2 · not MVP": agreed as useful, outside the MVP (Nov 17 review). */
+export function Level2() {
+  return (
+    <span className="chip neutral pending-chip" title="Useful but not part of the MVP (UC3 technical requirements review, Nov 17)">
+      Level 2 · not MVP
+    </span>
+  );
+}
+
 export interface SegOption<T extends string> {
   value: T;
   label: string;

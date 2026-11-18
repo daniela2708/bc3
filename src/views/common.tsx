@@ -7,7 +7,7 @@ import { CATS, DEPTS, ITEMS, itemCode, PRICE_GROUPS, SUBS } from '../data/produc
 import { AD_LABEL, EVENTS, PROMO_LABEL, type PromoEvent } from '../data/promos';
 import type { FilterState, Rollup } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
-import { count, DASH, money, moneyCompact, pct, pctChange, ratio, volume, volumeCompact } from '../lib/format';
+import { count, DASH, money, moneyCompact, pct, pctChange, volume, volumeCompact } from '../lib/format';
 import { BASELINE_WEEKS, safeDiv, type BaselineWeeks } from '../lib/kpis';
 import { CANN_LEVELS, derive, eventAgg, sumAggs, type Agg, type Basis, type ByUom, type CannLevel, type EventCtx, type Metrics, type U } from '../lib/metrics';
 
@@ -79,6 +79,7 @@ export interface MetricCol extends HierCol {
 }
 
 const PENDING_TITLE = (q: number) => `Definition pending (#${q})`;
+const LEVEL2_TITLE = 'Level 2 · not MVP';
 
 /** Every metric column the performance tables can show, keyed for the column chooser. */
 export const METRIC_COLS: Record<string, MetricCol> = {
@@ -91,32 +92,27 @@ export const METRIC_COLS: Record<string, MetricCol> = {
   net: { key: 'net', label: 'Net Customer Sales $', group: 'Sales', cell: (m) => moneyCompact(m.net), sort: (m) => m.net },
   units: { key: 'units', label: 'Promo Units', group: 'Sales', cell: (m) => unitsText(m.units), sort: (m) => m.units.ea + m.units.lb },
   avgRetail: { key: 'avgRetail', label: 'Avg Promo Retail $', group: 'Sales', cell: (m) => (m.avgRetail.ea ?? m.avgRetail.lb) === null ? DASH : `$${(m.avgRetail.ea ?? m.avgRetail.lb)!.toFixed(2)}${m.avgRetail.lb !== null ? ' / lb' : ''}`, sort: (m) => uomFirst(m.avgRetail) },
-  baseSales: { key: 'baseSales', label: 'Baseline Sales $', group: 'Baseline', title: PENDING_TITLE(6), cell: (m) => moneyCompact(m.baseSales), sort: (m) => m.baseSales },
+  baseSales: { key: 'baseSales', label: 'Baseline Sales $', group: 'Baseline', title: PENDING_TITLE(4), cell: (m) => moneyCompact(m.baseSales), sort: (m) => m.baseSales },
   baseUnits: { key: 'baseUnits', label: 'Baseline Units', group: 'Baseline', defaultHidden: true, cell: (m) => unitsText(m.baseUnits), sort: (m) => m.baseUnits.ea + m.baseUnits.lb },
   incSales: { key: 'incSales', label: 'Incremental Sales $', group: 'Baseline', cell: (m) => <Impact value={m.incSales} compact />, sort: (m) => m.incSales },
   incUnits: { key: 'incUnits', label: 'Incremental Units', group: 'Baseline', defaultHidden: true, cell: (m) => uomPctUnits(m.incUnits), sort: (m) => uomFirst(m.incUnits) },
   salesLift: { key: 'salesLift', label: 'Sales Lift %', group: 'Baseline', cell: (m) => pctChange(m.salesLift), sort: (m) => m.salesLift },
   unitLift: { key: 'unitLift', label: 'Unit Lift %', group: 'Baseline', cell: (m) => uomPct(m.unitLift, true), sort: (m) => uomFirst(m.unitLift) },
-  gm: { key: 'gm', label: 'Promo GM $', group: 'Margin', cell: (m) => moneyCompact(m.gm), sort: (m) => m.gm },
-  gmPct: { key: 'gmPct', label: 'Promo GM %', group: 'Margin', title: PENDING_TITLE(7), cell: (m) => pct(m.gmPct), sort: (m) => m.gmPct },
+  gm: { key: 'gm', label: 'Promo GM $', group: 'Margin', title: PENDING_TITLE(15), cell: (m) => moneyCompact(m.gm), sort: (m) => m.gm },
+  gmPct: { key: 'gmPct', label: 'Promo GM %', group: 'Margin', title: `${PENDING_TITLE(5)}; cost logic also pending (#15)`, cell: (m) => pct(m.gmPct), sort: (m) => m.gmPct },
   baseGm: { key: 'baseGm', label: 'Baseline GM $', group: 'Margin', defaultHidden: true, cell: (m) => moneyCompact(m.baseGm), sort: (m) => m.baseGm },
   incGm: { key: 'incGm', label: 'Incremental GM $', group: 'Margin', cell: (m) => <Impact value={m.incGm} compact />, sort: (m) => m.incGm },
-  netGm: { key: 'netGm', label: 'Net GM $', group: 'Margin', title: PENDING_TITLE(3), cell: (m) => moneyCompact(m.netGm), sort: (m) => m.netGm },
+  netGm: { key: 'netGm', label: 'Net GM $', group: 'Margin', title: PENDING_TITLE(7), cell: (m) => moneyCompact(m.netGm), sort: (m) => m.netGm },
   catIncSales: { key: 'catIncSales', label: 'Category Incremental Sales $', group: 'Category', cell: (m) => orPg(m, <Impact value={m.catIncSales} compact />), sort: (m) => m.catIncSales },
   catIncGm: { key: 'catIncGm', label: 'Category Incremental GM $', group: 'Category', defaultHidden: true, cell: (m) => orPg(m, <Impact value={m.catIncGm} compact />), sort: (m) => m.catIncGm },
-  cannSales: { key: 'cannSales', label: 'Cannibalized Sales $', group: 'Category', title: PENDING_TITLE(5), cell: (m) => orPg(m, <Impact value={m.cannSales} compact />), sort: (m) => m.cannSales },
-  cannRate: { key: 'cannRate', label: 'Cannibalization Rate %', group: 'Category', title: PENDING_TITLE(5), cell: (m) => orPg(m, uomPct(m.cannRate)), sort: (m) => uomFirst(m.cannRate) },
+  cannSales: { key: 'cannSales', label: 'Cannibalized Sales $', group: 'Category', title: PENDING_TITLE(3), cell: (m) => orPg(m, <Impact value={m.cannSales} compact />), sort: (m) => m.cannSales },
+  cannRate: { key: 'cannRate', label: 'Cannibalization Rate %', group: 'Category', title: PENDING_TITLE(3), cell: (m) => orPg(m, uomPct(m.cannRate)), sort: (m) => uomFirst(m.cannRate) },
   netIncSales: { key: 'netIncSales', label: 'Net Incremental Sales $', group: 'Category', cell: (m) => orPg(m, <Impact value={m.netIncSales} compact />), sort: (m) => m.netIncSales },
-  netIncGm: { key: 'netIncGm', label: 'Net Incremental GM $', group: 'Margin', title: PENDING_TITLE(3), cell: (m) => orPg(m, <Impact value={m.netIncGm} compact />), sort: (m) => m.netIncGm },
-  invest: { key: 'invest', label: 'Promo Investment $', group: 'Funding', cell: (m) => moneyCompact(m.invest), sort: (m) => m.invest },
-  funding: { key: 'funding', label: 'Vendor Promo Funding $', group: 'Funding', cell: (m) => moneyCompact(m.funding), sort: (m) => m.funding },
-  vendorPct: { key: 'vendorPct', label: 'Vendor-Funded %', group: 'Funding', cell: (m) => pct(m.vendorPct, 0), sort: (m) => m.vendorPct },
-  weisCost: { key: 'weisCost', label: 'Weis-Funded Promo Cost $', group: 'Funding', cell: (m) => moneyCompact(m.weisCost), sort: (m) => m.weisCost },
-  roi: { key: 'roi', label: 'Promo ROI', group: 'Funding', title: PENDING_TITLE(3), cell: (m) => roiText(m), sort: (m) => m.roi },
+  netIncGm: { key: 'netIncGm', label: 'Net Incremental GM $', group: 'Margin', title: PENDING_TITLE(7), cell: (m) => orPg(m, <Impact value={m.netIncGm} compact />), sort: (m) => m.netIncGm },
   ly: { key: 'ly', label: 'LY Gross Sales $', group: 'Trend', cell: (m) => moneyCompact(m.ly), sort: (m) => m.ly },
   yoyAbs: { key: 'yoyAbs', label: 'YoY Gross Sales $', group: 'Trend', cell: (m) => <Impact value={m.yoy.abs} compact />, sort: (m) => m.yoy.abs },
   yoyPct: { key: 'yoyPct', label: 'YoY Gross Sales %', group: 'Trend', cell: (m) => pctChange(m.yoy.pct), sort: (m) => m.yoy.pct },
-  dip: { key: 'dip', label: 'Post-Promo Dip %', group: 'Trend', title: PENDING_TITLE(4), cell: (m) => uomPct(m.dip, true), sort: (m) => uomFirst(m.dip) },
+  dip: { key: 'dip', label: 'Post-Promo Dip %', group: 'Trend', title: LEVEL2_TITLE, cell: (m) => uomPct(m.dip, true), sort: (m) => uomFirst(m.dip) },
 };
 
 function uomPctUnits(v: ByUom): ReactNode {
@@ -128,13 +124,6 @@ function uomPctUnits(v: ByUom): ReactNode {
       </>
     );
   return v.lb !== null ? volumeCompact(v.lb, 'lb') : volumeCompact(v.ea, 'ea');
-}
-
-export function roiText(m: Pick<Metrics, 'roi' | 'weisCostAll' | 'invest' | 'cannSales'>): ReactNode {
-  if (m.roi !== null) return ratio(m.roi);
-  if (m.cannSales === null) return pgOnly();
-  if (m.invest > 0 && (m.weisCostAll ?? 0) <= 0.005) return <span title="The vendor paid the whole promo investment, so ROI is not defined.">— fully vendor funded</span>;
-  return DASH;
 }
 
 export function columnsOf(keys: string[], hidden: string[] = []): MetricCol[] {
@@ -250,7 +239,7 @@ export function ViewControls({ cann = true, rollup = false, basis = true, baseli
       {baseline && (
         <span className="toggle-group">
           <span className="toggle-label">
-            Baseline window <InfoTip text="Average of the weeks right before the event, scaled to the promo days. Default 4 weeks (question #6). Prior promo weeks inside the window are not excluded." />
+            Baseline window <InfoTip text="Average of the weeks right before the event, scaled to the promo days. Default 4 weeks (question #4); a default per promo type is pending. Prior promo weeks inside the window are not excluded." />
           </span>
           <Segmented<string>
             small
@@ -260,7 +249,7 @@ export function ViewControls({ cann = true, rollup = false, basis = true, baseli
             options={BASELINE_WEEKS.map((w) => ({ value: String(w), label: `${w} wk` }))}
           />
           <span className="baseline-note">
-            Baseline includes prior promo weeks in the window <Pending q={6} />
+            Baseline includes prior promo weeks in the window <Pending q={4} />
           </span>
         </span>
       )}
@@ -270,13 +259,13 @@ export function ViewControls({ cann = true, rollup = false, basis = true, baseli
             Cannibalization level <InfoTip text={CANN_LEVELS.map((l) => `${l.label}: ${l.tip}`).join(' ')} />
           </span>
           <Segmented<CannLevel> small label="Cannibalization level" value={state.level} onChange={(v) => set({ level: v })} options={CANN_LEVELS.map((l) => ({ value: l.id, label: l.label }))} />
-          <Pending q={5} />
+          <Pending q={3} />
         </span>
       )}
       {basis && (
         <span className="toggle-group">
           <span className="toggle-label">
-            Sales basis <InfoTip text="Sales used for Promo Sales $, baseline, lift, incremental and margin. Net Customer Sales by default; Promo GM % divides by the same basis (question #7)." />
+            Sales basis <InfoTip text="Sales used for Promo Sales $, baseline, lift, incremental and margin. Net Customer Sales by default; Promo GM % divides by the same basis (question #5)." />
           </span>
           <Segmented<Basis>
             small
