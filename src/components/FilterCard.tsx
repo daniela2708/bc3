@@ -1,6 +1,6 @@
 import { CalendarDays, RotateCcw } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { AS_OF_DAY, dayFromISO, dayFromUS, formatDay, FISCAL_YEARS, HOLIDAYS, holidayAvailable, isoFromDay, snapToSunday, snapToThursday } from '../data/calendar';
+import { AD_WEEK_RULE, AD_WEEK_START_NAME, AS_OF_DAY, dayFromISO, dayFromUS, formatDay, FISCAL_YEARS, HOLIDAYS, holidayAvailable, isoFromDay, snapToSunday, snapToAdWeekStart } from '../data/calendar';
 import { BRANDS, DEPTS, VENDORS } from '../data/products';
 import { AD_TYPES, DEPTH_BANDS, EVENTS, eventLabel, PROMO_TYPES } from '../data/promos';
 import { REGIONS } from '../data/stores';
@@ -157,7 +157,7 @@ export function FilterCard() {
         <span className="row-label">
           Time
           <InfoTip
-            text={`Ad weeks run Thursday to Wednesday; fiscal weeks (Week beginning, periods, quarters) run Sunday to Saturday on the Weis 4-4-5 calendar. An event is included when it starts in the range. Sales data through ${formatDay(AS_OF_DAY)}.`}
+            text={`Ad weeks run ${AD_WEEK_RULE} (configurable; holiday exceptions not simulated, #6); fiscal weeks (Week beginning, periods, quarters) run Sunday to Saturday on the Weis 4-4-5 calendar. An event is included when it starts in the range. Sales data through ${formatDay(AS_OF_DAY)}.`}
             below
           />
         </span>
@@ -195,7 +195,7 @@ export function FilterCard() {
             onChange={(v) => setTime({ period: Number(v) })}
           />
         )}
-        {t.mode === 'fiscal' && t.grain === 'adweek' && <DateInput label="Ad week (Thursday)" value={t.adWeek} onChange={(d) => setTime({ adWeek: snapToThursday(d) })} />}
+        {t.mode === 'fiscal' && t.grain === 'adweek' && <DateInput label={`Ad week (${AD_WEEK_START_NAME})`} value={t.adWeek} onChange={(d) => setTime({ adWeek: snapToAdWeekStart(d) })} />}
         {t.mode === 'fiscal' && t.grain === 'week' && <DateInput label="Week beginning (Sunday)" value={t.weekStart} onChange={(d) => setTime({ weekStart: snapToSunday(d) })} />}
         {t.mode === 'fiscal' && t.grain === 'holiday' && (
           <Select

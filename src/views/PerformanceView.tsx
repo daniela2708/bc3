@@ -8,7 +8,9 @@ import { CATS, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
 import { useFilters } from '../lib/filterStore';
 import { moneyCompact, moneyUnit, pct, pctChange, signedMoney, volumeCompact } from '../lib/format';
-import { CANN_LEVELS, dailySeries, derive, eventAgg, sumAggs } from '../lib/metrics';
+import { baselineText } from '../lib/baseline';
+import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
+import { CANN_LEVELS, dailySeries, derive, eventAgg, eventBaselineWeeks, sumAggs } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
 import { basisWord, columnsOf, EmptyState, eventDates, performanceRows, unitsText, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
 import { RunsCompare } from './RunsCompare';
@@ -20,8 +22,9 @@ const OTHER_STORY =
 
 const HB_COLS = ['dates', 'gross', 'net', 'units', 'baseSales', 'baseUnits', 'incSales', 'incUnits', 'salesLift', 'unitLift', 'gm', 'gmPct', 'baseGm', 'incGm', 'netGm', 'catIncSales', 'catIncGm', 'cannSales', 'cannRate', 'netIncSales', 'netIncGm'];
 const HB_HIDDEN = ['dates', 'net', 'catIncGm', 'netGm', 'incSales'];
-const OTHER_COLS = ['type', 'dates', 'gross', 'net', 'units', 'baseSales', 'salesLift', 'unitLift', 'gm', 'gmPct', 'incGm', 'netGm', 'catIncSales', 'cannSales', 'netIncGm'];
-const OTHER_HIDDEN = ['dates', 'net', 'netGm'];
+// Same layout as Hot Buy Performance (workbook); the extra KPI columns start hidden in the column chooser.
+const OTHER_COLS = ['type', 'dates', 'gross', 'net', 'units', 'baseSales', 'baseUnits', 'incSales', 'incUnits', 'salesLift', 'unitLift', 'gm', 'gmPct', 'baseGm', 'incGm', 'netGm', 'catIncSales', 'catIncGm', 'cannSales', 'cannRate', 'netIncSales', 'netIncGm'];
+const OTHER_HIDDEN = ['dates', 'net', 'netGm', 'incSales', 'cannRate', 'netIncSales'];
 
 export function PerformanceView({ openDefinitions, variant }: ViewProps & { variant: 'hotbuy' | 'other' }) {
   const { state, update } = useFilters();
@@ -57,7 +60,7 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
 
   const daily = useMemo(() => {
     if (!selEvent) return null;
-    const from = selEvent.start - Math.min(28, state.baseline * 7);
+    const from = selEvent.start - Math.min(28, eventBaselineWeeks(selEvent, scope.ctx) * 7);
     const s = dailySeries(selEvent, scope.ctx, from, selEvent.end + 7);
     const key = basis === 'net' ? 'net' : 'gross';
     return s.days.map((d) => ({
@@ -66,7 +69,7 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
       baseline: s.baseline[key],
       phase: d.day < s.window.from ? ('before' as const) : d.day < selEvent.start ? ('baseline' as const) : d.day <= selEvent.end ? ('promo' as const) : ('after' as const),
     }));
-  }, [selEvent, scope.ctx, basis, state.baseline]);
+  }, [selEvent, scope.ctx, basis]);
 
   const bridgeM = bridgeScope === 'all' ? all : selM;
   const bridge: BridgeStep[] = bridgeM
@@ -89,6 +92,7 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
   const losers = perEvent.filter((x) => (x.m.netIncGm ?? 0) < 0);
   const cannTop = [...perEvent].filter((x) => (x.m.salesLift ?? 0) > 0.8 && (uomFirst(x.m.cannRate) ?? 0) > 0.25).sort((a, b) => (uomFirst(b.m.cannRate) ?? 0) - (uomFirst(a.m.cannRate) ?? 0))[0];
   const levelWord = CANN_LEVELS.find((l) => l.id === state.level)!.label.toLowerCase();
+  const baseWord = baselineText(scope.ctx.baselineWeeks);
   const typeWord = hb ? 'Hot Buys' : scope.types.length === 1 ? `${PROMO_LABEL[scope.types[0]]} events` : 'promotions';
 
   const tiles: Tile[] = [
@@ -105,19 +109,25 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
       two: true,
       sub: 'Gross · Net Customer',
     },
-    { label: 'Promo Units', info: 'Units (ea) and pounds (lb) sold on promo days. Never added together.', value: unitsText(all.units), two: all.units.ea > 0 && all.units.lb > 0, sub: `Baseline ${all.baseUnits.ea > 0 ? volumeCompact(all.baseUnits.ea, 'ea') : volumeCompact(all.baseUnits.lb, 'lb')}` },
+    { label: 'Promo Units', info: `Units (ea) and pounds (lb) sold on promo days; random-weight items count pounds, as in Total Volume (UC2). Never added together. ${RANDOM_WEIGHT_NOTE}`, value: unitsText(all.units), two: all.units.ea > 0 && all.units.lb > 0, sub: `Baseline ${all.baseUnits.ea > 0 ? volumeCompact(all.baseUnits.ea, 'ea') : volumeCompact(all.baseUnits.lb, 'lb')}` },
     {
       label: 'Sales / Unit Lift %',
-      info: `Incremental ÷ Baseline, on ${basisWord(basis)} and on units. Baseline = ${state.baseline}-week average before each event.`,
+      info: `Incremental ÷ Baseline, on ${basisWord(basis)} and on units. Baseline: ${baseWord}, average of the weeks before each event.`,
       value: pctChange(all.salesLift),
       sub: <>Units {uomPct(all.unitLift, true)}</>,
       pending: 4,
     },
-    { label: 'Promo GM $ / %', info: `${basisWord(basis)} − cost of goods sold, before vendor funding. GM % = GM $ ÷ ${basisWord(basis)}. Cost logic pending (#15); GM % denominator pending (#5).`, value: moneyCompact(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 15 },
-    { label: 'Incremental GM $', info: 'Promo GM $ − Baseline GM $ (before cannibalization and vendor funding).', value: signedMoney(all.incGm), sub: <>Baseline GM {moneyCompact(all.baseGm)}</> },
+    {
+      label: 'Promo GM $ / %',
+      info: `${basisWord(basis)} − cost of goods sold. Cost (#15): DC items use the DC average cost minus scan-downs; DSD items the replacement cost that day. GM % = GM $ ÷ ${basisWord(basis)}; denominator pending (#5). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`,
+      value: moneyCompact(all.gm),
+      sub: <>{pct(all.gmPct)} margin rate</>,
+      pending: 15,
+    },
+    { label: 'Incremental GM $', info: `Promo GM $ − Baseline GM $ (before cannibalization and the vendor funding Net GM adds). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: signedMoney(all.incGm), sub: <>Baseline GM {moneyCompact(all.baseGm)}</>, pending: 7 },
     {
       label: 'Net Incremental GM $',
-      info: 'Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (all funding types). The main "did it pay off" number.',
+      info: `Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (#7: scan-downs at the expected amount, bill-backs only for DSD items, no slotting or lump sums; DC scan-downs are already in the cost, #15). The main "did it pay off" number. ${RANDOM_WEIGHT_NOTE}`,
       value: signedMoney(all.netIncGm),
       sub: <>{losers.length} of {perEvent.length} below zero</>,
       pending: 7,
@@ -156,7 +166,7 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
         )}
         {all.partialBaseline > 0 && (
           <Banner lead="Short baseline:" kind="note">
-            {all.partialBaseline} event{all.partialBaseline > 1 ? 's' : ''} started less than {state.baseline} weeks after the start of the data (FY2024), so the baseline uses the weeks available.
+            {all.partialBaseline} event{all.partialBaseline > 1 ? 's' : ''} started less than one baseline window after the start of the data (FY2024), so the baseline uses the weeks available.
           </Banner>
         )}
       </BannerStack>
@@ -164,7 +174,7 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
       <ViewControls rollup />
 
       <KeyFigures
-        caption={`${scope.range.name} · ${scope.events.length} ${typeWord} · ${basisWord(basis)} · ${state.baseline}-week baseline`}
+        caption={`${scope.range.name} · ${scope.events.length} ${typeWord} · ${basisWord(basis)} · ${baseWord}`}
         tiles={tiles}
         note={
           hb ? (
@@ -266,7 +276,7 @@ function Heading({ hb, children }: { hb: boolean; children?: React.ReactNode }) 
       title={hb ? 'Hot Buy Performance' : 'Other Promo Performance'}
       question={hb ? 'Did each Hot Buy pay off, for the item and for the category?' : 'How did TPRs, BOGOs, price locks and other reductions perform, and which items drove the result?'}
       story={hb ? HB_STORY : OTHER_STORY}
-      validate="Baseline window (#4), cannibalization level and source (#3, #19), Promo GM % denominator (#5), cost logic (#15) and which vendor funding Net GM $ adds (#7)."
+      validate="Baseline (#4), cannibalization (#3), sales basis and GM % denominator (#5), margin scope and funding (#7), cost (#15)."
     >
       {children}
     </SectionHeading>

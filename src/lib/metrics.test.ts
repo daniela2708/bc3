@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { STORE_SHARE } from '../data/generate';
-import { DEPTS, PRICE_GROUPS } from '../data/products';
+import { DEPTS, ITEMS, PRICE_GROUPS } from '../data/products';
 import { EVENTS } from '../data/promos';
 import { STORES } from '../data/stores';
 import { AS_OF_DAY } from '../data/calendar';
-import { baselineWindow, cannGroup, derive, emptyAgg, eventAgg, POST_PROMO_WINDOW_DAYS, sumAggs, type EventCtx } from './metrics';
+import { netGmFunding } from './cost';
+import { baselineWindow, cannGroup, CANN_LEVELS, DEFAULT_CANN_LEVEL, derive, emptyAgg, eventAgg, eventBaselineWeeks, POST_PROMO_WINDOW_DAYS, sumAggs, type EventCtx } from './metrics';
 
 const ctx: EventCtx = { baselineWeeks: 4, level: 'category', itemMask: null, storeShare: null };
 const close = (a: number | null, b: number | null) => {
@@ -25,9 +26,10 @@ describe('every event is internally coherent', () => {
         close(m.netGm, m.gm! + m.funding);
         close(m.netIncSales, m.incSales! + m.cannSales!);
         close(m.netIncGm, m.incGm! + m.cannGm! + m.funding);
-        // Vendor funding is an internal input: every type counts, each allowance once.
-        close(m.funding, a.fund.scan + a.fund.bill + a.fund.other);
-        close(m.funding, a.invest * e.fundingRate);
+        // Generated vendor funding: each allowance once, a share of the markdown.
+        close(a.fund.scan + a.fund.bill + a.fund.other, a.invest * e.fundingRate);
+        // Net GM adds only the funding #7 allows, by supply source (DC scan-downs are already in the cost, #15).
+        close(m.funding, netGmFunding(PRICE_GROUPS[e.pg].source, a.fund));
         expect(m.funding).toBeLessThanOrEqual(a.invest + 1e-6);
         expect(m.net).toBeLessThan(m.gross);
       }
@@ -79,6 +81,36 @@ describe('baseline and cannibalization controls', () => {
   it('a longer baseline window changes the baseline', () => {
     const e = EVENTS[EVENTS.length - 1];
     expect(eventAgg(e, { ...ctx, baselineWeeks: 13 }).bNet).not.toBeCloseTo(eventAgg(e, ctx).bNet, 0);
+  });
+  it("'byType' uses each event's proposed default: 4 weeks for Hot Buys, 13 for every other type (#4)", () => {
+    const hb = EVENTS.find((e) => e.type === 'HB')!;
+    const tpr = EVENTS.find((e) => e.type === 'TPR')!;
+    expect(eventBaselineWeeks(hb, { baselineWeeks: 'byType' })).toBe(4);
+    expect(eventBaselineWeeks(tpr, { baselineWeeks: 'byType' })).toBe(13);
+    expect(eventBaselineWeeks(tpr, { baselineWeeks: 8 })).toBe(8);
+    expect(eventAgg(hb, { ...ctx, baselineWeeks: 'byType' })).toEqual(eventAgg(hb, { ...ctx, baselineWeeks: 4 }));
+    expect(eventAgg(tpr, { ...ctx, baselineWeeks: 'byType' })).toEqual(eventAgg(tpr, { ...ctx, baselineWeeks: 13 }));
+  });
+  it('Subcategory is a cannibalization level and the default (#3)', () => {
+    expect(DEFAULT_CANN_LEVEL).toBe('sub');
+    expect(CANN_LEVELS.map((l) => l.id)).toEqual(['sub', 'brand', 'brandcat', 'category']);
+    expect(CANN_LEVELS[0].label).toBe('Subcategory');
+  });
+  it('the Subcategory group is the rest of the subcategory: same subcategory and unit of measure, inside the category', () => {
+    let nonEmpty = 0;
+    for (const e of EVENTS.slice(0, 200)) {
+      const pg = PRICE_GROUPS[e.pg];
+      const sub = cannGroup(e, 'sub');
+      const cat = new Set(cannGroup(e, 'category'));
+      if (sub.length) nonEmpty++;
+      for (const i of sub) {
+        expect(ITEMS[i].sub).toBe(pg.sub);
+        expect(ITEMS[i].uom).toBe(pg.uom);
+        expect(cat.has(i)).toBe(true);
+        expect(pg.items.includes(i)).toBe(false);
+      }
+    }
+    expect(nonEmpty).toBeGreaterThan(0);
   });
   it('cannibalization groups nest: brand-category ⊂ brand and ⊂ category, never the promoted items', () => {
     for (const e of EVENTS.slice(0, 200)) {

@@ -39,7 +39,7 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
           <h2 id="defs-title">KPI definitions</h2>
           <div className="defs-intro">
             <p>
-              Definitions from the UC3 requirements workbook (v3, updated with the Nov 17 technical requirements review), for validation with Weis. Every rate is a ratio of totals. Items marked Definition pending depend on an open question (numbers follow the workbook tab “UC #3 - Open Questions”); the assumption the prototype uses is listed at the end. Level 2 items are useful but not part of the MVP. Illustrative data only.
+              Definitions from the requirements workbook UC3_KPIs_Definitions_and_Mapping.xlsx, for validation with Weis. Every rate is a ratio of totals. Items marked Definition pending depend on an open question (numbers follow the workbook tab “UC #3 - Open Questions”); the assumption the prototype uses is listed at the end. Level 2 items are useful but not part of the MVP. Illustrative data only.
             </p>
             <input
               className="text-input defs-search"

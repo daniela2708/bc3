@@ -5,6 +5,7 @@ import { Level2, Pending, Segmented } from '../components/ui';
 import { shortDay } from '../data/calendar';
 import { ITEMS, pgByName, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL, type PromoType } from '../data/promos';
+import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
 import { useFilters } from '../lib/filterStore';
 import { count, moneyCompact, pct, pctChange, signedMoney, volume } from '../lib/format';
 import { dailySeries, derive, eventAgg, POST_PROMO_WINDOW_DAYS, sumAggs } from '../lib/metrics';
@@ -78,10 +79,10 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
   const tiles: Tile[] = [
     { label: 'Promo Event Count', info: 'Number of runs of this promotion (same price group and promo type) in the period.', value: count(runs.length), sub: `${PROMO_LABEL[runType!]} runs` },
     { label: 'Total Gross Sales', info: 'Gross sales of the promoted items on promo days, all runs.', value: moneyCompact(all.gross) },
-    { label: 'Total Volume', info: 'Units or pounds sold on promo days, all runs.', value: unitsText(all.units) },
-    { label: 'Gross Margin $ / %', info: 'Promo GM $ before vendor funding; GM % on the selected sales basis. Cost logic pending (#15); GM % denominator pending (#5).', value: moneyCompact(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 15 },
+    { label: 'Promo Units', info: `Units or pounds sold on promo days, all runs; random-weight items count pounds, as in Total Volume (UC2). ${RANDOM_WEIGHT_NOTE}`, value: unitsText(all.units) },
+    { label: 'Promo GM $ / %', info: `Promo GM $ (cost per #15: DC average cost minus scan-downs, DSD replacement cost); GM % on the selected sales basis, denominator pending (#5). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: moneyCompact(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 15 },
     { label: 'Sales / Unit Lift %', info: 'Incremental ÷ Baseline, all runs (ratio of totals).', value: pctChange(all.salesLift), sub: <>Units {uomPct(all.unitLift, true)}</>, pending: 4 },
-    { label: 'Net Incremental GM $', info: 'Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $.', value: signedMoney(all.netIncGm), sub: <>Incremental GM {signedMoney(all.incGm)}</>, pending: 7 },
+    { label: 'Net Incremental GM $', info: `Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (the funding #7 allows). ${RANDOM_WEIGHT_NOTE}`, value: signedMoney(all.netIncGm), sub: <>Incremental GM {signedMoney(all.incGm)}</>, pending: 7 },
     { label: 'YoY Gross Sales Growth', info: 'Promo-day gross sales vs. the same days last year (364 days earlier), runs with last-year history.', value: pctChange(all.yoy.pct), sub: <>LY {moneyCompact(all.ly)} · {signedMoney(all.yoy.abs)}</> },
   ];
 
@@ -154,12 +155,12 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
         </ChartCard>
       </ChartGrid>
 
-      <section className="secondary-section" aria-label="Before, during and after each promo">
+      <section className="secondary-section" aria-label="Post-Promo Trend">
         <h3 className="secondary-title">
-          Before, during and after each promo <Level2 />
+          Post-Promo Trend <Level2 />
         </h3>
         <p className="chart-sub">
-          Useful but outside the MVP (Nov 17 review). Post-Promo Dip % compares units in the 4 weeks after the promo with baseline units for the same days; a negative value suggests pantry loading. It shows — until the 4 weeks have passed. Whether the window varies by promo type will be reviewed on the prototype.{' '}
+          Units before, during and after each promo vs. baseline. Useful but outside the MVP (#8). Post-Promo Dip % compares units in the 4 weeks after the promo with baseline units for the same days; a negative value suggests pantry loading. It shows — until the 4 weeks have passed.{' '}
           <button type="button" className="btn-link" onClick={() => openDefinitions('dip')}>
             Definition
           </button>
@@ -193,7 +194,7 @@ function Heading({ children }: { children?: React.ReactNode }) {
       title="Promo Run Trend"
       question="Is the same promotion trending up or down each time it runs?"
       story={STORY}
-      validate="Baseline window (#4), cost logic (#15), Promo GM % denominator (#5) and which vendor funding Net GM $ adds (#7). Last Year Gross Sales and YoY growth come from user story 3 (no KPI row yet)."
+      validate="Baseline (#4), sales basis and GM % denominator (#5), margin scope and funding (#7), cost (#15). Last Year Gross Sales and YoY growth reuse the UC1 definition."
     >
       {children}
     </SectionHeading>

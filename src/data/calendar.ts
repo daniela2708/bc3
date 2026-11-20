@@ -1,6 +1,6 @@
 /**
  * Weis fiscal calendar (same as UC2) plus the promotional ad week. Fiscal weeks run Sunday to Saturday; ad weeks
- * run Thursday to Wednesday. Weeks run Sunday to Saturday; a fiscal year has 52 weeks
+ * follow the AD_WEEK rule below (Thursday to Wednesday by default). A fiscal year has 52 weeks
  * in 12 periods (P3, P6, P9 and P11 have 5 weeks). All dates are handled as
  * integer day indexes from FY2024 day 1 (Sun 12/31/2023), so arithmetic is exact
  * and free of time zones.
@@ -260,31 +260,46 @@ export function anchorWeek(id: 'valentinesDay' | 'superBowl' | 'christmasEve' | 
 
 export const HOLIDAY_YEARS = Object.keys(MOVABLE).map(Number);
 
-// ---------------------------------------------------------------- Ad weeks (Thursday to Wednesday)
+// ---------------------------------------------------------------- Ad weeks
 
-/** Day index of the first Thursday (day 0 is Sunday 12/31/2023, so Thursday 01/04/2024 is day 4). */
-export const AD_WEEK_ANCHOR = 4;
+/**
+ * The ad week rule, in one place (#6). Default: Thursday to Wednesday, 7 days. Weis needs it to stay configurable:
+ * change START_WEEKDAY (0 = Sunday … 6 = Saturday) or DAYS here and every ad week, filter, label and generated promo
+ * event follows. Holiday exceptions in the ad calendar (shifted or longer ad weeks) are not simulated.
+ */
+export const AD_WEEK = { START_WEEKDAY: 4, DAYS: 7 } as const;
 
-/** Global ad week index: ad week a runs from day 4 + 7a (Thursday) to 10 + 7a (Wednesday). */
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+/** "Thursday" with the default rule. */
+export const AD_WEEK_START_NAME = WEEKDAY_NAMES[AD_WEEK.START_WEEKDAY];
+/** "Wednesday" with the default rule. */
+export const AD_WEEK_END_NAME = WEEKDAY_NAMES[(AD_WEEK.START_WEEKDAY + AD_WEEK.DAYS - 1) % 7];
+/** "Thursday to Wednesday" with the default rule. */
+export const AD_WEEK_RULE = `${AD_WEEK_START_NAME} to ${AD_WEEK_END_NAME}`;
+
+/** Day index of the first ad week start (day 0 is Sunday 12/31/2023, so Thursday 01/04/2024 is day 4). */
+export const AD_WEEK_ANCHOR = AD_WEEK.START_WEEKDAY;
+
+/** Global ad week index: ad week a runs from AD_WEEK_ANCHOR + DAYS × a for DAYS days. */
 export function adWeekOfDay(day: number): number {
-  return Math.floor((day - AD_WEEK_ANCHOR) / 7);
+  return Math.floor((day - AD_WEEK_ANCHOR) / AD_WEEK.DAYS);
 }
 export function adWeekStart(adWeek: number): number {
-  return AD_WEEK_ANCHOR + adWeek * 7;
+  return AD_WEEK_ANCHOR + adWeek * AD_WEEK.DAYS;
 }
 export function adWeekEnd(adWeek: number): number {
-  return adWeekStart(adWeek) + 6;
+  return adWeekStart(adWeek) + AD_WEEK.DAYS - 1;
 }
-/** Snaps any day back to the Thursday that starts its ad week. */
-export function snapToThursday(day: number): number {
+/** Snaps any day back to the first day of its ad week (a Thursday with the default rule). */
+export function snapToAdWeekStart(day: number): number {
   return adWeekStart(adWeekOfDay(day));
 }
-/** Ad week label: the fiscal week that holds its Thursday, e.g. "FY2026 AW45". */
+/** Ad week label: the fiscal week that holds its first day, e.g. "FY2026 AW45". */
 export function adWeekLabel(adWeek: number): string {
   const f = fiscalOfDay(adWeekStart(adWeek));
   return `FY${f.fy} AW${f.week}`;
 }
-/** Last ad week that has ended by the as-of date (Wednesday on or before AS_OF_DAY). */
+/** Last ad week that has ended by the as-of date (its last day on or before AS_OF_DAY). */
 export const LAST_COMPLETE_AD_WEEK = adWeekEnd(adWeekOfDay(AS_OF_DAY)) <= AS_OF_DAY ? adWeekOfDay(AS_OF_DAY) : adWeekOfDay(AS_OF_DAY) - 1;
 
 /** Calendar month (1–12) of a day index. */

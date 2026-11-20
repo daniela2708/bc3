@@ -5,6 +5,7 @@ import { HierTable, type HierCol, type HierRow } from '../components/HierTable';
 import { InfoTip, Pending, Var } from '../components/ui';
 import { PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
+import { baselineText } from '../lib/baseline';
 import { effectiveTime } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
 import { count, moneyUnit, pct } from '../lib/format';
@@ -102,7 +103,7 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
   const tiles: Tile[] = [
     {
       label: 'Promo Buyer Count',
-      info: 'Club card households that bought the promoted item during the promotion.',
+      info: 'Club card households that bought the promoted item during the promotion. Household vs. card level per metric is pending; Promo Buyer Count uses households (#16).',
       value: count(all.buyers),
       sub: (
         <>
@@ -110,15 +111,15 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
           {vsUsual(all.buyersChange)}
         </>
       ),
-      pending: 12,
+      pending: 16,
     },
-    { label: 'Avg Basket Size $', info: 'Average total transaction dollars for transactions that include the promoted item.', value: moneyUnit(all.basket), sub: vsUsual(all.basketChange), pending: 12 },
-    { label: 'Promo Buyer Spend Change %', info: "Promo buyers' spend during the event vs. their usual spend.", value: <Var value={all.spendChange} kind="pct" />, pending: 12 },
-    { label: 'Units per Basket', info: 'Average units in transactions that include the promoted item.', value: all.upb === null ? '—' : all.upb.toFixed(1), sub: vsUsual(all.upbChange), pending: 12 },
+    { label: 'Avg Basket Size $', info: 'Average total transaction dollars for transactions that include the promoted item.', value: moneyUnit(all.basket), sub: vsUsual(all.basketChange), pending: 16 },
+    { label: 'Promo Buyer Spend Change %', info: "Promo buyers' spend during the event vs. their usual spend.", value: <Var value={all.spendChange} kind="pct" />, pending: 16 },
+    { label: 'Units per Basket', info: 'Average units in transactions that include the promoted item.', value: all.upb === null ? '—' : all.upb.toFixed(1), sub: vsUsual(all.upbChange), pending: 16 },
     { label: 'New-to-Category Buyers %', info: 'Share of promo buyers with no category purchase in the 52-week look-back.', value: pct(all.newToCat), pending: 11 },
-    { label: 'Category Trips', info: 'Trips by promo buyers that included any item in the category, vs. their usual.', value: count(all.catTrips), sub: vsUsual(all.catTripsChange), pending: 12 },
-    { label: 'Transaction Count', info: 'Total store transactions on promo days (store traffic indicator). Days shared by several events count once.', value: count(all.storeTxns), pending: 12 },
-    { label: 'Repeat Purchase Rate %', info: `Level 2 (not MVP). Promo buyers who bought the item again at regular price within ${REPEAT_WINDOW_DAYS} days after the promotion. — until enough days have passed.`, value: pct(all.repeatRate), pending: 12 },
+    { label: 'Category Trips', info: 'Trips by promo buyers that included any item in the category, vs. their usual.', value: count(all.catTrips), sub: vsUsual(all.catTripsChange), pending: 16 },
+    { label: 'Transaction Count', info: 'Total store transactions on promo days (store traffic indicator). Days shared by several events count once.', value: count(all.storeTxns), pending: 16 },
+    { label: 'Repeat Purchase Rate %', info: `Level 2 (not MVP). Promo buyers who bought the item again at regular price within ${REPEAT_WINDOW_DAYS} days after the promotion. — until enough days have passed.`, value: pct(all.repeatRate), pending: 16 },
   ];
 
   const cols: HierCol[] = [
@@ -149,7 +150,10 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
       </Heading>
       <p className="privacy-note" role="note">
         <ShieldCheck size={15} aria-hidden="true" />
-        Aggregates only: every figure is a total or average per promo event. No customer- or card-level detail is stored or shown. Club card data refreshed weekly; “usual” = the same buyers over the {state.baseline}-week baseline window.
+        Aggregates only: every figure is a total or average per promo event. No customer- or card-level detail is stored or shown. Club card data refreshed weekly; “usual” = the same buyers over the {baselineText(scope.ctx.baselineWeeks)} window.
+      </p>
+      <p className="privacy-note approval-note" role="note">
+        Aggregates only. Individual-level detail requires approval (#16).
       </p>
       <ViewControls cann={false} basis={false} />
       <KeyFigures caption={`${scope.range.name} · ${scope.events.length} events · club card households`} tiles={tiles} />
@@ -172,7 +176,7 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
         <header className="table-head">
           <div>
             <h3 className="chart-title">
-              All events <Pending q={12} />
+              All events <Pending q={16} />
             </h3>
             <p className="chart-sub">
               The same aggregates for every event, plus Transaction Count and Repeat Purchase Rate %.{' '}
@@ -195,8 +199,8 @@ function Heading({ children }: { children?: React.ReactNode }) {
       title="Promo Shopper Impact"
       question="Did the promotion grow baskets and the category, not just the promoted item?"
       story={STORY}
-      badge={<Pending q={12} />}
-      validate="Source pending: Symphony AI vs. Weis Club Card data (#12); Nov 17: no Symphony AI feed (Excel exports only), so the intent is to calculate from Club Card data. New-to-category logic from a third-party system (#11). The view will be trimmed once the 6–8 core metrics are agreed (#9). Rewards and loyalty campaigns are out of scope."
+      badge={<Pending q={16} />}
+      validate="Symphony AI cannot be a data source, only a reference for comparison (#12); shopper metrics are calculated from the Weis T-log and Club Card tables. Household vs. card level per metric (#16). New-to-category logic from a third-party system (#11). About 6 to 8 core metrics, which ones pending (#9). Rewards and loyalty campaigns are out of scope."
     >
       {children}
     </SectionHeading>

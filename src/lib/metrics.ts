@@ -24,13 +24,20 @@ import {
   yoyGrowth,
   type Growth,
 } from './kpis';
+import { baselineWeeksFor, type BaselineSetting } from './baseline';
+import { netGmFunding, promoCost } from './cost';
 
-/** Days after the promo ends that Post-Promo Dip % measures (4 weeks, agreed Nov 17). Level 2 KPI. */
+/** Days after the promo ends that Post-Promo Dip % measures (4-week post-promo window, per the workbook). Level 2 KPI. */
 export const POST_PROMO_WINDOW_DAYS = 28;
 
-/** Which items count as the "group" for cannibalization (question #3). */
-export type CannLevel = 'brand' | 'brandcat' | 'category';
+/**
+ * Which items count as the "group" for cannibalization (#3). The workbook KPI rows measure at subcategory (the
+ * default); brand, brand-category and category were also proposed. Level and source are pending.
+ */
+export type CannLevel = 'sub' | 'brand' | 'brandcat' | 'category';
+export const DEFAULT_CANN_LEVEL: CannLevel = 'sub';
 export const CANN_LEVELS: { id: CannLevel; label: string; tip: string }[] = [
+  { id: 'sub', label: 'Subcategory', tip: 'Every other item in the same subcategory (default, as in the workbook KPI rows).' },
   { id: 'brand', label: 'Brand', tip: 'Other items of the same brand, in any category.' },
   { id: 'brandcat', label: 'Brand-category', tip: 'Other items of the same brand in the same category.' },
   { id: 'category', label: 'Category', tip: 'Every other item in the same category.' },
@@ -63,11 +70,12 @@ export interface Agg {
   /** Events whose baseline window was cut short by the start of the data (FY2024). */
   partialBaseline: number;
   /**
-   * All vendor promo funding of the events, by type: an internal input of Net GM $ and Net Incremental GM $ (#7),
-   * not a KPI of its own. Each allowance is counted once (a CNS store shipment recap is the same allowance as the
-   * off-invoice one, not a second one).
+   * All vendor promo funding of the events, by type (generated; Vendor Promo Funding $ is not a KPI here, #2).
+   * Each allowance is counted once (a CNS store shipment recap is the same allowance as the DC off-invoice one).
    */
   fund: Record<FundingType, number>;
+  /** The part of the funding that Net GM $ and Net Incremental GM $ add (#7, by supply source; see cost.ts). */
+  fundNetGm: number;
   /** Change vs baseline of the cannibalization group; null on SKU rows (measured for the price group). */
   cGross: number | null;
   cNet: number | null;
@@ -102,6 +110,7 @@ export function emptyAgg(): Agg {
     bUnits: u0(),
     partialBaseline: 0,
     fund: { scan: 0, bill: 0, other: 0 },
+    fundNetGm: 0,
     cGross: 0,
     cNet: 0,
     cCost: 0,
@@ -136,6 +145,7 @@ export function addAgg(a: Agg, b: Agg): Agg {
     bUnits: uAdd(a.bUnits, b.bUnits),
     partialBaseline: a.partialBaseline + b.partialBaseline,
     fund: { scan: a.fund.scan + b.fund.scan, bill: a.fund.bill + b.fund.bill, other: a.fund.other + b.fund.other },
+    fundNetGm: a.fundNetGm + b.fundNetGm,
     cGross: addNull(a.cGross, b.cGross),
     cNet: addNull(a.cNet, b.cNet),
     cCost: addNull(a.cCost, b.cCost),
@@ -160,7 +170,8 @@ export function sumAggs(list: Agg[]): Agg {
 // ---------------------------------------------------------------- One event
 
 export interface EventCtx {
-  baselineWeeks: number;
+  /** Baseline window in weeks, or 'byType' for the proposed default of each event's promo type (#4). */
+  baselineWeeks: BaselineSetting;
   level: CannLevel;
   /** Items that pass the product filters (SKU, vendor / brand, pasted UPCs); null = every item. */
   itemMask: Uint8Array | null;
@@ -196,11 +207,22 @@ export function baselineWindow(e: Pick<PromoEvent, 'start'>, weeks: number): { f
   return { from, to, days: Math.max(0, to - from + 1), partial: wanted < 0 };
 }
 
+/** Weeks of the baseline window for an event under the current setting. */
+export function eventBaselineWeeks(e: Pick<PromoEvent, 'type'>, ctx: Pick<EventCtx, 'baselineWeeks'>): number {
+  return baselineWeeksFor(e.type, ctx.baselineWeeks);
+}
+
 /** Items of the cannibalization group: same unit of measure, not in the promoted price group. */
 export function cannGroup(e: Pick<PromoEvent, 'pg'>, level: CannLevel): number[] {
   const pg = PRICE_GROUPS[e.pg];
   const pool = level === 'brand' ? ITEMS.filter((i) => i.brand === pg.brand).map((i) => i.idx) : CAT_ITEMS[pg.cat];
-  return pool.filter((i) => ITEMS[i].pg !== pg.idx && ITEMS[i].uom === pg.uom && (level !== 'brandcat' || ITEMS[i].brand === pg.brand));
+  return pool.filter(
+    (i) =>
+      ITEMS[i].pg !== pg.idx &&
+      ITEMS[i].uom === pg.uom &&
+      (level !== 'brandcat' || ITEMS[i].brand === pg.brand) &&
+      (level !== 'sub' || ITEMS[i].sub === pg.sub),
+  );
 }
 
 /** Promo-window total minus its baseline, for a group of items. */
@@ -222,7 +244,7 @@ export function eventAgg(e: PromoEvent, ctx: EventCtx, onlyItem?: number): Agg {
   const end = Math.min(e.end, AS_OF_DAY);
   const days = end - e.start + 1;
   const p = sums(items, e.start, end);
-  const bw = baselineWindow(e, ctx.baselineWeeks);
+  const bw = baselineWindow(e, eventBaselineWeeks(e, ctx));
   const b = sums(items, bw.from, bw.to);
   const base = (v: number) => (baselineFromWindow(v, bw.days, days) ?? 0) * f;
   const fund: Record<FundingType, number> = { scan: 0, bill: 0, other: 0 };
@@ -233,7 +255,8 @@ export function eventAgg(e: PromoEvent, ctx: EventCtx, onlyItem?: number): Agg {
   a.promoDays = days;
   a.gross = p.gross * f;
   a.net = p.net * f;
-  a.cost = p.cost * f;
+  // Cost basis by supply source (#15): DC average cost minus scan-downs, DSD replacement cost.
+  a.cost = promoCost(pg.source, p.cost * f, fund.scan);
   a.invest = p.invest * f;
   a.units = uOf(pg.uom, p.units * f);
   a.bGross = base(b.gross);
@@ -242,6 +265,7 @@ export function eventAgg(e: PromoEvent, ctx: EventCtx, onlyItem?: number): Agg {
   a.bUnits = uOf(pg.uom, base(b.units));
   a.partialBaseline = bw.partial ? 1 : 0;
   a.fund = fund;
+  a.fundNetGm = netGmFunding(pg.source, fund);
   a.depthSum = e.depth;
 
   if (onlyItem === undefined) {
@@ -279,7 +303,7 @@ export function dailySeries(e: PromoEvent, ctx: EventCtx, from: number, to: numb
   const pg = PRICE_GROUPS[e.pg];
   const items = onlyItem !== undefined ? [onlyItem] : pg.items.filter((i) => !ctx.itemMask || ctx.itemMask[i]);
   const f = ctx.storeShare ? ctx.storeShare[pg.dept] : 1;
-  const bw = baselineWindow(e, ctx.baselineWeeks);
+  const bw = baselineWindow(e, eventBaselineWeeks(e, ctx));
   const b = sums(items, bw.from, bw.to);
   const per = (v: number) => (baselineFromWindow(v, bw.days, 1) ?? 0) * f;
   const out: { day: number; gross: number; net: number; units: number }[] = [];
@@ -314,7 +338,7 @@ export interface Metrics {
   gmPct: number | null;
   baseGm: number | null;
   incGm: number | null;
-  /** All vendor promo funding: internal input of Net GM $ and Net Incremental GM $ (#7), not shown as a KPI. */
+  /** Vendor funding added by Net GM $ and Net Incremental GM $ (#7, by supply source), not shown as a KPI. */
   funding: number;
   netGm: number | null;
   cannSales: number | null;
@@ -342,7 +366,7 @@ export function derive(a: Agg, basis: Basis): Metrics {
   const gm = grossMargin(sales, a.cost);
   const baseGm = grossMargin(baseSales, a.bCost);
   const incGm = incrementalGm(gm, baseGm);
-  const funding = a.fund.scan + a.fund.bill + a.fund.other;
+  const funding = a.fundNetGm;
   const cannGm = cSales === null || a.cCost === null ? null : cSales - a.cCost;
   const incSales = incremental(sales, baseSales);
   const netIncGm = netIncrementalGm(incGm, cannGm, funding);
@@ -373,7 +397,7 @@ export function derive(a: Agg, basis: Basis): Metrics {
     catIncGm: catSales === null || a.catCost === null ? null : catSales - a.catCost,
     netIncSales: netIncrementalSales(incSales, cSales),
     netIncGm,
-    avgRetail: byUom((k) => (a.units[k] > 0 && !(a.units.ea > 0 && a.units.lb > 0) ? avgPromoRetail(a.gross, a.units[k]) : null)),
+    avgRetail: byUom((k) => (a.units[k] > 0 && !(a.units.ea > 0 && a.units.lb > 0) ? avgPromoRetail(sales, a.units[k]) : null)),
     avgDepth: safeDiv(a.depthSum, a.n),
     ly: a.lyN > 0 ? a.ly : null,
     yoy: a.lyN > 0 ? yoyGrowth(a.lyTy, a.ly) : { abs: null, pct: null },

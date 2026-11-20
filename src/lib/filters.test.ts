@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AS_OF_DAY, adWeekOfDay, adWeekStart, dayFromYMD, LAST_COMPLETE_AD_WEEK, snapToThursday, weekday } from '../data/calendar';
+import { AD_WEEK, AD_WEEK_RULE, AS_OF_DAY, adWeekEnd, adWeekOfDay, adWeekStart, dayFromYMD, LAST_COMPLETE_AD_WEEK, snapToAdWeekStart, weekday } from '../data/calendar';
+import { baselineWeeksFor, effectiveBaseline, PROPOSED_BASELINE_BY_TYPE, viewBaselineDefault } from './baseline';
 import { EVENTS } from '../data/promos';
 import { ITEMS } from '../data/products';
 import { BASE_TIME, DEFAULT_STATE, fromQuery, resolveTime, TABS, toQuery, usesFilter, type FilterState } from './filters';
@@ -11,8 +12,8 @@ describe('ad weeks', () => {
   it('run Thursday to Wednesday', () => {
     const thu = dayFromYMD(2026, 11, 5);
     expect(weekday(thu)).toBe(4);
-    expect(snapToThursday(dayFromYMD(2026, 11, 11))).toBe(thu);
-    expect(snapToThursday(dayFromYMD(2026, 11, 12))).toBe(dayFromYMD(2026, 11, 12));
+    expect(snapToAdWeekStart(dayFromYMD(2026, 11, 11))).toBe(thu);
+    expect(snapToAdWeekStart(dayFromYMD(2026, 11, 12))).toBe(dayFromYMD(2026, 11, 12));
     expect(adWeekOfDay(thu)).toBe(adWeekOfDay(thu + 6));
     expect(adWeekOfDay(thu + 7)).toBe(adWeekOfDay(thu) + 1);
   });
@@ -55,8 +56,8 @@ describe('URL state', () => {
     const s = fromQuery('tab=<script>&dept=999&bw=5&lv=x&sb=x&ev=-4&sku=1%27OR1&vb=v:999&pt=ZZ&from=2026-02-30&tm=custom&cols=a:%3Cb%3E', EVENTS.length);
     expect(s.tab).toBe('hotbuy');
     expect(s.dept).toBe(-1);
-    expect(s.baseline).toBe(4);
-    expect(s.level).toBe('category');
+    expect(s.baseline).toBeNull();
+    expect(s.level).toBe('sub');
     expect(s.basis).toBe('net');
     expect(s.event).toBe(-1);
     expect(s.item).toBe(-1);
@@ -75,8 +76,54 @@ describe('URL state', () => {
     expect(toQuery(s)).not.toMatch(/(^|&)(fu|funding)=/);
     expect(usesFilter('history', 'funding' as never)).toBe(false);
   });
+  it('keeps the view default out of the URL and round-trips a chosen baseline and the Subcategory level', () => {
+    expect(toQuery(DEFAULT_STATE)).not.toMatch(/(^|&)(bw|lv)=/);
+    expect(fromQuery('tab=other', EVENTS.length).baseline).toBeNull();
+    expect(fromQuery('bw=8', EVENTS.length).baseline).toBe(8);
+    expect(fromQuery('bw=funding', EVENTS.length).baseline).toBeNull();
+    expect(fromQuery('lv=sub', EVENTS.length).level).toBe('sub');
+    expect(fromQuery('lv=category', EVENTS.length).level).toBe('category');
+    expect(fromQuery(toQuery(state({ level: 'category' })), EVENTS.length).level).toBe('category');
+  });
+  it('still rejects funding anywhere in the URL', () => {
+    for (const q of ['tab=funding', 'tab=Funding', 'tab=funding&ft=scan', 'lv=funding', 'sb=funding', 'cols=funding:fund.roi']) {
+      const s = fromQuery(q, EVENTS.length);
+      expect(s.tab).not.toBe('funding');
+      expect(toQuery(s)).not.toMatch(/(^|&)(tab|lv|sb)=funding/);
+      expect(toQuery(s)).not.toMatch(/(^|&)(ft|fu)=/);
+    }
+  });
   it('never puts a pasted UPC list in the URL', () => {
     expect(toQuery(state({ codes: [1, 2, 3] }))).not.toMatch(/codes|upc/);
+  });
+});
+
+describe('baseline default per view (#4)', () => {
+  it('Hot Buy Performance 4 weeks, Other Promo Performance 13, the other views by promo type', () => {
+    expect(viewBaselineDefault('hotbuy')).toBe(4);
+    expect(viewBaselineDefault('other')).toBe(13);
+    for (const tab of ['trend', 'history', 'shopper'] as const) expect(viewBaselineDefault(tab)).toBe('byType');
+    expect(PROPOSED_BASELINE_BY_TYPE).toEqual({ HB: 4, TPR: 13, BOGO: 13, PL: 13, OTH: 13 });
+  });
+  it('the scope uses the view default until the user picks a window, and the pick wins in every view', () => {
+    expect(getScope(state({ tab: 'hotbuy' })).ctx.baselineWeeks).toBe(4);
+    expect(getScope(state({ tab: 'other' })).ctx.baselineWeeks).toBe(13);
+    expect(getScope(state({ tab: 'trend' })).ctx.baselineWeeks).toBe('byType');
+    expect(getScope(state({ tab: 'shopper' })).ctx.baselineWeeks).toBe('byType');
+    for (const tab of TABS.map((t) => t.id)) expect(getScope(state({ tab, baseline: 52 })).ctx.baselineWeeks).toBe(52);
+    expect(effectiveBaseline('history', null)).toBe('byType');
+    expect(baselineWeeksFor('BOGO', 'byType')).toBe(13);
+    expect(baselineWeeksFor('HB', 'byType')).toBe(4);
+    expect(baselineWeeksFor('HB', 2)).toBe(2);
+  });
+});
+
+describe('ad week rule', () => {
+  it('lives in one place and defaults to Thursday to Wednesday', () => {
+    expect(AD_WEEK).toEqual({ START_WEEKDAY: 4, DAYS: 7 });
+    expect(AD_WEEK_RULE).toBe('Thursday to Wednesday');
+    expect(adWeekEnd(10) - adWeekStart(10)).toBe(AD_WEEK.DAYS - 1);
+    expect(weekday(adWeekStart(10))).toBe(AD_WEEK.START_WEEKDAY);
   });
 });
 

@@ -7,6 +7,13 @@ import { hash01, nameKey } from './prng';
 import { upcA } from '../lib/upc';
 
 export type Uom = 'ea' | 'lb';
+/** Supply source: shipped from a Weis distribution center (DC) or delivered to the store by the vendor (DSD). */
+export type SupplySource = 'DC' | 'DSD';
+/**
+ * Vendors that deliver direct to store in this simulated catalog (illustrative). Every other vendor ships through
+ * the DC. The supply source sets the cost basis (#15) and which vendor funding Net GM $ adds (#7).
+ */
+export const DSD_VENDORS: ReadonlySet<string> = new Set(['Frito-Lay', 'The Coca-Cola Company', 'PepsiCo Beverages', 'Turkey Hill Dairy']);
 /** How often the generator promotes a price group, and with which promo types. */
 export type PromoProfile = 'hot' | 'std' | 'low' | 'lock';
 
@@ -406,6 +413,7 @@ export interface PriceGroup {
   vendor: number;
   profile: PromoProfile;
   uom: Uom;
+  source: SupplySource;
   dept: number;
   cat: number;
   sub: number;
@@ -426,6 +434,7 @@ export interface Item {
   cost: number;
   weeklyUnits: number;
   season: [number, number] | null;
+  source: SupplySource;
   pg: number;
   brand: number;
   vendor: number;
@@ -475,6 +484,7 @@ for (const d of CATALOG) {
           vendor: indexOf(VENDORS, p.vendor),
           profile: p.profile,
           uom: p.uom ?? 'ea',
+          source: DSD_VENDORS.has(p.vendor) ? 'DSD' : 'DC',
           dept: dept.idx,
           cat: cat.idx,
           sub: sub.idx,
@@ -498,6 +508,7 @@ for (const d of CATALOG) {
             cost: Math.round(it.r * (1 - gm) * 100) / 100,
             weeklyUnits: it.wu,
             season: it.season ?? null,
+            source: pg.source,
             pg: pg.idx,
             brand: pg.brand,
             vendor: pg.vendor,

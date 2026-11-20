@@ -22,7 +22,7 @@ import {
   periodSpan,
   quarterSpan,
   snapToSunday,
-  snapToThursday,
+  snapToAdWeekStart,
   adWeekStart,
   weekEndDay,
   weekStartDay,
@@ -32,13 +32,13 @@ import {
 import { BRANDS, CATS, DEPTS, ITEMS, PRICE_GROUPS, SUBS, VENDORS } from '../data/products';
 import { AD_TYPES, DEPTH_BANDS, PROMO_TYPES, type AdType, type DepthBand, type PromoType } from '../data/promos';
 import { DISTRICTS, STORE_BY_ID, STORES } from '../data/stores';
-import { BASELINE_WEEKS, DEFAULT_BASELINE_WEEKS, type BaselineWeeks } from './kpis';
-import { DEFAULT_BASIS, type Basis, type CannLevel } from './metrics';
+import { BASELINE_WEEKS, type BaselineWeeks } from './kpis';
+import { CANN_LEVELS, DEFAULT_BASIS, DEFAULT_CANN_LEVEL, type Basis, type CannLevel } from './metrics';
 
 // ---------------------------------------------------------------- Views
 
 export type TabId = 'hotbuy' | 'other' | 'trend' | 'history' | 'shopper';
-/** The five views, in the order of the requirements. Promo Funding was removed (question #2, answered Nov 17). */
+/** The five views, in the order of the requirements. Promo Funding is not part of this dashboard (#2: vendor funding analytics live in the DNP tool). */
 export const TABS: { id: TabId; label: string }[] = [
   { id: 'hotbuy', label: 'Hot Buy Performance' },
   { id: 'other', label: 'Other Promo Performance' },
@@ -93,7 +93,7 @@ export interface TimeSel {
   fy: number;
   quarter: number;
   period: number;
-  /** Thursday that starts the chosen ad week. */
+  /** First day of the chosen ad week (a Thursday with the default rule). */
   adWeek: number;
   /** Sunday that starts the chosen fiscal week (Week Beginning). */
   weekStart: number;
@@ -214,7 +214,7 @@ export function resolveTime(t: TimeSel, tab?: TabId): ResolvedRange {
         [start, end] = spanDays(sp.startWeek, sp.endWeek);
         name = `P${p} FY${fy}`;
       } else if (grain === 'adweek') {
-        const a = adWeekOfDay(snapToThursday(clampDay(t.adWeek)));
+        const a = adWeekOfDay(snapToAdWeekStart(clampDay(t.adWeek)));
         start = adWeekStart(a);
         end = Math.min(adWeekEnd(a), AS_OF_DAY);
         name = `Ad week ${adWeekLabel(a)}`;
@@ -282,7 +282,8 @@ export interface FilterState {
   region: number;
   districts: string[];
   stores: number[];
-  baseline: BaselineWeeks;
+  /** Baseline window picked by the user; null = the view's proposed default (#4, see baseline.ts). */
+  baseline: BaselineWeeks | null;
   level: CannLevel;
   basis: Basis;
   rollup: Rollup;
@@ -308,8 +309,8 @@ export const DEFAULT_STATE: FilterState = {
   region: 0,
   districts: [],
   stores: [],
-  baseline: DEFAULT_BASELINE_WEEKS,
-  level: 'category',
+  baseline: null,
+  level: DEFAULT_CANN_LEVEL,
   basis: DEFAULT_BASIS,
   rollup: 'event',
   sel: -1,
@@ -383,7 +384,7 @@ const TO_DATES: ToDateOpt[] = ['day', 'wtd', 'ptd', 'qtd', 'ytd'];
 const GRAINS: FiscalGrain[] = ['year', 'quarter', 'period', 'adweek', 'week', 'holiday'];
 const HOLIDAY_IDS = HOLIDAYS.map((h) => h.id);
 const PROMO_IDS: PromoTypeFilter[] = ['all', ...PROMO_TYPES.map((t) => t.id)];
-const LEVELS: CannLevel[] = ['brand', 'brandcat', 'category'];
+const LEVELS: CannLevel[] = CANN_LEVELS.map((l) => l.id);
 const ROLLUPS: Rollup[] = ['event', 'sub', 'cat', 'dept'];
 
 function oneOf<T extends string | number>(v: string | null, allowed: readonly T[]): T | undefined {
@@ -436,8 +437,8 @@ export function toQuery(s: FilterState): string {
   if (s.region > 0) p.set('reg', String(s.region));
   if (s.districts.length) p.set('dist', s.districts.join(','));
   if (s.stores.length) p.set('st', s.stores.join(','));
-  if (s.baseline !== DEFAULT_BASELINE_WEEKS) p.set('bw', String(s.baseline));
-  if (s.level !== 'category') p.set('lv', s.level);
+  if (s.baseline !== null) p.set('bw', String(s.baseline));
+  if (s.level !== DEFAULT_CANN_LEVEL) p.set('lv', s.level);
   if (s.basis !== DEFAULT_BASIS) p.set('sb', s.basis);
   if (s.rollup !== 'event') p.set('ru', s.rollup);
   if (s.sel >= 0) p.set('sel', String(s.sel));
@@ -464,7 +465,7 @@ export function fromQuery(query: string, eventCount: number): FilterState {
     t.quarter = intIn(p.get('q'), 1, 4) ?? t.quarter;
     t.period = intIn(p.get('p'), 1, 12) ?? t.period;
     const aw = dayParam(p.get('aw'));
-    if (aw !== undefined) t.adWeek = snapToThursday(aw);
+    if (aw !== undefined) t.adWeek = snapToAdWeekStart(aw);
     const wk = dayParam(p.get('wk'));
     if (wk !== undefined) t.weekStart = snapToSunday(wk);
     t.holiday = oneOf(p.get('hol'), HOLIDAY_IDS) ?? t.holiday;
@@ -502,8 +503,8 @@ export function fromQuery(query: string, eventCount: number): FilterState {
     .filter((id) => STORE_BY_ID.has(id));
   s.stores = [...new Set(stores)].slice(0, STORES.length);
   const bw = intIn(p.get('bw'), 1, 52);
-  s.baseline = (BASELINE_WEEKS as readonly number[]).includes(bw ?? -1) ? (bw as BaselineWeeks) : DEFAULT_BASELINE_WEEKS;
-  s.level = oneOf(p.get('lv'), LEVELS) ?? 'category';
+  s.baseline = (BASELINE_WEEKS as readonly number[]).includes(bw ?? -1) ? (bw as BaselineWeeks) : null;
+  s.level = oneOf(p.get('lv'), LEVELS) ?? DEFAULT_CANN_LEVEL;
   s.basis = p.get('sb') === 'gross' ? 'gross' : DEFAULT_BASIS;
   s.rollup = oneOf(p.get('ru'), ROLLUPS) ?? 'event';
   s.sel = intIn(p.get('sel'), 0, eventCount - 1) ?? -1;

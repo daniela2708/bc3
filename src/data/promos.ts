@@ -1,7 +1,8 @@
 /**
  * Promo event master: one row per promotion run of a price group. Built once, deterministically, from the seed.
  * Durations (approved): Hot Buy = one ad week; TPR 1–8 ad weeks; Price Lock 4–13 ad weeks; BOGO and Other 1–2.
- * Every event starts on a Thursday and ends on a Wednesday, and ends on or before the last complete ad week.
+ * Every event covers whole ad weeks (Thursday to Wednesday with the default AD_WEEK rule in calendar.ts) and ends on
+ * or before the last complete ad week.
  */
 import { adWeekEnd, adWeekLabel, adWeekOfDay, adWeekStart, dayFromYMD, fiscalOfDay, LAST_COMPLETE_AD_WEEK, monthOfDay } from './calendar';
 import { hash01, mulberry32, nameKey, SEED } from './prng';
@@ -53,7 +54,7 @@ export interface PromoEvent {
   id: string;
   pg: number;
   type: PromoType;
-  /** First day (Thursday) and last day (Wednesday), inclusive. */
+  /** First and last day of the event's ad weeks (Thursday and Wednesday by default), inclusive. */
   start: number;
   end: number;
   adWeeks: number;

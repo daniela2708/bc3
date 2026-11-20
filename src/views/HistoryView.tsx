@@ -68,7 +68,7 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
   const tiles: Tile[] = [
     { label: 'Promo Event Count', info: 'Times the item or price group was promoted in the period.', value: count(events.length) },
     { label: 'Promo Depth %', info: 'Average (Regular retail − Promo retail) ÷ Regular retail across the events.', value: pct(all.avgDepth, 0), sub: 'average across events' },
-    { label: 'Average Retail Price per Unit', info: 'Promo Gross Sales $ ÷ Promo Units (per lb for random-weight items).', value: moneyUnit(uomFirst(all.avgRetail)), sub: all.avgRetail.lb !== null ? 'per lb' : 'per unit' },
+    { label: 'Avg Promo Retail $', info: 'Promo Sales $ (selected sales basis) ÷ Promo Units; per lb for random-weight items.', value: moneyUnit(uomFirst(all.avgRetail)), sub: all.avgRetail.lb !== null ? 'per lb' : 'per unit' },
     { label: 'Sales Lift %', info: 'Incremental Sales $ ÷ Baseline Sales $, all events.', value: pctChange(all.salesLift), pending: 4 },
     { label: 'Unit Lift %', info: 'Incremental Units ÷ Baseline Units, all events.', value: uomPct(all.unitLift, true), pending: 4 },
     { label: 'Incremental GM $', info: 'Promo GM $ − Baseline GM $, before cannibalization and funding.', value: signedMoney(all.incGm) },
@@ -164,7 +164,7 @@ function Heading({ children }: { children?: React.ReactNode }) {
       title="Promo History"
       question="When, how deep and with which ad type should this item be promoted?"
       story={STORY}
-      validate="Ad Type / Vehicle and Promo Depth Band values follow the workbook; the attributes and the objective of this view are pending (#10). Baseline window (#4)."
+      validate="Ad Type / Vehicle and Promo Depth Band values follow the workbook; the objective of this view is pending (#10). Baseline (#4): each event uses the proposed default of its promo type. Margin scope and funding (#7), cost (#15)."
     >
       {children}
     </SectionHeading>

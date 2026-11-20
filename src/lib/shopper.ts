@@ -9,7 +9,7 @@ import { DEPTS, PRICE_GROUPS } from '../data/products';
 import { EVENTS, type PromoEvent } from '../data/promos';
 import { STORES } from '../data/stores';
 import { newToCategoryPct, repeatRate, safeDiv, spendChange } from './kpis';
-import { eventAgg, type EventCtx } from './metrics';
+import { eventAgg, eventBaselineWeeks, type EventCtx } from './metrics';
 
 const CLUB_SHARE = 0.78;
 /** Days after the promo needed to measure repeat purchases at regular price. */
@@ -78,7 +78,7 @@ export function eventShopper(e: PromoEvent, ctx: EventCtx): ShopperAgg {
   const tripsPerBuyer = 1.1 + 0.15 * h(3);
   const buyers = (txns * CLUB_SHARE) / tripsPerBuyer;
   const usualBuyers = (usualTxns * CLUB_SHARE) / (1.05 + 0.1 * h(4));
-  const usualBasket = DEPTS[pg.dept].basket * (0.92 + 0.16 * h(5)) * (1 + 0.01 * hashSigned(k, ctx.baselineWeeks, 6));
+  const usualBasket = DEPTS[pg.dept].basket * (0.92 + 0.16 * h(5)) * (1 + 0.01 * hashSigned(k, eventBaselineWeeks(e, ctx), 6));
   const liftCap = Math.min(2, e.lift);
   const basket = usualBasket * (1 + 0.02 + 0.045 * liftCap + 0.03 * hashSigned(k, 7) - 0.05 * e.dip);
   const usualUpb = 13 + 8 * h(8);

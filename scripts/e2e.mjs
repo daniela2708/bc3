@@ -182,14 +182,20 @@ async function main() {
   // 5. Labels added after review: baseline note, SKU-row dash tooltip, buyer-count sum label, funding filter note.
   await send('Page.navigate', { url: `${base}/?tab=hotbuy` });
   await until(`!!document.querySelector('.baseline-note')`, 'baseline note');
-  check('Baseline note with Definition pending #4', await evaluate(`(() => { const n = document.querySelector('.baseline-note'); return n.textContent.includes('Baseline includes prior promo weeks in the window') && n.textContent.includes('Definition pending #4'); })()`));
+  check('Baseline note with Definition pending #4', await evaluate(`(() => { const n = document.querySelector('.baseline-note'); return n.textContent.includes('Proposed default, pending confirmation (#4)') && n.textContent.includes('Baseline includes prior promo weeks in the window') && n.textContent.includes('Definition pending #4'); })()`));
+  const pressed = (group) => `[...document.querySelectorAll('[role=group][aria-label="${group}"] button[aria-pressed=true]')].map((b) => b.textContent).join()`;
+  check('Hot Buy Performance: 4-week baseline and Subcategory cannibalization by default', (await evaluate(pressed('Baseline window in weeks'))) === '4 wk' && (await evaluate(pressed('Cannibalization level'))) === 'Subcategory');
   await evaluate(`document.querySelector('table.hier tbody tr:not(.total-row) button[aria-expanded]').click(), 1`);
   await until(`!!document.querySelector('tr.sku-row .pg-only')`, 'SKU row dash');
   check('SKU-row cannibalization dash has the tooltip', await evaluate(`[...document.querySelectorAll('tr.sku-row .pg-only')].every((e) => e.title === 'Measured at price group level')`));
   await send('Page.navigate', { url: `${base}/?tab=shopper` });
   await until(`!!document.querySelector('.sum-label')`, 'buyer count sum label');
+  check('Promo Shopper Impact: aggregates-only approval line (#16) and "By promo type" baseline', await evaluate(`document.body.textContent.includes('Aggregates only. Individual-level detail requires approval (#16).')`) && (await evaluate(pressed('Baseline window in weeks'))) === 'By promo type');
   check('Promo Buyer Count total is labelled as a sum across events', await evaluate(`document.querySelector('.sum-label').textContent.includes('Sum across events (not unique households)') && !!document.querySelector('.sum-label .tip')`));
-  // 6. Nov 17 review: Promo Funding removed, Promo Run Trend is Must Have with a level-2 section.
+  await send('Page.navigate', { url: `${base}/?tab=other` });
+  await until(`!!document.querySelector('.baseline-note')`, 'Other Promo baseline control');
+  check('Other Promo Performance: 13-week baseline by default', (await evaluate(pressed('Baseline window in weeks'))) === '13 wk');
+  // 6. Per the requirements: no Promo Funding view (#2); Promo Run Trend is Must Have with a level-2 Post-Promo Trend (#8).
   await send('Page.navigate', { url: `${base}/?tab=funding&fu=bill` });
   await until(`!!document.querySelector('#section-title')`, 'fallback view for tab=funding');
   check(
@@ -199,8 +205,8 @@ async function main() {
   await send('Page.navigate', { url: `${base}/?tab=trend` });
   await until(`!!document.querySelector('.secondary-title')`, 'Run Trend secondary section');
   check(
-    'Promo Run Trend is Must Have; the before / during / after section is Level 2',
-    await evaluate(`document.querySelector('.eyebrow').textContent.includes('Must Have') && document.querySelector('.eyebrow').textContent.includes('of 5') && document.querySelector('.secondary-title').textContent.includes('Level 2 · not MVP') && !document.body.textContent.includes('View content pending')`),
+    'Promo Run Trend is Must Have; the Post-Promo Trend section is Level 2',
+    await evaluate(`document.querySelector('.eyebrow').textContent.includes('Must Have') && document.querySelector('.eyebrow').textContent.includes('of 5') && document.querySelector('.secondary-title').textContent.trim() === 'Post-Promo Trend Level 2 · not MVP' && !document.body.textContent.includes('View content pending')`),
   );
 
   check('No console errors or exceptions', errors.length === 0, errors.slice(0, 3).join(' | '));

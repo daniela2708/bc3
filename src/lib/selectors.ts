@@ -8,6 +8,7 @@ import { STORES } from '../data/stores';
 import { STORE_SHARE } from '../data/generate';
 import { effectiveTime, promoTypesFor, resolveTime, usesFilter, type FilterState, type ResolvedRange } from './filters';
 import type { EventCtx } from './metrics';
+import { effectiveBaseline } from './baseline';
 
 export interface Scope {
   range: ResolvedRange;
@@ -88,7 +89,7 @@ export function getScope(s: FilterState): Scope {
   return {
     range,
     events,
-    ctx: { baselineWeeks: s.baseline, level: s.level, itemMask: mask, storeShare: storeShareOf(s) },
+    ctx: { baselineWeeks: effectiveBaseline(s.tab, s.baseline), level: s.level, itemMask: mask, storeShare: storeShareOf(s) },
     itemFiltered: narrows,
     types,
   };

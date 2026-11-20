@@ -31,10 +31,9 @@ export function sumStrict(...parts: Num[]): number | null {
 
 // ---------------------------------------------------------------- Baseline
 
-/** Baseline windows offered by the control, in weeks (default 4, adjustable; question #4). */
+/** Baseline windows offered by the control, in weeks (proposed default per view / promo type in baseline.ts; #4). */
 export const BASELINE_WEEKS = [2, 4, 8, 13, 52] as const;
 export type BaselineWeeks = (typeof BASELINE_WEEKS)[number];
-export const DEFAULT_BASELINE_WEEKS: BaselineWeeks = 4;
 
 /**
  * Baseline for the promo days: the daily average of the baseline window × the number of promo days.
@@ -57,7 +56,7 @@ export function lift(promo: Num, baseline: Num): number | null {
   return safeDiv(incremental(promo, baseline), baseline);
 }
 
-/** Avg Promo Retail $ (Average Retail Price per Unit) = Promo Sales $ ÷ Promo Units. */
+/** Avg Promo Retail $ = Promo Sales $ ÷ Promo Units. */
 export function avgPromoRetail(promoSales: Num, promoUnits: Num): number | null {
   return safeDiv(promoSales, promoUnits);
 }
@@ -85,7 +84,7 @@ export function incrementalGm(promoGm: Num, baselineGm: Num): number | null {
   return diff(promoGm, baselineGm);
 }
 
-/** Net Gross Margin $ = Promo Gross Margin $ + Vendor Promo Funding $ (all funding types; question #7). */
+/** Net Gross Margin $ = Promo Gross Margin $ + Vendor Promo Funding $ (the funding #7 allows; see cost.ts). */
 export function netGrossMargin(promoGm: Num, vendorFunding: Num): number | null {
   return sumStrict(promoGm, vendorFunding);
 }

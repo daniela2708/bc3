@@ -88,13 +88,23 @@ describe('planted demo stories', () => {
     expect(m.salesLift!).toBeLessThan(0);
     expect(m.incGm!).toBeLessThan(0);
   });
-  it('Tide Hot Buy: fully vendor funded, so a negative Incremental GM becomes a positive Net Incremental GM', () => {
+  it('Tide Hot Buy: fully funded by scan-downs on a DC item, so the funding is in the cost (#15) and not added again (#7)', () => {
     const e = runsOf('Tide Liquid Detergent 92 oz', 'HB').find((x) => x.planted)!;
     const a = eventAgg(e, ctx);
     const m = derive(a, 'net');
-    expect(m.funding).toBeCloseTo(a.invest, 6);
-    expect(m.incGm!).toBeLessThan(0);
+    expect(PRICE_GROUPS[e.pg].source).toBe('DC');
+    expect(a.fund.scan).toBeCloseTo(a.invest, 6);
+    expect(m.funding).toBe(0);
+    expect(m.netGm).toBe(m.gm);
+    expect(m.incGm!).toBeGreaterThan(0);
     expect(m.netIncGm!).toBeGreaterThan(0);
+  });
+  it('Coca-Cola 2 L is delivered direct to store (DSD), so its scan-downs are added in Net GM $', () => {
+    const e = runsOf('Coca-Cola 2 L', 'HB').find((x) => x.planted)!;
+    const a = eventAgg(e, ctx);
+    const m = derive(a, 'net');
+    expect(PRICE_GROUPS[e.pg].source).toBe('DSD');
+    expect(m.funding).toBeCloseTo(a.fund.scan + a.fund.bill + a.fund.other, 6);
     expect(m.netGm! - m.gm!).toBeCloseTo(m.funding, 6);
   });
   it('Bounty Hot Buy: pantry loading in the 4 weeks after the promo', () => {
