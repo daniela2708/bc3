@@ -2,6 +2,7 @@ import { ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
 import { HierTable, type HierCol, type HierRow } from '../components/HierTable';
+import { Term } from '../components/Term';
 import { InfoTip, Pending, Var } from '../components/ui';
 import { PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
@@ -11,7 +12,8 @@ import { useFilters } from '../lib/filterStore';
 import { count, moneyUnit, pct } from '../lib/format';
 import { getScope } from '../lib/selectors';
 import { deriveShopper, eventShopper, REPEAT_WINDOW_DAYS, shopperOf, type ShopperMetrics } from '../lib/shopper';
-import { EmptyState, eventDates, ViewControls, type ViewProps } from './common';
+import { VIEW_INFO } from '../lib/viewInfo';
+import { EmptyState, eventDates, SettingTags, ViewControls, type ViewProps } from './common';
 
 const PANEL_LIMIT = 12;
 export const SUM_LABEL = 'Sum across events (not unique households)';
@@ -145,8 +147,8 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
     <>
       <Heading />
 
-      <ViewControls cann={false} basis={false} />
-      <KeyFigures caption={`${scope.range.name} · ${scope.events.length} events · club card households`} tiles={tiles} />
+      <ViewControls />
+      <KeyFigures tags={<SettingTags block="tiles" />} caption={`${scope.range.name} · ${scope.events.length} events · club card households`} tiles={tiles} />
 
       <ViewSummary>
       {scope.events.length} promotions starting {scope.range.label}: <b>{count(all.buyers)}</b> promo buyers{scope.events.length > 1 ? ' (sum across events, not unique households)' : ''} spent <b>{<Var value={all.spendChange} kind="pct" />}</b> vs. their usual, with <b>{pct(all.newToCat)}</b> new to the category.
@@ -160,7 +162,9 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
       </p>
 
       <section aria-label="Panel per event">
-        <h3 className="secondary-title">One panel per event</h3>
+        <h3 className="secondary-title">
+          One panel per <Term id="event">event</Term> <SettingTags block="panels" />
+        </h3>
         <div className="shopper-grid">
           {panels.map(({ e, m }) => (
             <Panel key={e} e={e} m={m} onOpen={() => open(e)} />
@@ -179,6 +183,9 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
             <h3 className="chart-title">
               All events <Pending q={16} />
             </h3>
+            <p className="block-tags">
+              <SettingTags block="table" />
+            </p>
             <p className="chart-sub">
               The same aggregates for every event, plus Transaction Count and Repeat Purchase Rate %.{' '}
               <button type="button" className="btn-link" onClick={() => openDefinitions('buyers')}>
@@ -194,5 +201,5 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
 }
 
 function Heading() {
-  return <SectionHeading title="Promo Shopper Impact" badge={<Pending q={16} />} />;
+  return <SectionHeading title="Promo Shopper Impact" badge={<Pending q={16} />} objective={VIEW_INFO.shopper.objective} />;
 }

@@ -20,16 +20,17 @@ Current order:
 
 - Hot Buy Performance: tiles → Daily sales vs. baseline and Category / subcategory bridge → Hot Buy events by price group (hierarchical table).
 - Other Promo Performance: tiles → Daily sales vs. baseline and Category bridge → Promotions by price group (hierarchical table) → Runs of the same promo.
+- Promo Funding (notice tab): title and chip → notice → list of the workbook KPIs for the view.
 - Post-Promo Trend (Level 2 tab): tiles → Daily units and Daily sales vs. baseline for the selected promo → Post-promo summary by category (events underneath).
 - Promo History: tiles → Results by fiscal period or week → charts by Promo Depth Band and by Ad Type / Vehicle → Every past promotion.
 - Promo Shopper Impact: tiles → One panel per event → All events (table).
 - Promo Run Trend: tiles → Lift across runs and Net Incremental GM $ per run → Each run side by side.
 
-The tabs are the views of the requirements workbook, in its order, without Promo Funding (#2). A whole view that is level 2 shows the `Level2` chip next to its title.
+The tabs are the views of the requirements workbook, in its order. Promo Funding is a notice tab (#2): title with the "Not in this dashboard (#2)" chip, a notice and the list of its workbook KPIs; no numbers, every filter greyed out. A whole view that is level 2 shows the `Level2` chip next to its title.
 
 ### Rule 2: no business-context block on top
 
-A view starts with its title and goes straight to the key figures. Do not add an eyebrow (priority, "View N of 6"), the user story, the view question or "to validate" text above the content. That information lives in `src/lib/viewInfo.ts` and is shown in the **KPI definitions** dialog (`DefinitionsDrawer`), one entry per view. `SectionHeading` takes only `title` and an optional `badge` chip.
+A view starts with its title and goes straight to the key figures. Do not add an eyebrow (priority, "View N of 7"), the user story, the view question or "to validate" text above the content. That information lives in `src/lib/viewInfo.ts` and is shown in the **KPI definitions** dialog (`DefinitionsDrawer`), one entry per view. `SectionHeading` takes only `title` and an optional `badge` chip.
 
 The **Definition pending #N** (`Pending`) and **Level 2 · not MVP** (`Level2`) chips stay next to each KPI, chart or table they qualify.
 
@@ -38,6 +39,28 @@ The **Definition pending #N** (`Pending`) and **Level 2 · not MVP** (`Level2`) 
 - Same spacing and components in every view: `KeyFigures` tiles, `ChartGrid` / `ChartCard` charts, `HierTable` tables.
 - Every chart keeps its table view (`ChartCard` `table` prop); every table keeps its column chooser and Excel export.
 - Layout changes never change calculations, filters or data.
+
+### Rule 4: the view objective under the title
+
+One line under each title, in the secondary text colour, with what the view answers: `objective` in `src/lib/viewInfo.ts`, passed to `SectionHeading`. Not the user story (that stays in the KPI definitions dialog).
+
+### Rule 5: each control lives next to what it changes
+
+- A control that changes one block goes in that block's header (`BlockSettings`; `RowsControl` for table rows).
+- A control that changes several blocks goes in the compact "Calculation settings" bar (`ViewControls`) under the objective.
+- A control that changes nothing in a view is not shown there.
+- Every control has an (i) starting with "Affects: …". Cannibalization level uses its "How it works" popover, with its "Definition pending #3" chip next to it.
+- Declare what each control changes in `AFFECTS` (`src/lib/settings.ts`), reading the data each block actually uses. The bar, the tags and the README table come from it.
+
+### Rule 6: active-value tag on every affected block
+
+- Every key-figure group, chart or table that a Calculation settings control changes shows `<SettingTags block="…" />` in its header (`KeyFigures` / `ChartCard` take a `tags` prop; table headers use a `block-tags` line).
+- A value different from the view default is highlighted and says what changed ("Baseline 13 wk (default: 4 wk)").
+- Blocks no setting changes show no tag. Hover or focus shows the "Affects: …" text. Theme variables only.
+
+### Rule 7: glossary
+
+Key terms use <Term> with a plain-language explanation, once per view: `<Term id="…">` from `src/components/Term.tsx`, texts only in `src/lib/glossary.ts` (also listed under "Glossary" in the KPI definitions dialog). Underline the first appearance in each view, never every appearance. `Pending term` and `Level2 term` mark the one chip per view that carries the explanation.
 
 ## Checks before finishing a change
 

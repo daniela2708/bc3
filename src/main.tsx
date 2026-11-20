@@ -8,11 +8,13 @@ import '@fontsource/space-mono/400.css';
 import '@fontsource/space-mono/700.css';
 import App from './App';
 import { PasswordGate } from './components/PasswordGate';
+import { handleVitePreloadError } from './lib/lazyWithReload';
 import './styles/app.css';
 import './styles/access.css';
 import './styles/uc3.css';
 
 window.addEventListener('unhandledrejection', (e) => console.error('Unhandled error', e.reason));
+window.addEventListener('vite:preloadError', handleVitePreloadError);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

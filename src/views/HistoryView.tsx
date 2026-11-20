@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
 import { ChartCard, ChartGrid, HBars, hbarHeight, SignedColumns } from '../components/Charts';
 import { HierTable } from '../components/HierTable';
+import { Term } from '../components/Term';
 import { Pending, Segmented } from '../components/ui';
 import { fiscalOfDay } from '../data/calendar';
 import { ITEMS, pgByName, PRICE_GROUPS } from '../data/products';
@@ -10,7 +11,8 @@ import { useFilters } from '../lib/filterStore';
 import { count, moneyCompact, moneyUnit, pct, pctChange, signedMoney, signedMoneyTile } from '../lib/format';
 import { derive, sumAggs, type Agg } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
-import { columnsOf, EmptyState, performanceRows, uomFirst, uomTile, ViewControls, type ViewProps } from './common';
+import { VIEW_INFO } from '../lib/viewInfo';
+import { columnsOf, EmptyState, performanceRows, SettingTags, uomFirst, uomTile, ViewControls, type ViewProps } from './common';
 
 const DEFAULT_PG = pgByName('Coca-Cola 12 pk 12 oz Cans').idx;
 const COLS = ['dates', 'type', 'depth', 'ad', 'avgRetail', 'gross', 'salesLift', 'unitLift', 'incGm', 'netIncGm'];
@@ -59,13 +61,13 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
     return (
       <>
         <Heading />
-        <ViewControls cann />
+        <ViewControls />
         <EmptyState>No past promotions for {name} with the current filters. Pick a SKU Number or price group, or widen the period.</EmptyState>
       </>
     );
 
   const tiles: Tile[] = [
-    { label: 'Promo Event Count', info: 'Times the item or price group was promoted in the period.', value: count(events.length) },
+    { label: 'Promo Event Count', labelNode: <>Promo <Term id="event">Event</Term> Count</>, info: 'Times the item or price group was promoted in the period.', value: count(events.length) },
     { label: 'Promo Depth %', info: 'Average (Regular retail − Promo retail) ÷ Regular retail across the events.', value: pct(all.avgDepth, 0), sub: 'average across events' },
     { label: 'Avg Promo Retail $', info: 'Promo Sales $ (selected sales basis) ÷ Promo Units; per lb for random-weight items.', value: moneyUnit(uomFirst(all.avgRetail)), sub: all.avgRetail.lb !== null ? 'per lb' : 'per unit' },
     { label: 'Sales Lift %', info: 'Incremental Sales $ ÷ Baseline Sales $, all events.', value: pctChange(all.salesLift), pending: 4 },
@@ -82,8 +84,8 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
     <>
       <Heading />
 
-      <ViewControls cann />
-      <KeyFigures caption={`${name} · ${scope.range.name}`} tiles={tiles} />
+      <ViewControls />
+      <KeyFigures tags={<SettingTags block="tiles" />} caption={`${name} · ${scope.range.name}`} tiles={tiles} />
 
       <ViewSummary>
       {name}: <b>{events.length}</b> promotions in {scope.range.name.toLowerCase()}, average depth <b>{pct(all.avgDepth, 0)}</b>, Sales Lift <b>{pctChange(all.salesLift)}</b>. {best && <>The <b>{best.label}</b> depth band returned the most Net Incremental GM ({signedMoney(best.m.netIncGm)}).</>}
@@ -93,6 +95,7 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
       <ChartGrid cols={1}>
         <ChartCard
           title={`Results by ${grain === 'period' ? 'fiscal period' : 'fiscal week'}`}
+          tags={<SettingTags block="periodChart" />}
           subtitle={
             <span className="chart-sub-tools">
               Net Incremental GM $ of the promotions that started in each {grain}; hover for lift and event count.
@@ -128,16 +131,16 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
       </ChartGrid>
 
       <ChartGrid cols={2}>
-        <ChartCard title="Sales Lift % by Promo Depth Band" subtitle={<>Number of events in brackets <Pending q={10} /></>} table={tbl(byDepth, 'Depth band')} height={hbarHeight(byDepth.length)}>
+        <ChartCard tags={<SettingTags block="depthCharts" />} title="Sales Lift % by Promo Depth Band" subtitle={<>Number of events in brackets <Pending q={10} /></>} table={tbl(byDepth, 'Depth band')} height={hbarHeight(byDepth.length)}>
           <HBars data={lift(byDepth)} format={(v) => pctChange(v)} valueLabel="Sales Lift %" labelWidth={130} />
         </ChartCard>
-        <ChartCard title="Net Incremental GM $ by Promo Depth Band" subtitle="Margin after cannibalization and vendor funding" table={tbl(byDepth, 'Depth band')} height={hbarHeight(byDepth.length)}>
+        <ChartCard tags={<SettingTags block="depthCharts" />} title="Net Incremental GM $ by Promo Depth Band" subtitle="Margin after cannibalization and vendor funding" table={tbl(byDepth, 'Depth band')} height={hbarHeight(byDepth.length)}>
           <HBars data={gm(byDepth)} format={moneyCompact} valueLabel="Net Incremental GM $" diverging labelWidth={130} />
         </ChartCard>
-        <ChartCard title="Sales Lift % by Ad Type / Vehicle" subtitle={<>Number of events in brackets <Pending q={10} /></>} table={tbl(byAd, 'Ad type')} height={hbarHeight(byAd.length)}>
+        <ChartCard tags={<SettingTags block="adCharts" />} title="Sales Lift % by Ad Type / Vehicle" subtitle={<>Number of events in brackets <Pending q={10} /></>} table={tbl(byAd, 'Ad type')} height={hbarHeight(byAd.length)}>
           <HBars data={lift(byAd)} format={(v) => pctChange(v)} valueLabel="Sales Lift %" labelWidth={130} />
         </ChartCard>
-        <ChartCard title="Net Incremental GM $ by Ad Type / Vehicle" subtitle="Margin after cannibalization and vendor funding" table={tbl(byAd, 'Ad type')} height={hbarHeight(byAd.length)}>
+        <ChartCard tags={<SettingTags block="adCharts" />} title="Net Incremental GM $ by Ad Type / Vehicle" subtitle="Margin after cannibalization and vendor funding" table={tbl(byAd, 'Ad type')} height={hbarHeight(byAd.length)}>
           <HBars data={gm(byAd)} format={moneyCompact} valueLabel="Net Incremental GM $" diverging labelWidth={130} />
         </ChartCard>
       </ChartGrid>
@@ -146,7 +149,10 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
         <header className="table-head">
           <div>
             <h3 className="chart-title">Every past promotion</h3>
-            <p className="chart-sub">One row per event with dates, Promo Type, Promo Depth %, Ad Type / Vehicle and results. Expand a row for its SKU Numbers.</p>
+            <p className="block-tags">
+              <SettingTags block="table" />
+            </p>
+            <p className="chart-sub">One row per event of the <Term id="priceGroup">price group</Term>, with dates, Promo Type, Promo Depth %, Ad Type / Vehicle and results. Expand a row for its SKU Numbers.</p>
           </div>
         </header>
         <HierTable hierarchy="Price group · event" columns={cols} rows={table.rows} total={table.total} defaultSort={{ key: 'dates', dir: 'desc' }} tableId="hist" exportTitle="Promo History" maxHeight={480} />
@@ -162,5 +168,5 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
 }
 
 function Heading() {
-  return <SectionHeading title="Promo History" />;
+  return <SectionHeading title="Promo History" objective={VIEW_INFO.history.objective} />;
 }

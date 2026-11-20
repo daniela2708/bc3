@@ -2,16 +2,18 @@
 import type { ReactNode } from 'react';
 import type { Tile, TileValue } from '../components/Blocks';
 import type { HierCol, HierRow } from '../components/HierTable';
-import { Field, Impact, InfoTip, Pending, Segmented } from '../components/ui';
+import { Term } from '../components/Term';
+import { Field, HowItWorks, Impact, InfoTip, Pending, Segmented } from '../components/ui';
 import { formatDay, shortDay } from '../data/calendar';
 import { CATS, DEPTS, ITEMS, itemCode, PRICE_GROUPS, SUBS } from '../data/products';
 import { AD_LABEL, EVENTS, PROMO_LABEL, type PromoEvent } from '../data/promos';
 import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
-import type { FilterState, Rollup } from '../lib/filters';
+import type { Rollup } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
 import { count, DASH, money, moneyCompact, moneyTile, numberCompact, pct, pctChange, volume, volumeCompact } from '../lib/format';
 import { BASELINE_PENDING_TEXT, BASELINE_WEEKS, PROPOSED_BASELINE_BY_TYPE, viewBaselineDefault, type BaselineWeeks } from '../lib/baseline';
 import { safeDiv } from '../lib/kpis';
+import { affectsText, barSettings, blockSettings, SETTING_LABEL, tagsFor, type BlockId, type SettingKey } from '../lib/settings';
 import { CANN_LEVELS, derive, eventAgg, sumAggs, type Agg, type Basis, type ByUom, type CannLevel, type EventCtx, type Metrics, type U } from '../lib/metrics';
 
 export interface ViewProps {
@@ -58,8 +60,8 @@ export const uomFirst = (v: ByUom) => v.ea ?? v.lb;
  * UC1 sales table, #5) and the other basis the secondary one.
  */
 export function salesPair(gross: number, net: number, basis: Basis): [TileValue, TileValue] {
-  const n: TileValue = { value: moneyTile(net), tag: 'Net Customer', spoken: 'Net Customer Sales' };
-  const g: TileValue = { value: moneyTile(gross), tag: 'Gross', spoken: 'Gross Sales' };
+  const n: TileValue = { value: moneyTile(net), tag: 'Net Customer', spoken: 'Net Customer Sales', term: 'netCustomerSales' };
+  const g: TileValue = { value: moneyTile(gross), tag: 'Gross', spoken: 'Gross Sales', term: 'grossSales' };
   return basis === 'net' ? [n, g] : [g, n];
 }
 
@@ -70,7 +72,7 @@ export function unitsTile(u: U): Pick<Tile, 'value' | 'pair'> {
   if (u.ea > 0 && u.lb > 0)
     return {
       pair: [
-        { value: numberCompact(u.ea), tag: 'ea', spoken: UOM_SPOKEN.ea },
+        { value: numberCompact(u.ea), tag: 'ea', spoken: UOM_SPOKEN.ea, term: 'eaLb' },
         { value: numberCompact(u.lb), tag: 'lb', spoken: UOM_SPOKEN.lb },
       ],
     };
@@ -83,7 +85,7 @@ export function uomTile(v: ByUom, signed = false): Pick<Tile, 'value' | 'pair'> 
   if (v.ea !== null && v.lb !== null)
     return {
       pair: [
-        { value: f(v.ea), tag: 'ea', spoken: UOM_SPOKEN.ea },
+        { value: f(v.ea), tag: 'ea', spoken: UOM_SPOKEN.ea, term: 'eaLb' },
         { value: f(v.lb), tag: 'lb', spoken: UOM_SPOKEN.lb },
       ],
     };
@@ -273,80 +275,171 @@ export function performanceRows(o: RowOptions): { rows: HierRow[]; total: HierRo
   };
 }
 
-// ---------------------------------------------------------------- Controls
+// ---------------------------------------------------------------- Calculation settings (layout rules 5 and 6)
 
-export function ViewControls({ cann = true, rollup = false, basis = true, baseline = true, children }: { cann?: boolean; rollup?: boolean; basis?: boolean; baseline?: boolean; children?: ReactNode }) {
+function BaselineControl() {
   const { state, update } = useFilters();
-  const set = (patch: Partial<FilterState>) => update((s) => ({ ...s, ...patch }));
   const viewDefault = viewBaselineDefault(state.tab);
-  const baselineValue = state.baseline === null ? String(viewDefault) : String(state.baseline);
-  const baselineOptions = [
-    ...(viewDefault === 'byType' ? [{ value: 'byType', label: 'By promo type' }] : []),
-    ...BASELINE_WEEKS.map((w) => ({ value: String(w), label: `${w} wk` })),
-  ];
+  const value = state.baseline === null ? String(viewDefault) : String(state.baseline);
+  const options = [...(viewDefault === 'byType' ? [{ value: 'byType', label: 'By promo type' }] : []), ...BASELINE_WEEKS.map((w) => ({ value: String(w), label: `${w} wk` }))];
   // Picking the view's default stores no choice, so the URL and other views keep their own default.
-  const setBaseline = (v: string) => set({ baseline: v === 'byType' || v === String(viewDefault) ? null : (Number(v) as BaselineWeeks) });
+  const set = (v: string) => update((s) => ({ ...s, baseline: v === 'byType' || v === String(viewDefault) ? null : (Number(v) as BaselineWeeks) }));
   return (
-    <div className="toggle-row view-toggles" role="group" aria-label="View controls">
-      {baseline && (
-        <span className="toggle-group">
-          <span className="toggle-label">
-            Baseline window{' '}
-            <InfoTip
-              text={`Average of the weeks right before the event, scaled to the promo days. Proposed defaults (#4): ${PROPOSED_BASELINE_BY_TYPE.HB} weeks for Hot Buys, ${PROPOSED_BASELINE_BY_TYPE.TPR} weeks for TPRs, BOGOs and price locks. Hot Buy Performance uses 4 weeks, Other Promo Performance 13 weeks, and the other views the default of each event's promo type. Prior promo weeks inside the window are still included; whether to exclude them is pending.`}
-            />
-          </span>
-          <Segmented<string> small label="Baseline window in weeks" value={baselineValue} onChange={setBaseline} options={baselineOptions} />
-          <span className="baseline-note">
-            {BASELINE_PENDING_TEXT}. Baseline includes prior promo weeks in the window <Pending q={4} />
-          </span>
-        </span>
-      )}
-      {cann && (
-        <span className="toggle-group">
-          <span className="toggle-label">
-            Cannibalization level <InfoTip text={CANN_LEVELS.map((l) => `${l.label}: ${l.tip}`).join(' ')} />
-          </span>
-          <Segmented<CannLevel> small label="Cannibalization level" value={state.level} onChange={(v) => set({ level: v })} options={CANN_LEVELS.map((l) => ({ value: l.id, label: l.label }))} />
-          <Pending q={3} />
-        </span>
-      )}
-      {basis && (
-        <span className="toggle-group">
-          <span className="toggle-label">
-            Sales basis <InfoTip text="Sales used for Promo Sales $, baseline, lift, incremental and margin. Net Customer Sales by default; Promo GM % divides by the same basis (question #5)." />
-          </span>
-          <Segmented<Basis>
-            small
-            label="Sales basis"
-            value={state.basis}
-            onChange={(v) => set({ basis: v })}
-            options={[
-              { value: 'net', label: 'Net Customer' },
-              { value: 'gross', label: 'Gross' },
-            ]}
-          />
-        </span>
-      )}
-      {rollup && (
-        <span className="toggle-group">
-          <span className="toggle-label">Rows</span>
-          <Segmented<Rollup>
-            small
-            label="Table rows: roll up by"
-            value={state.rollup}
-            onChange={(v) => set({ rollup: v })}
-            options={[
-              { value: 'event', label: 'Price Group' },
-              { value: 'sub', label: 'Subcategory' },
-              { value: 'cat', label: 'Category' },
-              { value: 'dept', label: 'Department' },
-            ]}
-          />
-        </span>
-      )}
+    <span className="toggle-group">
+      <span className="toggle-label">
+        <Term id="baseline">Baseline</Term> window{' '}
+        <InfoTip
+          text={`${affectsText(state.tab, 'baseline')} Average of the weeks right before the event, scaled to the promo days. Proposed defaults (#4): ${PROPOSED_BASELINE_BY_TYPE.HB} weeks for Hot Buys, ${PROPOSED_BASELINE_BY_TYPE.TPR} weeks for TPRs, BOGOs and price locks. Prior promo weeks inside the window are still included; whether to exclude them is pending.`}
+          label="Baseline window: what it affects"
+        />
+      </span>
+      <Segmented<string> small label="Baseline window in weeks" value={value} onChange={set} options={options} />
+      <span className="baseline-note">
+        {BASELINE_PENDING_TEXT}. Baseline includes prior promo weeks in the window <Pending q={4} term />
+      </span>
+    </span>
+  );
+}
+
+function BasisControl() {
+  const { state, update } = useFilters();
+  return (
+    <span className="toggle-group">
+      <span className="toggle-label">
+        <Term id="salesBasis">Sales basis</Term>{' '}
+        <InfoTip text={`${affectsText(state.tab, 'basis')} Net Customer Sales by default (#5); Promo GM % divides by the same basis.`} label="Sales basis: what it affects" />
+      </span>
+      <Segmented<Basis>
+        small
+        label="Sales basis"
+        value={state.basis}
+        onChange={(v) => update((s) => ({ ...s, basis: v }))}
+        options={[
+          { value: 'net', label: 'Net Customer' },
+          { value: 'gross', label: 'Gross' },
+        ]}
+      />
+    </span>
+  );
+}
+
+function CannControl() {
+  const { state, update } = useFilters();
+  return (
+    <span className="toggle-group">
+      <span className="toggle-label">
+        <Term id="cannLevel">Cannibalization level</Term>{' '}
+        <HowItWorks title="How cannibalization works">
+          <p>
+            <b>{affectsText(state.tab, 'cann')}</b>
+          </p>
+          <p>Which items count as competitors of the promoted price group. Always excludes the promoted price group and compares only items with the same unit of measure.</p>
+          <p>
+            <b>How it is calculated:</b> for those items, sales during the promo minus their baseline. A drop is cannibalization (negative), a rise is halo (positive). Cannibalization Rate % = units lost by those items ÷
+            incremental units of the promoted item.
+          </p>
+          <p>
+            <b>What changes:</b> Cannibalized Sales $, Cannibalization Rate %, Net Incremental Sales $, Net Incremental Gross Margin $, and the Cannibalization step in the bridge chart.
+          </p>
+          <p>
+            <b>What does not change:</b> the promoted item&apos;s own sales, units, lift, incremental results and Promo GM, and Category Incremental Sales $ / GM $, which always use the whole category.
+          </p>
+          <p>
+            <b>Levels:</b> Subcategory (default, as in the KPI sheet), Brand, Brand-category, Category. The level is still open (#3).
+          </p>
+          <ul>
+            {CANN_LEVELS.map((l) => (
+              <li key={l.id}>
+                <b>{l.label}:</b> {l.tip}
+              </li>
+            ))}
+          </ul>
+        </HowItWorks>
+      </span>
+      <Segmented<CannLevel> small label="Cannibalization level" value={state.level} onChange={(v) => update((s) => ({ ...s, level: v }))} options={CANN_LEVELS.map((l) => ({ value: l.id, label: l.label }))} />
+      <Pending q={3} />
+    </span>
+  );
+}
+
+const CONTROL: Record<SettingKey, () => ReactNode> = { baseline: BaselineControl, basis: BasisControl, cann: CannControl };
+
+/**
+ * "Calculation settings": the controls that change more than one block of the view (layout rule 5). A control that
+ * changes nothing in the view is not shown; one that changes a single block lives in that block's header
+ * (BlockSettings). `children` adds view-specific selectors (e.g. the promotion to compare in Promo Run Trend).
+ */
+export function ViewControls({ children }: { children?: ReactNode }) {
+  const { state } = useFilters();
+  const keys = barSettings(state.tab);
+  if (keys.length === 0 && !children) return null;
+  return (
+    <div className="toggle-row view-toggles calc-settings" role="group" aria-label="Calculation settings">
+      <span className="calc-settings-title">Calculation settings</span>
+      {keys.map((k) => {
+        const C = CONTROL[k];
+        return <C key={k} />;
+      })}
       {children}
     </div>
+  );
+}
+
+/** Controls that change only this block, shown in its header (layout rule 5). */
+export function BlockSettings({ block }: { block: BlockId }) {
+  const { state } = useFilters();
+  const keys = blockSettings(state.tab, block);
+  if (keys.length === 0) return null;
+  return (
+    <span className="block-settings" role="group" aria-label="Settings for this block">
+      {keys.map((k) => {
+        const C = CONTROL[k];
+        return <C key={k} />;
+      })}
+    </span>
+  );
+}
+
+/** Rows (Price Group / Subcategory / Category / Department): changes only the table, so it lives in its header. */
+export function RowsControl() {
+  const { state, update } = useFilters();
+  return (
+    <span className="toggle-group rows-control">
+      <span className="toggle-label">
+        Rows <InfoTip text="Affects: this table only (how its rows are grouped). Totals and every other block stay the same." label="Rows: what it affects" />
+      </span>
+      <Segmented<Rollup>
+        small
+        label="Table rows: roll up by"
+        value={state.rollup}
+        onChange={(v) => update((s) => ({ ...s, rollup: v }))}
+        options={[
+          { value: 'event', label: 'Price Group' },
+          { value: 'sub', label: 'Subcategory' },
+          { value: 'cat', label: 'Category' },
+          { value: 'dept', label: 'Department' },
+        ]}
+      />
+    </span>
+  );
+}
+
+/** Active-value tags of the settings that change this block (layout rule 6); nothing when no setting does. */
+export function SettingTags({ block }: { block: BlockId }) {
+  const { state } = useFilters();
+  const tags = tagsFor(state.tab, block, state);
+  if (tags.length === 0) return null;
+  return (
+    <span className="setting-tags" data-block={block}>
+      {tags.map((t) => (
+        <span key={t.key} className={`setting-tag tip below${t.changed ? ' is-changed' : ''}`} tabIndex={0} data-setting={t.key} aria-label={`${SETTING_LABEL[t.key]}: ${t.text}. ${t.affects}`}>
+          {t.text}
+          <span className="tip-body" role="tooltip" aria-hidden="true">
+            {t.affects}
+          </span>
+        </span>
+      ))}
+    </span>
   );
 }
 

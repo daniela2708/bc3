@@ -430,6 +430,44 @@ select {
 .typeahead-list li:hover {
   background: var(--n2);
 }
+/* Local "Event" filter of a chart card (EventPicker): same look as the global filters. */
+.event-picker select {
+  max-width: min(440px, 100%);
+}
+.event-combobox .text-input {
+  width: min(440px, 70vw);
+  padding-left: 10px;
+  padding-right: 28px;
+  text-overflow: ellipsis;
+}
+.event-combobox > svg {
+  left: auto;
+  right: 9px;
+}
+.event-combobox .typeahead-list {
+  width: min(520px, 90vw);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.event-combobox .typeahead-list li {
+  justify-content: flex-start;
+}
+.event-combobox .typeahead-list li[aria-selected='true'] {
+  background: transparent;
+  font-weight: 800;
+}
+.event-combobox .typeahead-list li.is-active,
+.event-combobox .typeahead-list li:hover {
+  background: var(--n2);
+}
+.event-combobox .typeahead-list li.empty {
+  color: var(--n5);
+  cursor: default;
+}
+.event-combobox .text-input:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 1px;
+}
 .typeahead-list .code {
   font-family: var(--mono);
   font-size: 11px;
@@ -500,6 +538,91 @@ select {
   margin: 0 0 4px;
   letter-spacing: -0.01em;
 }
+/* Layout rule 4: one line under the title with what the view answers. */
+.section-objective {
+  margin: 2px 0 0;
+  font-size: 15px;
+  color: var(--n5);
+  max-width: 1100px;
+}
+
+/* Layout rule 5: compact "Calculation settings" bar. */
+.calc-settings {
+  align-items: center;
+}
+.calc-settings-title {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--n5);
+  padding-right: 4px;
+  border-right: 1px solid var(--n3);
+  margin-right: 4px;
+}
+.block-tags {
+  margin: 6px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.block-settings {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.table-head .rows-control {
+  align-self: flex-start;
+  margin-left: auto;
+}
+
+/* Layout rule 6: active-value tag of a calculation setting on each block it changes. */
+.setting-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.card-caption .setting-tags,
+.block-tags .setting-tags,
+.secondary-title .setting-tags {
+  margin-left: 6px;
+}
+.block-tags .setting-tags {
+  margin-left: 0;
+}
+.setting-tag {
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--n5);
+  background: var(--n1);
+  border: 1px solid var(--n3);
+  border-radius: 999px;
+  padding: 1px 8px;
+  line-height: 1.5;
+  cursor: help;
+}
+.setting-tag.is-changed {
+  color: var(--dark);
+  background: var(--white);
+  border-color: var(--info);
+  box-shadow: inset 3px 0 0 var(--info);
+}
+.setting-tag:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+.setting-tag .tip-body {
+  font-weight: 600;
+  white-space: normal;
+}
+
 .section-narrative {
   margin: 0;
   color: #4a4845;
@@ -1192,6 +1315,11 @@ tr.is-stale td {
   margin: 80px auto;
   padding: 28px;
 }
+.app-error-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
 
 /* ---------------------------------------------------------------- Responsive (still usable at 1280 px) */
 @media (max-width: 1500px) {
@@ -1731,6 +1859,128 @@ table.hier tr.total-row td:first-child {
 table.hier tbody tr:not(.total-row):hover td:first-child {
   background: #faf9f5;
 }
+/* Promo Funding notice tab */
+.funding-card {
+  margin-top: 14px;
+  padding: 14px 16px;
+}
+/* A greyed-out filter's Paste UPCs link looks disabled too. */
+.paste-btn:disabled {
+  color: var(--n4);
+  text-decoration: none;
+  cursor: not-allowed;
+}
+.funding-kpis {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+.funding-kpis li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* "How it works" popover (cannibalization level) */
+.howto {
+  position: relative;
+  display: inline-block;
+}
+.howto-btn {
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.howto-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  width: min(480px, 90vw);
+  background: var(--white);
+  color: var(--dark);
+  border: 1px solid var(--n3);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.45;
+  white-space: normal;
+}
+.howto-pop p {
+  margin: 0 0 8px;
+}
+.howto-pop ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.howto-pop:focus {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+
+/* Glossary terms (<Term>): dotted underline, popover with the plain-language explanation. Theme variables only. */
+.term {
+  position: relative;
+  border-bottom: 1px dotted currentColor;
+  cursor: help;
+  text-decoration: none;
+}
+.term:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.term-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 70;
+  width: max-content;
+  max-width: 320px;
+  background: var(--dark);
+  color: var(--white);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.45;
+  white-space: normal;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  cursor: default;
+}
+.term-pop[hidden] {
+  display: none;
+}
+.term-pop b {
+  font-weight: 800;
+}
+.defs-glossary {
+  margin: 0 0 12px;
+  padding: 0 10px;
+  display: grid;
+  gap: 8px;
+  font-size: 13.5px;
+}
+.defs-glossary dt {
+  font-weight: 800;
+}
+.defs-glossary dd {
+  margin: 2px 0 0;
+  color: var(--dark);
+}
+
 .defs-note {
   display: block;
   margin-top: 4px;

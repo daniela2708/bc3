@@ -1,18 +1,23 @@
 import { useMemo, useState } from 'react';
 import { Banner, BannerStack, KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
-import { Bridge, ChartCard, ChartGrid, DailyVsBaseline, type BridgeStep } from '../components/Charts';
+import { Bridge, ChartCard, ChartGrid, type BridgeStep } from '../components/Charts';
 import { HierTable } from '../components/HierTable';
-import { Pending, Segmented } from '../components/ui';
-import { shortDay } from '../data/calendar';
+import { EventPicker } from '../components/EventPicker';
+import { Term } from '../components/Term';
+import { Pending } from '../components/ui';
 import { CATS, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
 import { useFilters } from '../lib/filterStore';
 import { moneyCompact, moneyTile, moneyUnit, pct, pctChange, signedMoney, signedMoneyTile, volumeCompact } from '../lib/format';
 import { baselineText } from '../lib/baseline';
 import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
-import { CANN_LEVELS, dailySeries, derive, eventAgg, eventBaselineWeeks, sumAggs } from '../lib/metrics';
+import { CANN_LEVELS, derive, eventAgg, sumAggs } from '../lib/metrics';
+import { SALES_COLUMNS } from '../lib/series';
+import { ALL_EVENTS, bridgeEvent, bridgeSteps, chartEvent, eventOptions, selectedInTable } from '../lib/eventPick';
 import { getScope } from '../lib/selectors';
-import { basisWord, columnsOf, EmptyState, eventDates, performanceRows, salesPair, unitsTile, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
+import { VIEW_INFO } from '../lib/viewInfo';
+import { basisWord, columnsOf, EmptyState, eventDates, performanceRows, RowsControl, salesPair, SettingTags, unitsTile, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
+import { PromoWindowCard } from './PromoWindowCard';
 import { RunsCompare } from './RunsCompare';
 
 
@@ -31,7 +36,8 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
     const c = columnsOf(hb ? HB_COLS : OTHER_COLS, hb ? HB_HIDDEN : OTHER_HIDDEN);
     return hb ? c : [...c.slice(0, 5), { key: 'share', label: 'Share of price group %', group: 'Sales' as const, cell: () => '', sort: () => null }, ...c.slice(5)];
   }, [hb]);
-  const [bridgeScope, setBridgeScope] = useState<'event' | 'all'>('event');
+  /** The selected event when the user picked "All events" in the bridge (see eventPick.ts). */
+  const [allAt, setAllAt] = useState<number | null>(null);
 
   const table = useMemo(
     () =>
@@ -50,33 +56,23 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
   const all = useMemo(() => derive(sumAggs([...table.aggs.values()]), basis), [table, basis]);
   const perEvent = useMemo(() => scope.events.map((e) => ({ e, m: derive(table.aggs.get(e)!, basis) })), [scope.events, table, basis]);
 
-  const sel = scope.events.includes(state.sel) ? state.sel : [...perEvent].sort((a, b) => b.m.sales - a.m.sales)[0]?.e ?? -1;
+  // Sales vs. baseline chart: the selected event, else the one with the highest sales. Bridge: All events by default.
+  const salesOf = (e: number) => perEvent.find((x) => x.e === e)?.m.sales ?? 0;
+  const sel = chartEvent(state.sel, scope.events, salesOf);
   const selEvent = sel >= 0 ? EVENTS[sel] : null;
   const selM = sel >= 0 ? derive(table.aggs.get(sel)!, basis) : null;
+  const bridgeSel = bridgeEvent(state.sel, scope.events, allAt);
+  const pick = (v: string) => {
+    if (v === ALL_EVENTS) setAllAt(selectedInTable(state.sel, scope.events) ?? -1);
+    else update((s) => ({ ...s, sel: Number(v) }));
+  };
+  const optionsAll = useMemo(() => eventOptions(scope.events, true), [scope.events]);
+  const optionsOne = useMemo(() => eventOptions(scope.events, false), [scope.events]);
 
-  const daily = useMemo(() => {
-    if (!selEvent) return null;
-    const from = selEvent.start - Math.min(28, eventBaselineWeeks(selEvent, scope.ctx) * 7);
-    const s = dailySeries(selEvent, scope.ctx, from, selEvent.end + 7);
-    const key = basis === 'net' ? 'net' : 'gross';
-    return s.days.map((d) => ({
-      x: shortDay(d.day),
-      actual: d[key],
-      baseline: s.baseline[key],
-      phase: d.day < s.window.from ? ('before' as const) : d.day < selEvent.start ? ('baseline' as const) : d.day <= selEvent.end ? ('promo' as const) : ('after' as const),
-    }));
-  }, [selEvent, scope.ctx, basis]);
 
-  const bridgeM = bridgeScope === 'all' ? all : selM;
-  const bridge: BridgeStep[] = bridgeM
-    ? [
-        { label: 'Promo item lift', value: bridgeM.incSales ?? 0, kind: 'delta' },
-        { label: 'Cannibalization', value: bridgeM.cannSales ?? 0, kind: 'delta' },
-        { label: 'Net incremental', value: bridgeM.netIncSales ?? 0, kind: 'total' },
-        { label: 'Rest of category', value: (bridgeM.catIncSales ?? 0) - (bridgeM.netIncSales ?? 0), kind: 'delta' },
-        { label: 'Category incremental', value: bridgeM.catIncSales ?? 0, kind: 'total' },
-      ]
-    : [];
+  const bridgeM = bridgeSel === null ? all : derive(table.aggs.get(bridgeSel)!, basis);
+  const bridge: BridgeStep[] = bridgeSteps(bridgeM);
+  const bridgePg = bridgeSel === null ? null : PRICE_GROUPS[EVENTS[bridgeSel].pg];
 
   // Runs of the selected promo (same price group and promo type) side by side, Other Promo Performance.
   const runs = useMemo(() => {
@@ -100,6 +96,11 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
     { label: 'Promo Units', info: `Units (ea) and pounds (lb) sold on promo days; random-weight items count pounds, as in Total Volume (UC2). Never added together. ${RANDOM_WEIGHT_NOTE}`, ...unitsTile(all.units), sub: `Baseline ${all.baseUnits.ea > 0 ? volumeCompact(all.baseUnits.ea, 'ea') : volumeCompact(all.baseUnits.lb, 'lb')}` },
     {
       label: 'Sales / Unit Lift %',
+      labelNode: (
+        <>
+          Sales / Unit <Term id="lift">Lift</Term> %
+        </>
+      ),
       info: `Incremental ÷ Baseline, on ${basisWord(basis)} and on units. Baseline: ${baseWord}, average of the weeks before each event.`,
       value: pctChange(all.salesLift),
       sub: <>Units {uomPct(all.unitLift, true)}</>,
@@ -112,7 +113,7 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
       sub: <>{pct(all.gmPct)} margin rate</>,
       pending: 15,
     },
-    { label: 'Incremental GM $', info: `Promo GM $ − Baseline GM $ (before cannibalization and the vendor funding Net GM adds). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: signedMoneyTile(all.incGm), sub: <>Baseline GM {moneyTile(all.baseGm)}</>, pending: 7 },
+    { label: 'Incremental GM $', labelNode: <><Term id="incremental">Incremental</Term> GM $</>, info: `Promo GM $ − Baseline GM $ (before cannibalization and the vendor funding Net GM adds). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: signedMoneyTile(all.incGm), sub: <>Baseline GM {moneyTile(all.baseGm)}</>, pending: 7 },
     {
       label: 'Net Incremental GM $',
       info: `Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (#7: scan-downs at the expected amount, bill-backs only for DSD items, no slotting or lump sums; DC scan-downs are already in the cost, #15). The main "did it pay off" number. ${RANDOM_WEIGHT_NOTE}`,
@@ -126,7 +127,7 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
     return (
       <>
         <Heading hb={hb} />
-        <ViewControls rollup />
+        <ViewControls />
         <EmptyState>No {typeWord} start in {scope.range.label} for the current filters. Try a longer period or clear a filter.</EmptyState>
       </>
     );
@@ -135,9 +136,10 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
     <>
       <Heading hb={hb} />
 
-      <ViewControls rollup />
+      <ViewControls />
 
       <KeyFigures
+        tags={<SettingTags block="tiles" />}
         caption={`${scope.range.name} · ${scope.events.length} ${typeWord} · ${basisWord(basis)} · ${baseWord}`}
         tiles={tiles}
         note={
@@ -180,38 +182,39 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
 
       {selEvent && selM && (
         <ChartGrid cols={2}>
-          <ChartCard
-            title={`Daily ${basisWord(basis)} vs. baseline`}
-            subtitle={
-              <>
-                {PRICE_GROUPS[selEvent.pg].name} · {selEvent.id} · baseline {moneyCompact((daily?.[0]?.baseline ?? 0) * 7)} / week
-              </>
-            }
-            legend={[
-              { label: 'Daily sales', color: '#2d63a0' },
-              { label: 'Baseline (daily average)', color: '#797873' },
-            ]}
-            table={daily ? { head: ['Day', 'Phase', 'Sales $', 'Baseline $'], rows: daily.map((d) => [d.x, d.phase, Math.round(d.actual), Math.round(d.baseline)]) } : undefined}
-            height={260}
-          >
-            <DailyVsBaseline data={daily ?? []} format={moneyUnit} tickFormat={moneyCompact} actualLabel={`${basisWord(basis)}`} />
-          </ChartCard>
+          <PromoWindowCard
+            key={selEvent.idx}
+            event={selEvent}
+            ctx={scope.ctx}
+            seriesKey={basis === 'net' ? 'net' : 'gross'}
+            measure={basisWord(basis)}
+            columns={SALES_COLUMNS}
+            format={moneyUnit}
+            tickFormat={moneyCompact}
+            baselineFormat={moneyCompact}
+            block="salesChart"
+            picker={<EventPicker value={String(selEvent.idx)} options={optionsOne} onChange={pick} />}
+          />
           <ChartCard
             title={`${hb ? 'Category / subcategory' : 'Category'} bridge`}
+            titleNode={
+              <>
+                {hb ? 'Category / subcategory' : 'Category'} <Term id="bridge">bridge</Term>
+              </>
+            }
+            tags={
+              <>
+                <EventPicker value={bridgeSel === null ? ALL_EVENTS : String(bridgeSel)} options={optionsAll} onChange={pick} />
+                <SettingTags block="bridge" />
+              </>
+            }
             subtitle={
-              <span className="chart-sub-tools">
-                {bridgeScope === 'event' ? `${PRICE_GROUPS[selEvent.pg].name} in ${CATS[PRICE_GROUPS[selEvent.pg].cat].name}` : `All ${scope.events.length} events in the table`} · {levelWord} level <Pending q={3} />
-                <Segmented<'event' | 'all'>
-                  small
-                  label="Bridge scope"
-                  value={bridgeScope}
-                  onChange={setBridgeScope}
-                  options={[
-                    { value: 'event', label: 'Selected event' },
-                    { value: 'all', label: 'All events' },
-                  ]}
-                />
-              </span>
+              <>
+                {bridgePg ? `${bridgePg.name} in ${CATS[bridgePg.cat].name}` : `All ${scope.events.length} events in the table`} · {levelWord} level <Pending q={3} />
+                <br />
+                Promo item lift, minus <Term id="cannibalization">cannibalization</Term> (or plus <Term id="halo">halo</Term>), equals <Term id="netIncremental">net incremental</Term>; plus the rest of the category equals{' '}
+                <Term id="categoryIncremental">category incremental</Term>.
+              </>
             }
             table={{ head: ['Step', 'Sales $'], rows: bridge.map((b) => [b.label, Math.round(b.value)]) }}
             height={260}
@@ -224,11 +227,18 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
       <section className="card table-card" aria-label={hb ? 'Hot Buy events' : 'Promotions by price group'}>
         <header className="table-head">
           <div>
-            <h3 className="chart-title">{hb ? 'Hot Buy events by price group' : 'Promotions by price group'}</h3>
+            <h3 className="chart-title">
+              {hb ? 'Hot Buy events by ' : 'Promotions by '}
+              <Term id="priceGroup">price group</Term>
+            </h3>
+            <p className="block-tags">
+              <SettingTags block="table" />
+            </p>
             <p className="chart-sub">
-              One row per event at price group level. Expand a row for its SKU Numbers{hb ? '' : ' and each item’s share of the price group result'}; click a row to show it in the charts above. Cannibalization is measured for the price group, so SKU rows show —.
+              One row per <Term id="event">event</Term> at price group level. Expand a row for its SKU Numbers{hb ? '' : ' and each item’s share of the price group result'}. Click a row, or pick an event in the charts above, to see it in detail. Cannibalization is measured for the price group, so SKU rows show —.
             </p>
           </div>
+          <RowsControl />
         </header>
         <HierTable
           hierarchy={state.rollup === 'event' ? 'Price group · event' : 'Hierarchy'}
@@ -249,6 +259,9 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
               <h3 className="chart-title">
                 Runs of the same promo: {PRICE_GROUPS[selEvent.pg].name} · {PROMO_LABEL[selEvent.type]}
               </h3>
+              <p className="block-tags">
+                <SettingTags block="runs" />
+              </p>
               <p className="chart-sub">Up to six runs, side by side, from two years before the selected period. Click a run to show it in the charts. Promo Run Trend has the full history.</p>
             </div>
           </header>
@@ -260,5 +273,5 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
 }
 
 function Heading({ hb }: { hb: boolean }) {
-  return <SectionHeading title={hb ? 'Hot Buy Performance' : 'Other Promo Performance'} />;
+  return <SectionHeading title={hb ? 'Hot Buy Performance' : 'Other Promo Performance'} objective={VIEW_INFO[hb ? 'hotbuy' : 'other'].objective} />;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { KPI_DEFINITIONS, kpiStatus, OPEN_QUESTIONS } from '../lib/definitions';
+import { KPI_DEFINITIONS, kpiStatus, OPEN_QUESTIONS, WORKBOOK_NAME, WORKBOOK_URL } from '../lib/definitions';
 import { sanitizeSearch, SEARCH_MAX, TABS } from '../lib/filters';
+import { GLOSSARY, TERM_IDS } from '../lib/glossary';
 import { VIEW_INFO } from '../lib/viewInfo';
 
 const TAB_LABEL = Object.fromEntries(TABS.map((t) => [t.id, t.label]));
@@ -40,7 +41,11 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
           <h2 id="defs-title">KPI definitions</h2>
           <div className="defs-intro">
             <p>
-              Definitions and calculations copied from the requirements workbook UC3_KPIs_Definitions_and_Mapping.xlsx (how the prototype applies each one is marked Prototype), for validation with Weis, followed by each view's priority, user story and what is still to validate. Every rate is a ratio of totals. Items marked Definition pending depend on an open question (numbers follow the workbook tab “UC #3 - Open Questions”); the assumption the prototype uses is listed at the end. Level 2 items are useful but not part of the MVP. Illustrative data only.
+              Definitions and calculations copied from the requirements workbook{' '}
+              <a className="btn-link" href={WORKBOOK_URL} target="_blank" rel="noopener noreferrer" title="Open the workbook in SharePoint (new tab)">
+                {WORKBOOK_NAME}
+              </a>{' '}
+              (how the prototype applies each one is marked Prototype), for validation with Weis, followed by each view's priority, user story and what is still to validate. Every rate is a ratio of totals. Items marked Definition pending depend on an open question (numbers follow the workbook tab “UC #3 - Open Questions”); the assumption the prototype uses is listed at the end. Level 2 items are useful but not part of the MVP. Illustrative data only.
             </p>
             <input
               className="text-input defs-search"
@@ -117,6 +122,15 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
               );
             })}
           </ul>
+          <h3 className="defs-q-title">Glossary</h3>
+          <dl className="defs-glossary">
+            {TERM_IDS.map((id) => (
+              <div key={id} id={`term-${id}`}>
+                <dt>{GLOSSARY[id].term}</dt>
+                <dd>{GLOSSARY[id].text}</dd>
+              </div>
+            ))}
+          </dl>
           <h3 className="defs-q-title">Open questions and the assumption used</h3>
           <ul className="defs-questions">
             {OPEN_QUESTIONS.map((q) => (

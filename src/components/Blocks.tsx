@@ -2,19 +2,22 @@ import { AlertTriangle, Info } from 'lucide-react';
 import { Children, Fragment, useState, type ReactNode } from 'react';
 import { AS_OF_DAY, fiscalOfDay, formatDay } from '../data/calendar';
 import { TABS, type TabId } from '../lib/filters';
+import type { TermId } from '../lib/glossary';
+import { Term } from './Term';
 import { InfoTip, Pending } from './ui';
 
 /**
- * View heading: the title and an optional chip, nothing else (layout rule 2). Priority, user story and what is
- * still to validate live in the KPI definitions dialog (src/lib/viewInfo.ts).
+ * View heading: the title, an optional chip and one line with what the view answers (layout rules 2 and 4). Priority,
+ * user story and what is still to validate live in the KPI definitions dialog (src/lib/viewInfo.ts).
  */
-export function SectionHeading({ title, badge }: { title: string; badge?: ReactNode }) {
+export function SectionHeading({ title, badge, objective }: { title: string; badge?: ReactNode; objective?: string }) {
   return (
     <section className="section-head" aria-labelledby="section-title">
       <h2 className="section-title" id="section-title">
         {title}
         {badge && <span className="title-badge">{badge}</span>}
       </h2>
+      {objective && <p className="section-objective">{objective}</p>}
     </section>
   );
 }
@@ -98,12 +101,16 @@ export interface TileValue {
   value: string;
   /** Short tag shown next to the value, e.g. "Net Customer" or "ea". */
   tag: string;
+  /** Glossary term for the tag (shown once per view). */
+  term?: TermId;
   /** Spoken label, e.g. "Net Customer Sales"; the value is appended. */
   spoken: string;
 }
 
 export interface Tile {
   label: string;
+  /** Label with glossary terms; `label` stays the plain text (key, accessible names). */
+  labelNode?: ReactNode;
   info: string;
   /** Open question number when the KPI definition is pending. */
   pending?: number;
@@ -118,22 +125,31 @@ function TileLine({ v, main }: { v: TileValue; main: boolean }) {
   return (
     <div className={main ? 'kpi-value kpi-pair-main' : 'kpi-pair-sub'} role="group" aria-label={`${v.spoken} ${v.value}`}>
       <span aria-hidden="true">{v.value}</span>
-      <span className="kpi-tag" aria-hidden="true">
-        {v.tag}
-      </span>
+      {v.term ? (
+        <span className="kpi-tag">
+          <Term id={v.term}>{v.tag}</Term>
+        </span>
+      ) : (
+        <span className="kpi-tag" aria-hidden="true">
+          {v.tag}
+        </span>
+      )}
     </div>
   );
 }
 
-export function KeyFigures({ caption, tiles, note }: { caption: string; tiles: Tile[]; note?: ReactNode }) {
+export function KeyFigures({ caption, tiles, note, tags }: { caption: string; tiles: Tile[]; note?: ReactNode; tags?: ReactNode }) {
   return (
     <section className="card kf-card" aria-label="Key figures">
-      <p className="card-caption">{caption}</p>
+      <p className="card-caption">
+        {caption}
+        {tags}
+      </p>
       <div className="kpi-row" style={{ ['--n' as string]: tiles.length }}>
         {tiles.map((t) => (
           <div className="kpi-tile" key={t.label}>
             <div className="kpi-label">
-              <span>{t.label}</span>
+              <span>{t.labelNode ?? t.label}</span>
               <InfoTip text={t.info} label={`${t.label} definition`} below />
             </div>
             {t.pending !== undefined && <Pending q={t.pending} />}

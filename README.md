@@ -31,16 +31,17 @@ The gate is the UC5 mechanism: only the hash is embedded, the check runs in cons
 
 ## Views
 
-Six tabs: the views of the requirements workbook, in its order (Hot Buy Performance, Other Promo Performance, Post-Promo Trend, Promo History, Promo Shopper Impact, Promo Run Trend). Each view's priority, user story and the definitions still pending are in the **KPI definitions** dialog; the views themselves start with the title and the key figures (see Layout rules). **Promo Funding is not part of this dashboard** (#2: vendor funding analytics live in the DNP tool), and neither are the Funding Type filter, Vendor-Funded %, Weis-Funded Promo Cost $ and Promo ROI.
+Seven tabs: the views of the requirements workbook, in its order (Hot Buy Performance, Other Promo Performance, Post-Promo Trend, Promo Funding, Promo History, Promo Shopper Impact, Promo Run Trend). Each view's priority, user story and the definitions still pending are in the **KPI definitions** dialog; the views themselves start with the title and the key figures (see Layout rules). **Promo Funding is not part of this dashboard** (#2: vendor funding analytics live in the DNP tool), and neither are the Funding Type filter, Vendor-Funded %, Weis-Funded Promo Cost $ and Promo ROI.
 
 | # | View | Priority | What it shows |
 |---|---|---|---|
 | 1 | **Hot Buy Performance** | Must Have | Tiles (Promo Sales gross and net customer, Promo Units, Sales / Unit Lift %, Promo GM $ / %, Incremental GM $, Net Incremental GM $) with the Hot Buy Score placeholder note; daily sales vs. baseline and the category / subcategory bridge (promo item lift → cannibalization → net → rest of category → category incremental); then one row per event with SKU drill-down and roll-up to Subcategory / Category / Department. The only view with Region / District / Store. Baseline default 4 weeks (#4). |
 | 2 | **Other Promo Performance** | Must Have | Same layout for TPR, BOGO, Price Lock and other temporary price reductions (the extra KPI columns start hidden in the column chooser), with each SKU's share of the price group (Seasonal / Everyday tag); last, the runs of the same promo side by side. Baseline default 13 weeks (#4). |
 | 3 | **Post-Promo Trend** | Nice to have · **Level 2 · not MVP** (#8) | Tiles for Post-Promo Dip % (4-week post-promo window) and Repeat Purchase Rate %; daily units and sales before, during and after the selected promo vs. baseline; then the post-promo summary by category with each event underneath (click an event to chart it). Baseline: the default of each event's promo type (#4). |
-| 4 | **Promo History** | Should Have · *Definition pending (#10)* | Tiles; results by fiscal period or week; lift and margin by Promo Depth Band and by Ad Type; then every past promo for a SKU Number or price group with dates, type, depth, ad type and results. Holiday Periods filter. Baseline: the default of each event's promo type (#4). |
-| 5 | **Promo Shopper Impact** | Should Have · *Definition pending (#16)* | Tiles; one panel per event with Promo Buyer Count, Avg Basket Size $, Spend Change %, Units per Basket, New-to-Category % (#11), Category Trips, each vs. the same buyers' usual; Transaction Count and Repeat Purchase Rate % (level 2) in the tiles and the table, which comes last. Calculated from the Weis T-log and Club Card tables; Symphony AI is only a reference for comparison (#12). **Aggregates only. Individual-level detail requires approval (#16).** About 6 to 8 core metrics will be kept (#9). Baseline: the default of each event's promo type (#4). |
-| 6 | **Promo Run Trend** | Must Have (#8) | The MVP: tiles; lift and Net Incremental GM across runs; each run of the same promotion (price group + promo type) side by side, with Last Year Gross Sales and YoY growth. Uses all promo history by default. Baseline: the default of each event's promo type (#4). |
+| 4 | **Promo Funding** | Should Have · *Not in this dashboard (#2)* | Notice tab with no numbers: vendor funding analytics live in the DNP tool. Lists the KPIs the workbook assigns to the view and what happens to each (Vendor Promo Funding $ is only an input to Net GM; Net GM $ is shown in Hot Buy and Other Promo Performance; the rest are not shown). Every filter is greyed out. |
+| 5 | **Promo History** | Should Have · *Definition pending (#10)* | Tiles; results by fiscal period or week; lift and margin by Promo Depth Band and by Ad Type; then every past promo for a SKU Number or price group with dates, type, depth, ad type and results. Holiday Periods filter. Baseline: the default of each event's promo type (#4). |
+| 6 | **Promo Shopper Impact** | Should Have · *Definition pending (#16)* | Tiles; one panel per event with Promo Buyer Count, Avg Basket Size $, Spend Change %, Units per Basket, New-to-Category % (#11), Category Trips, each vs. the same buyers' usual; Transaction Count and Repeat Purchase Rate % (level 2) in the tiles and the table, which comes last. Calculated from the Weis T-log and Club Card tables; Symphony AI is only a reference for comparison (#12). **Aggregates only. Individual-level detail requires approval (#16).** About 6 to 8 core metrics will be kept (#9). Baseline: the default of each event's promo type (#4). |
+| 7 | **Promo Run Trend** | Must Have (#8) | The MVP: tiles; lift and Net Incremental GM across runs; each run of the same promotion (price group + promo type) side by side, with Last Year Gross Sales and YoY growth. Uses all promo history by default. Baseline: the default of each event's promo type (#4). |
 
 ### Rules used everywhere
 
@@ -58,7 +59,7 @@ Six tabs: the views of the requirements workbook, in its order (Hot Buy Performa
 
 ## Layout rules
 
-Every view follows these rules. Apply them to any new view or change (they are also in `CLAUDE.md`). `npm run test:e2e` checks rules 1 and 2 in every view.
+Every view follows these rules. Apply them to any new view or change (they are also in `CLAUDE.md`). `npm run test:e2e` checks rules 1, 2, 4, 5, 6 and 7.
 
 **Rule 1: cascade, from general to particular.** Top to bottom, every view shows:
 
@@ -68,20 +69,62 @@ Every view follows these rules. Apply them to any new view or change (they are a
 4. Tables, from the most aggregated to the most detailed (summary first, then the drill-down table).
 5. Level 2 sections (**Level 2 · not MVP**), always last.
 
-No table comes before a chart of the same view. The view controls (baseline window, cannibalization level, sales basis, rows) sit between the title and the tiles as part of the filter bar; the one-line reading of the key figures and the notices (banners, privacy notes) sit right after the tiles.
+No table comes before a chart of the same view. A view that is not part of the dashboard (Promo Funding, #2) shows only its title, chip, a notice and the list of its workbook KPIs, with no numbers. The view controls (baseline window, cannibalization level, sales basis, rows) sit between the title and the tiles as part of the filter bar; the one-line reading of the key figures and the notices (banners, privacy notes) sit right after the tiles.
 
 | View | Order |
 |---|---|
 | Hot Buy Performance | Tiles → Daily sales vs. baseline and Category / subcategory bridge → Hot Buy events by price group (hierarchical table) |
 | Other Promo Performance | Tiles → Daily sales vs. baseline and Category bridge → Promotions by price group (hierarchical table) → Runs of the same promo |
 | Post-Promo Trend (Level 2 tab) | Tiles → Daily units and Daily sales vs. baseline for the selected promo → Post-promo summary by category (events underneath) |
+| Promo Funding (notice tab) | Title with the "Not in this dashboard (#2)" chip → notice → list of the workbook KPIs for the view (no tiles, charts or tables) |
 | Promo History | Tiles → Results by fiscal period or week → Sales Lift % and Net Incremental GM $ by Promo Depth Band and by Ad Type / Vehicle → Every past promotion |
 | Promo Shopper Impact | Tiles → One panel per event → All events (table) |
 | Promo Run Trend | Tiles → Lift across runs and Net Incremental GM $ per run → Each run side by side |
 
-**Rule 2: no business-context block on top.** A view starts with its title and goes straight to the key figures: no eyebrow (priority, "View N of 6"), no user story, no question and no "to validate" text above the content. That information lives in the **KPI definitions** dialog, one entry per view with its priority, question, user story and what is still to validate (with open-question numbers), from `src/lib/viewInfo.ts`. The **Definition pending #N** and **Level 2 · not MVP** chips stay next to each KPI, chart or table (and next to the title when the whole view is pending). `SectionHeading` takes only a title and an optional chip.
+**Rule 2: no business-context block on top.** A view starts with its title and goes straight to the key figures: no eyebrow (priority, "View N of 7"), no user story, no question and no "to validate" text above the content. That information lives in the **KPI definitions** dialog, one entry per view with its priority, question, user story and what is still to validate (with open-question numbers), from `src/lib/viewInfo.ts`. The **Definition pending #N** and **Level 2 · not MVP** chips stay next to each KPI, chart or table (and next to the title when the whole view is pending). `SectionHeading` takes only a title and an optional chip.
 
 **Rule 3: consistency.** The same spacing and the same components in every view: `KeyFigures` tiles, `ChartGrid` / `ChartCard` for charts (each keeps its table view), `HierTable` for tables (each keeps its column chooser and Excel export). Layout changes never change calculations, filters or data.
+
+**Rule 4: the view objective under the title.** Right under each title, one line in the secondary text colour says what the view answers (`objective` in `src/lib/viewInfo.ts`). It is not the user story, which stays in the KPI definitions dialog.
+
+| View | Objective |
+|---|---|
+| Hot Buy Performance | Did each Hot Buy lift sales and margin above baseline, and how much of that came from other items? |
+| Other Promo Performance | Did TPRs, BOGOs, price locks and other temporary price reductions lift sales and margin above baseline, and how much came from other items? |
+| Post-Promo Trend | What happens to units and sales in the 4 weeks after a promotion ends (pantry loading). |
+| Promo Funding | Not part of this dashboard: vendor funding analytics live in the DNP tool (#2). |
+| Promo History | Every past promotion for an item or price group, and how results change with discount depth and ad type. |
+| Promo Shopper Impact | Did promotions bring more or new shoppers and bigger baskets? Club Card aggregates only. |
+| Promo Run Trend | How the same promotion performs from one run to the next, and vs. last year. |
+
+**Rule 5: each control lives next to what it changes.** A control that changes a single block (one chart, one table or one section) sits in that block's header (`BlockSettings`, or `RowsControl` for the table rows). A control that changes several blocks sits in the compact **Calculation settings** bar under the view objective (`ViewControls`), and every block it changes shows its tag (rule 6). A control that changes nothing in a view is not shown there. Every control has an (i) that starts with "Affects: …" and says exactly what it changes; for Cannibalization level the (i) is its "How it works" popover, and its "Definition pending #3" chip sits next to the control. Which blocks each control changes is declared once in `src/lib/settings.ts` (read from the data each block uses) and drives the bar, the tags and the table below. Promo Run Trend also keeps its "Promotion" selector (which promo type to compare) in the bar: it picks the runs every block shows.
+
+**Rule 6: active-value tag on every block a setting changes.** Each key-figure group, chart or table that depends on a Calculation settings control shows a small tag with the value it uses ("Baseline 4 wk", "Net Customer Sales", "Subcategory level"). When the value differs from the view default, the tag is highlighted (accent border from the theme) and says what changed ("Using Gross Sales (default: Net Customer)", "Baseline 13 wk (default: 4 wk)", "Category level (default: Subcategory)"). Blocks that no setting changes show no tag, so it is clear at a glance what changed and what did not. Hovering or focusing a tag shows the same "Affects: …" text as its control; the tag's accessible name carries the setting, its value and that text. Tags use theme variables only.
+
+**Rule 7: glossary.** Key terms use <Term> with a plain-language explanation, once per view. `<Term id="…">` shows the word with a dotted underline (not a link) and opens a popover on hover, keyboard focus or click; Esc or a click outside closes it, and screen readers read the explanation as the term's description. The texts live only in `src/lib/glossary.ts`, and the KPI definitions dialog lists them under "Glossary". Put the term on its first appearance in each view (card titles, subtitles, control labels, tile labels, chips), not on every appearance.
+
+Control → blocks it changes, by view (generated from `src/lib/settings.ts`; `src/lib/readme.test.ts` fails if it drifts):
+
+| View | Control | Where it lives | Blocks it changes (each shows the tag) |
+|---|---|---|---|
+| Hot Buy Performance | Rows | Table header | Table only (no tag) |
+| Hot Buy Performance | Baseline window | Calculation settings bar | Key figures, Sales vs. baseline chart, Category bridge, Table |
+| Hot Buy Performance | Sales basis | Calculation settings bar | Key figures, Sales vs. baseline chart, Category bridge, Table |
+| Hot Buy Performance | Cannibalization level | Calculation settings bar | Key figures, Category bridge, Table |
+| Other Promo Performance | Rows | Table header | Table only (no tag) |
+| Other Promo Performance | Baseline window | Calculation settings bar | Key figures, Sales vs. baseline chart, Category bridge, Table, Runs of the same promo |
+| Other Promo Performance | Sales basis | Calculation settings bar | Key figures, Sales vs. baseline chart, Category bridge, Table, Runs of the same promo |
+| Other Promo Performance | Cannibalization level | Calculation settings bar | Key figures, Category bridge, Table, Runs of the same promo |
+| Post-Promo Trend | Baseline window | Calculation settings bar | Key figures, Units vs. baseline chart, Sales vs. baseline chart, Table |
+| Post-Promo Trend | Sales basis | Sales vs. baseline chart header | Sales vs. baseline chart |
+| Promo Funding | — | — | No calculation setting (notice tab) |
+| Promo History | Baseline window | Calculation settings bar | Key figures, Results by period / week, Charts by Promo Depth Band, Charts by Ad Type / Vehicle, Table |
+| Promo History | Sales basis | Calculation settings bar | Key figures, Results by period / week, Charts by Promo Depth Band, Charts by Ad Type / Vehicle, Table |
+| Promo History | Cannibalization level | Calculation settings bar | Key figures, Results by period / week, Charts by Promo Depth Band, Charts by Ad Type / Vehicle, Table |
+| Promo Shopper Impact | Baseline window | Calculation settings bar | Key figures, Event panels, Table |
+| Promo Run Trend | Baseline window | Calculation settings bar | Key figures, Lift across runs, Net Incremental GM $ per run, Table |
+| Promo Run Trend | Sales basis | Calculation settings bar | Key figures, Lift across runs, Net Incremental GM $ per run, Table |
+| Promo Run Trend | Cannibalization level | Calculation settings bar | Key figures, Net Incremental GM $ per run, Table |
 
 ## KPI traceability (view → KPI → definition)
 
@@ -250,7 +293,7 @@ scripts/set-access-password.mjs   writes the password hash to .env.local
 
 - No secrets, passwords or keys in the code or the repository; `.env*` files are ignored (except `.env.example`, which has no value).
 - No `eval`, `new Function`, `innerHTML` or `dangerouslySetInnerHTML`; all text renders through React.
-- Every input is validated and length-capped: URL parameters (unknown values fall back to defaults, including the retired `tab=funding` and funding filter; queries over 2,000 characters are ignored), typed dates, search text, the password (200 characters) and the pasted UPC list (4,000 characters, 200 codes, digits only with a valid check digit). The pasted list is never put in the URL.
+- Every input is validated and length-capped: URL parameters (unknown values fall back to defaults, `tab=funding` is accepted only exactly, for the notice tab, and the old funding filter parameters are ignored; queries over 2,000 characters are ignored), typed dates, search text, the password (200 characters) and the pasted UPC list (4,000 characters, 200 codes, digits only with a valid check digit). The pasted list is never put in the URL.
 - Excel export uses UC2's own dependency-free writer (`src/lib/xlsx.ts`, no npm package); exports guard against spreadsheet formula injection (from UC2).
 - Errors show a generic message; details go to the browser console only.
 - Strict Content-Security-Policy in `index.html` and `vercel.json` (`self` only; fonts are bundled with `@fontsource`, so nothing loads from a CDN), plus `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, HSTS and `noindex`.

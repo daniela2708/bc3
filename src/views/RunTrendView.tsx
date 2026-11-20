@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Banner, BannerStack, KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
 import { C, ChartCard, ChartGrid, SignedColumns, TrendLines } from '../components/Charts';
+import { Term } from '../components/Term';
 import { Pending, Segmented } from '../components/ui';
 import { shortDay } from '../data/calendar';
 import { ITEMS, pgByName, PRICE_GROUPS } from '../data/products';
@@ -10,7 +11,8 @@ import { useFilters } from '../lib/filterStore';
 import { count, moneyCompact, moneyTile, pct, pctChange, signedMoney, signedMoneyTile } from '../lib/format';
 import { derive, eventAgg, sumAggs } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
-import { EmptyState, unitsTile, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
+import { VIEW_INFO } from '../lib/viewInfo';
+import { EmptyState, SettingTags, unitsTile, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
 import { RunsCompare, runLabel } from './RunsCompare';
 
 const DEFAULT_PG = pgByName('Cheerios Family Size').idx;
@@ -57,13 +59,13 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
     return (
       <>
         <Heading />
-        <ViewControls cann={false} />
+        <ViewControls />
         <EmptyState>No runs for the current filters. Pick a price group or SKU Number with promo history, or widen the period.</EmptyState>
       </>
     );
 
   const tiles: Tile[] = [
-    { label: 'Promo Event Count', info: 'Number of runs of this promotion (same price group and promo type) in the period.', value: count(runs.length), sub: `${PROMO_LABEL[runType!]} runs` },
+    { label: 'Promo Event Count', labelNode: <>Promo <Term id="event">Event</Term> Count</>, info: 'Number of runs of this promotion (same price group and promo type) in the period.', value: count(runs.length), sub: `${PROMO_LABEL[runType!]} runs` },
     { label: 'Total Gross Sales', info: 'Gross sales of the promoted items on promo days, all runs.', value: moneyTile(all.gross) },
     { label: 'Promo Units', info: `Units or pounds sold on promo days, all runs; random-weight items count pounds, as in Total Volume (UC2). ${RANDOM_WEIGHT_NOTE}`, ...unitsTile(all.units) },
     { label: 'Promo GM $ / %', info: `Promo GM $ (cost per #15: DC average cost minus scan-downs, DSD replacement cost); GM % on the selected sales basis, denominator pending (#5). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: moneyTile(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 15 },
@@ -78,7 +80,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
     <>
       <Heading />
 
-      <ViewControls cann>
+      <ViewControls>
         {typesHere.length > 1 && state.promoType === 'all' && (
           <span className="toggle-group">
             <span className="toggle-label">Promotion</span>
@@ -87,7 +89,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
         )}
       </ViewControls>
 
-      <KeyFigures caption={`${name} · ${PROMO_LABEL[runType!]} · ${scope.range.name}`} tiles={tiles} />
+      <KeyFigures tags={<SettingTags block="tiles" />} caption={`${name} · ${PROMO_LABEL[runType!]} · ${scope.range.name}`} tiles={tiles} />
 
       <ViewSummary>
       {name}: {runs.length} {PROMO_LABEL[runType!]} runs in {scope.range.name.toLowerCase()}. Sales Lift went from <b>{pctChange(first.salesLift)}</b> ({runLabel(runs[0])}) to <b>{pctChange(last.salesLift)}</b> ({runLabel(runs[runs.length - 1])}); Net Incremental GM per run from{' '}
@@ -105,6 +107,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
       <ChartGrid cols={2}>
         <ChartCard
           title="Lift across runs"
+          tags={<SettingTags block="liftChart" />}
           subtitle="Sales Lift % and Unit Lift % per run (axis: run start date)"
           legend={[
             { label: 'Sales Lift %', color: C.s1 },
@@ -125,6 +128,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
         </ChartCard>
         <ChartCard
           title="Net Incremental GM $ per run"
+          tags={<SettingTags block="netIncChart" />}
           subtitle={<>After cannibalization and vendor funding <Pending q={7} /></>}
           table={{ head: ['Run', 'Net Incremental GM $'], rows: runs.map((e, i) => [runLabel(e), Math.round(metrics[i].netIncGm ?? 0)]) }}
           height={240}
@@ -136,7 +140,12 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
       <section className="card table-card" aria-label="Runs side by side">
         <header className="table-head">
           <div>
-            <h3 className="chart-title">Each run side by side</h3>
+            <h3 className="chart-title">
+              Each <Term id="promoRun">run</Term> side by side
+            </h3>
+            <p className="block-tags">
+              <SettingTags block="table" />
+            </p>
             <p className="chart-sub">
               One column per run, oldest first. The Post-Promo Trend tab shows units before, during and after each promo.{' '}
               <button type="button" className="btn-link" onClick={() => openDefinitions('yoy')}>
@@ -152,5 +161,5 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
 }
 
 function Heading() {
-  return <SectionHeading title="Promo Run Trend" />;
+  return <SectionHeading title="Promo Run Trend" objective={VIEW_INFO.trend.objective} />;
 }

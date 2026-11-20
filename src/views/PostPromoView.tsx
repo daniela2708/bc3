@@ -1,20 +1,20 @@
 import { useMemo, useState } from 'react';
 import { KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
-import { C, ChartCard, ChartGrid, DailyVsBaseline } from '../components/Charts';
+import { ChartGrid } from '../components/Charts';
 import { HierTable, type HierCol, type HierRow } from '../components/HierTable';
+import { Term } from '../components/Term';
 import { Level2 } from '../components/ui';
-import { shortDay } from '../data/calendar';
 import { CATS, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
 import { useFilters } from '../lib/filterStore';
 import { count, moneyCompact, moneyUnit, pct, pctChange, volume } from '../lib/format';
-import { dailySeries, derive, eventAgg, POST_PROMO_WINDOW_DAYS, sumAggs, type Agg } from '../lib/metrics';
+import { derive, eventAgg, POST_PROMO_WINDOW_DAYS, sumAggs, type Agg } from '../lib/metrics';
+import { SALES_COLUMNS, UNITS_COLUMNS } from '../lib/series';
 import { getScope } from '../lib/selectors';
 import { deriveShopper, eventShopper, REPEAT_WINDOW_DAYS, shopperOf } from '../lib/shopper';
-import { basisWord, EmptyState, eventDates, uomFirst, uomPct, uomTile, ViewControls, type ViewProps } from './common';
-
-const PHASE = (day: number, from: number, start: number, end: number) =>
-  day < from ? ('before' as const) : day < start ? ('baseline' as const) : day <= end ? ('promo' as const) : ('after' as const);
+import { VIEW_INFO } from '../lib/viewInfo';
+import { basisWord, EmptyState, eventDates, SettingTags, uomFirst, uomPct, uomTile, ViewControls, type ViewProps } from './common';
+import { PromoWindowCard } from './PromoWindowCard';
 
 /** Post-Promo Trend (workbook view, Nice to have, level 2): what happens to the item after each promo ends. */
 export default function PostPromoView({ openDefinitions }: ViewProps) {
@@ -32,16 +32,6 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
   const selEvent = sel >= 0 ? EVENTS[sel] : null;
   const uom = selEvent ? PRICE_GROUPS[selEvent.pg].uom : 'ea';
 
-  const daily = useMemo(() => {
-    if (!selEvent) return null;
-    const s = dailySeries(selEvent, scope.ctx, selEvent.start - 28, selEvent.end + POST_PROMO_WINDOW_DAYS);
-    const key = basis === 'net' ? 'net' : 'gross';
-    const phase = (d: number) => PHASE(d, s.window.from, selEvent.start, selEvent.end);
-    return {
-      units: s.days.map((d) => ({ x: shortDay(d.day), actual: d.units, baseline: s.baseline.units, phase: phase(d.day) })),
-      sales: s.days.map((d) => ({ x: shortDay(d.day), actual: d[key], baseline: s.baseline[key], phase: phase(d.day) })),
-    };
-  }, [selEvent, scope.ctx, basis]);
 
   // Category-level post-promo summary, with each event underneath (click an event to show it in the charts above).
   const table = useMemo(() => {
@@ -96,7 +86,7 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
     return (
       <>
         <Heading />
-        <ViewControls cann={false} />
+        <ViewControls />
         <EmptyState>No promotions start in {scope.range.label} for the current filters. Try a longer period or clear a filter.</EmptyState>
       </>
     );
@@ -104,6 +94,11 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
   const tiles: Tile[] = [
     {
       label: 'Post-Promo Dip %',
+      labelNode: (
+        <>
+          <Term id="postPromoDip">Post-Promo Dip</Term> %
+        </>
+      ),
       info: `Units in the ${POST_PROMO_WINDOW_DAYS / 7} weeks after each promo vs. baseline units for the same days (pantry loading), ratio of totals over the events whose 4 weeks have passed.`,
       ...uomTile(all.dip, true),
       sub: `${measured.length} of ${scope.events.length} events measurable`,
@@ -119,8 +114,8 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
   return (
     <>
       <Heading />
-      <ViewControls cann={false} />
-      <KeyFigures caption={`${scope.range.name} · ${scope.events.length} events · ${POST_PROMO_WINDOW_DAYS / 7}-week post-promo window`} tiles={tiles} />
+      <ViewControls />
+      <KeyFigures tags={<SettingTags block="tiles" />} caption={`${scope.range.name} · ${scope.events.length} events · ${POST_PROMO_WINDOW_DAYS / 7}-week post-promo window`} tiles={tiles} />
       <ViewSummary>
         {scope.events.length} promotions starting {scope.range.label}: units in the 4 weeks after the promo were <b>{pctChange(uomFirst(all.dip))}</b> vs. baseline, and <b>{pct(shopperAll.repeatRate)}</b> of promo buyers bought again at regular price.{' '}
         <button type="button" className="btn-link" onClick={() => openDefinitions('dip')}>
@@ -128,32 +123,34 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
         </button>
       </ViewSummary>
 
-      {selEvent && daily && (
+      {selEvent && (
         <ChartGrid cols={2}>
-          <ChartCard
-            title={`Daily ${uom === 'lb' ? 'pounds' : 'units'} vs. baseline`}
-            subtitle={`${PRICE_GROUPS[selEvent.pg].name} · ${selEvent.id} · four weeks before, the promo and four weeks after`}
-            legend={[
-              { label: uom === 'lb' ? 'Pounds' : 'Units', color: C.s1 },
-              { label: 'Baseline (daily average)', color: C.axis },
-            ]}
-            table={{ head: ['Day', 'Phase', 'Volume', 'Baseline'], rows: daily.units.map((d) => [d.x, d.phase, Math.round(d.actual), Math.round(d.baseline)]) }}
+          <PromoWindowCard
+            key={`u${selEvent.idx}`}
+            event={selEvent}
+            ctx={scope.ctx}
+            seriesKey="units"
+            measure={uom === 'lb' ? 'Pounds' : 'Units'}
+            columns={uom === 'lb' ? { value: 'Pounds', baseline: 'Baseline pounds', diff: 'Difference' } : UNITS_COLUMNS}
+            format={(v) => volume(v, uom)}
+            tickFormat={(v) => volume(v, uom)}
+            baselineFormat={(v) => volume(v, uom)}
             height={240}
-          >
-            <DailyVsBaseline data={daily.units} format={(v) => volume(v, uom)} tickFormat={(v) => volume(v, uom)} actualLabel={uom === 'lb' ? 'Pounds' : 'Units'} />
-          </ChartCard>
-          <ChartCard
-            title={`Daily ${basisWord(basis)} vs. baseline`}
-            subtitle={`${PRICE_GROUPS[selEvent.pg].name} · ${selEvent.id} · four weeks before, the promo and four weeks after`}
-            legend={[
-              { label: 'Daily sales', color: C.s1 },
-              { label: 'Baseline (daily average)', color: C.axis },
-            ]}
-            table={{ head: ['Day', 'Phase', 'Sales $', 'Baseline $'], rows: daily.sales.map((d) => [d.x, d.phase, Math.round(d.actual), Math.round(d.baseline)]) }}
+            block="unitsChart"
+          />
+          <PromoWindowCard
+            key={`s${selEvent.idx}`}
+            event={selEvent}
+            ctx={scope.ctx}
+            seriesKey={basis === 'net' ? 'net' : 'gross'}
+            measure={basisWord(basis)}
+            columns={SALES_COLUMNS}
+            format={moneyUnit}
+            tickFormat={moneyCompact}
+            baselineFormat={moneyCompact}
             height={240}
-          >
-            <DailyVsBaseline data={daily.sales} format={moneyUnit} tickFormat={moneyCompact} actualLabel={basisWord(basis)} />
-          </ChartCard>
+            block="salesChart"
+          />
         </ChartGrid>
       )}
 
@@ -161,6 +158,9 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
         <header className="table-head">
           <div>
             <h3 className="chart-title">Post-promo summary by category</h3>
+            <p className="block-tags">
+              <SettingTags block="table" />
+            </p>
             <p className="chart-sub">One row per category; expand it for its events and click an event to show it in the charts above. Post-Promo Dip % shows — until the 4 weeks after the promo have passed.</p>
           </div>
         </header>
@@ -171,5 +171,5 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
 }
 
 function Heading() {
-  return <SectionHeading title="Post-Promo Trend" badge={<Level2 />} />;
+  return <SectionHeading title="Post-Promo Trend" badge={<Level2 term />} objective={VIEW_INFO.post.objective} />;
 }

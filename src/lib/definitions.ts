@@ -7,6 +7,11 @@
  */
 import type { TabId } from './filters';
 
+/** The requirements workbook on the Weis SharePoint (opens with a Weis account). A fixed https URL, not user input. */
+export const WORKBOOK_NAME = 'UC3_KPIs_Definitions_and_Mapping.xlsx';
+export const WORKBOOK_URL =
+  'https://weismarketsinc.sharepoint.com/:x:/r/teams/DataStrategyProject/_layouts/15/Doc.aspx?sourcedoc=%7BBC164FA7-9CCD-41F9-A20C-EB56CC1F223F%7D&file=UC3_KPIs%20Definitions%20and%20Mapping.xlsx&action=default&mobileredirect=true';
+
 export type Priority = 'Must Have' | 'Should Have' | 'Nice to have';
 
 export interface KpiDef {

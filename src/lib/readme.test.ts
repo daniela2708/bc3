@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { KPI_DEFINITIONS, OPEN_QUESTIONS } from './definitions';
-import { assumptionsTable, traceabilityTable } from './readme';
+import { assumptionsTable, settingsTable, traceabilityTable } from './readme';
 // Vite raw import: the README as text, with no Node.js types needed.
 import README from '../../README.md?raw';
 
 describe('README stays generated from definitions.ts', () => {
   it('has the traceability table', () => {
     expect(README).toContain(traceabilityTable());
+  });
+  it('has the control → blocks table of the layout rules', () => {
+    expect(README).toContain(settingsTable());
   });
   it('has the open questions table', () => {
     expect(README).toContain(assumptionsTable());

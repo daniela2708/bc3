@@ -75,7 +75,13 @@ export function ChartCard({
   contentHeight,
   className,
   rank,
+  tags,
+  titleNode,
 }: {
+  /** Title with glossary terms; `title` stays the plain text (aria-label, Excel file name). */
+  titleNode?: ReactNode;
+  /** Active-value tags of the settings that change this chart, and any control that changes only it. */
+  tags?: ReactNode;
   /** Ranking charts: a Top first | Bottom first switch in the header. */
   rank?: { order: RankOrder; onChange: (o: RankOrder) => void };
   /** Full height of the chart when it is taller than `height`; the body then scrolls. */
@@ -93,8 +99,9 @@ export function ChartCard({
     <section className={`card chart-card${className ? ` ${className}` : ''}`} aria-label={title}>
       <header className="chart-head">
         <div>
-          <h3 className="chart-title">{title}</h3>
-          {subtitle && <p className="chart-sub">{subtitle}</p>}
+          <h3 className="chart-title">{titleNode ?? title}</h3>
+          {subtitle && <div className="chart-sub">{subtitle}</div>}
+          {tags && <div className="block-tags">{tags}</div>}
         </div>
         {(table || rank) && (
           <span className="chart-actions">
@@ -655,60 +662,78 @@ export function StackedBars({
 
 // ---------------------------------------------------------------- Daily sales vs. baseline
 
-export interface DailyPoint {
+/** One point of a promo-window chart (a day or an ad week); see src/lib/series.ts. */
+export interface WindowPoint {
   x: string;
   actual: number;
   baseline: number;
-  phase: 'baseline' | 'promo' | 'after' | 'before';
+  diff: number;
+  phase: 'baseline' | 'promo' | 'after';
+  days: number;
+  partial: boolean;
 }
 
-/** Daily actuals (line) against the baseline daily average (dashed), with the promo days shaded. */
-export function DailyVsBaseline({
+const WINDOW_SHADE = {
+  baseline: { fill: C.grid, opacity: 0.45, label: 'Baseline' },
+  promo: { fill: C.soft, opacity: 0.6, label: 'Promo' },
+  after: { fill: C.grid, opacity: 0.85, label: 'After' },
+} as const;
+
+/**
+ * Actuals (line) against the baseline (dashed) across the three windows, each shaded and labelled: Baseline, Promo
+ * and After. Daily points compare with the baseline daily average; weekly points with the weekly baseline, scaled to
+ * the days of a partial week.
+ */
+export function PromoWindowChart({
   data,
   format,
   tickFormat,
   actualLabel,
+  weekly,
   width,
   height,
 }: {
-  data: DailyPoint[];
+  data: WindowPoint[];
   format: (v: number) => string;
   tickFormat: (v: number) => string;
   actualLabel: string;
+  weekly: boolean;
   width?: number;
   height?: number;
 }) {
-  const promo = data.filter((d) => d.phase === 'promo');
-  const after = data.filter((d) => d.phase === 'after');
+  const span = (phase: WindowPoint['phase']) => {
+    const p = data.filter((d) => d.phase === phase);
+    return p.length ? { x1: p[0].x, x2: p[p.length - 1].x } : null;
+  };
   return (
     <ComposedChart width={width} height={height} data={data} margin={{ top: 16, right: 16, bottom: 0, left: 4 }}>
-      <XAxis dataKey="x" {...axisProps} interval="preserveStartEnd" minTickGap={28} />
+      <XAxis dataKey="x" {...axisProps} interval="preserveStartEnd" minTickGap={weekly ? 12 : 28} />
       <YAxis {...axisProps} width={56} tickFormatter={tickFormat} />
-      {promo.length > 0 && (
-        <ReferenceArea x1={promo[0].x} x2={promo[promo.length - 1].x} fill={C.soft} fillOpacity={0.6} label={{ value: 'Promo', position: 'insideTop', fill: C.axis, fontSize: 11 }} />
-      )}
-      {after.length > 0 && (
-        <ReferenceArea x1={after[0].x} x2={after[after.length - 1].x} fill={C.grid} fillOpacity={0.7} label={{ value: 'After', position: 'insideTop', fill: C.axis, fontSize: 11 }} />
-      )}
+      {(['baseline', 'promo', 'after'] as const).map((ph) => {
+        const sp = span(ph);
+        const sh = WINDOW_SHADE[ph];
+        return sp ? <ReferenceArea key={ph} x1={sp.x1} x2={sp.x2} fill={sh.fill} fillOpacity={sh.opacity} label={{ value: sh.label, position: 'insideTop', fill: C.axis, fontSize: 11 }} /> : null;
+      })}
       <Tooltip
         cursor={{ stroke: C.axis, strokeWidth: 1 }}
         content={({ active, payload, label }) => {
           if (!active || !payload?.length) return null;
-          const p = payload[0].payload as DailyPoint;
-          const phase = p.phase === 'promo' ? 'Promo day' : p.phase === 'after' ? 'Week after the promo' : p.phase === 'baseline' ? 'Baseline window' : 'Before the baseline window';
+          const p = payload[0].payload as WindowPoint;
+          const partial = p.partial ? ` · partial week (${p.days} of 7 days)` : '';
           return (
             <TipBox
-              title={`${label} · ${phase}`}
+              title={`${label} · ${WINDOW_SHADE[p.phase].label}${partial}`}
               rows={[
                 { label: actualLabel, value: format(p.actual), color: C.s1 },
-                { label: 'Baseline (daily average)', value: format(p.baseline), color: C.axis },
+                { label: weekly ? (p.partial ? `Baseline (${p.days} days)` : 'Baseline (weekly)') : 'Baseline (daily average)', value: format(p.baseline), color: C.axis },
+                { label: 'Difference', value: format(p.diff) },
               ]}
             />
           );
         }}
       />
       <Line type="stepAfter" dataKey="baseline" stroke={C.axis} strokeDasharray="5 4" strokeWidth={1.5} dot={false} isAnimationActive={false} activeDot={false} />
-      <Line type="linear" dataKey="actual" stroke={C.s1} strokeWidth={2} dot={false} isAnimationActive={false} activeDot={{ r: 4, stroke: '#fff', strokeWidth: 2 }} />
+      <Line type="linear" dataKey="actual" stroke={C.s1} strokeWidth={2} dot={weekly ? { r: 3, fill: C.s1, strokeWidth: 0 } : false} isAnimationActive={false} activeDot={{ r: 4, stroke: '#fff', strokeWidth: 2 }} />
     </ComposedChart>
   );
 }

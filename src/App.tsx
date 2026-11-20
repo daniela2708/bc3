@@ -1,25 +1,43 @@
-import { Component, lazy, Suspense, useCallback, useState, type ErrorInfo, type ReactNode } from 'react';
+import { Component, Suspense, useCallback, useState, type ErrorInfo, type ReactNode } from 'react';
 import { BottomBar } from './components/Blocks';
 import { DefinitionsDrawer } from './components/DefinitionsDrawer';
 import { FilterCard } from './components/FilterCard';
 import { Disclaimer, Header } from './components/Header';
 import { actions, FilterProvider, useFilters } from './lib/filterStore';
+import { toQuery } from './lib/filters';
+import { lazyWithReload } from './lib/lazyWithReload';
 import { PerformanceView } from './views/PerformanceView';
 
-const PostPromoView = lazy(() => import('./views/PostPromoView'));
-const RunTrendView = lazy(() => import('./views/RunTrendView'));
-const HistoryView = lazy(() => import('./views/HistoryView'));
-const ShopperView = lazy(() => import('./views/ShopperView'));
+const PostPromoView = lazyWithReload(() => import('./views/PostPromoView'));
+const FundingView = lazyWithReload(() => import('./views/FundingView'));
+const RunTrendView = lazyWithReload(() => import('./views/RunTrendView'));
+const HistoryView = lazyWithReload(() => import('./views/HistoryView'));
+const ShopperView = lazyWithReload(() => import('./views/ShopperView'));
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  resetKey: string;
+  onResetFilters: () => void;
+  onReload: () => void;
+}
 
 /** Shows a generic message to users; details go to the console only. */
-class ErrorBoundary extends Component<{ children: ReactNode; resetKey: string }, { failed: boolean; key: string }> {
+export class ErrorBoundary extends Component<ErrorBoundaryProps, { failed: boolean; key: string }> {
   state = { failed: false, key: this.props.resetKey };
   static getDerivedStateFromError() {
     return { failed: true };
   }
-  static getDerivedStateFromProps(props: { resetKey: string }, state: { failed: boolean; key: string }) {
+  static getDerivedStateFromProps(props: ErrorBoundaryProps, state: { failed: boolean; key: string }) {
     return props.resetKey !== state.key ? { failed: false, key: props.resetKey } : null;
   }
+  /**
+   * Clears the error, then resets the filters. Clearing here as well covers an error raised with the filters already
+   * at their defaults, where the reset leaves the reset key unchanged.
+   */
+  resetFilters = () => {
+    this.setState({ failed: false });
+    this.props.onResetFilters();
+  };
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('View failed to render', error, info.componentStack);
   }
@@ -29,6 +47,14 @@ class ErrorBoundary extends Component<{ children: ReactNode; resetKey: string },
         <section className="card app-error" role="alert">
           <h2>Something went wrong</h2>
           <p>This view could not be displayed. Try another filter or reset the filters.</p>
+          <div className="app-error-actions">
+            <button type="button" className="btn-outline" onClick={this.resetFilters}>
+              Reset filters
+            </button>
+            <button type="button" className="btn-outline" onClick={this.props.onReload}>
+              Reload page
+            </button>
+          </div>
         </section>
       );
     return this.props.children;
@@ -47,6 +73,8 @@ function Shell() {
         return <PerformanceView variant="other" openDefinitions={openDefinitions} />;
       case 'post':
         return <PostPromoView openDefinitions={openDefinitions} />;
+      case 'funding':
+        return <FundingView />;
       case 'trend':
         return <RunTrendView openDefinitions={openDefinitions} />;
       case 'history':
@@ -65,7 +93,7 @@ function Shell() {
       <main className="page">
         <FilterCard />
         <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${state.tab}`}>
-          <ErrorBoundary resetKey={window.location.search}>
+          <ErrorBoundary resetKey={`${toQuery(state)}#${state.codes.join(',')}`} onResetFilters={() => update(actions.reset())} onReload={() => window.location.reload()}>
             <Suspense fallback={<section className="card empty-card">Loading view…</section>}>{view}</Suspense>
           </ErrorBoundary>
         </div>
