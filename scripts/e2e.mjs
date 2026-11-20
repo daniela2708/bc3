@@ -202,6 +202,16 @@ async function main() {
   check('Baseline note with Definition pending #4', await evaluate(`(() => { const n = document.querySelector('.baseline-note'); return n.textContent.includes('Proposed default, pending confirmation (#4)') && n.textContent.includes('Baseline includes prior promo weeks in the window') && n.textContent.includes('Definition pending #4'); })()`));
   const pressed = (group) => `[...document.querySelectorAll('[role=group][aria-label="${group}"] button[aria-pressed=true]')].map((b) => b.textContent).join()`;
   check('Hot Buy Performance: 4-week baseline and Subcategory cannibalization by default', (await evaluate(pressed('Baseline window in weeks'))) === '4 wk' && (await evaluate(pressed('Cannibalization level'))) === 'Subcategory');
+  // Two-value tile: Net Customer main, Gross secondary, each tagged on its own line, 2 decimals; Gross basis swaps them.
+  const salesTile = `(() => { const t = [...document.querySelectorAll('.kpi-tile')].find((x) => x.querySelector('.kpi-label').textContent.startsWith('Promo Sales $')); return [t.querySelector('.kpi-pair-main').getAttribute('aria-label'), t.querySelector('.kpi-pair-sub').getAttribute('aria-label'), t.querySelector('.kpi-pair-main .kpi-tag').textContent, t.querySelector('.kpi-pair-sub .kpi-tag').textContent].join('|'); })()`;
+  const netFirst = await evaluate(salesTile);
+  check('Promo Sales $ tile: Net Customer main and Gross secondary, tagged, 2 decimals', /^Net Customer Sales \$\d+\.\d{2}[MK]\|Gross Sales \$\d+\.\d{2}[MK]\|Net Customer\|Gross$/.test(netFirst), netFirst);
+  await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Sales basis"] button')].find((b) => b.textContent === 'Gross').click(), 1`);
+  await until(`location.search.includes('sb=gross')`, 'Gross sales basis');
+  const grossFirst = await evaluate(salesTile);
+  check('Promo Sales $ tile: Gross basis puts Gross on top', /^Gross Sales \$\d+\.\d{2}[MK]\|Net Customer Sales/.test(grossFirst), grossFirst);
+  await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Sales basis"] button')].find((b) => b.textContent === 'Net Customer').click(), 1`);
+  await until(`!location.search.includes('sb=gross')`, 'Net Customer sales basis again');
   await evaluate(`document.querySelector('table.hier tbody tr:not(.total-row) button[aria-expanded]').click(), 1`);
   await until(`!!document.querySelector('tr.sku-row .pg-only')`, 'SKU row dash');
   check('SKU-row cannibalization dash has the tooltip', await evaluate(`[...document.querySelectorAll('tr.sku-row .pg-only')].every((e) => e.title === 'Measured at price group level')`));

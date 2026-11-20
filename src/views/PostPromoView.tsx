@@ -11,7 +11,7 @@ import { count, moneyCompact, moneyUnit, pct, pctChange, volume } from '../lib/f
 import { dailySeries, derive, eventAgg, POST_PROMO_WINDOW_DAYS, sumAggs, type Agg } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
 import { deriveShopper, eventShopper, REPEAT_WINDOW_DAYS, shopperOf } from '../lib/shopper';
-import { basisWord, EmptyState, eventDates, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
+import { basisWord, EmptyState, eventDates, uomFirst, uomPct, uomTile, ViewControls, type ViewProps } from './common';
 
 const PHASE = (day: number, from: number, start: number, end: number) =>
   day < from ? ('before' as const) : day < start ? ('baseline' as const) : day <= end ? ('promo' as const) : ('after' as const);
@@ -105,7 +105,7 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
     {
       label: 'Post-Promo Dip %',
       info: `Units in the ${POST_PROMO_WINDOW_DAYS / 7} weeks after each promo vs. baseline units for the same days (pantry loading), ratio of totals over the events whose 4 weeks have passed.`,
-      value: uomPct(all.dip, true),
+      ...uomTile(all.dip, true),
       sub: `${measured.length} of ${scope.events.length} events measurable`,
     },
     {

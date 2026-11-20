@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- shared view helpers and the controls they drive */
 import type { ReactNode } from 'react';
+import type { Tile, TileValue } from '../components/Blocks';
 import type { HierCol, HierRow } from '../components/HierTable';
 import { Field, Impact, InfoTip, Pending, Segmented } from '../components/ui';
 import { formatDay, shortDay } from '../data/calendar';
@@ -8,7 +9,7 @@ import { AD_LABEL, EVENTS, PROMO_LABEL, type PromoEvent } from '../data/promos';
 import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
 import type { FilterState, Rollup } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
-import { count, DASH, money, moneyCompact, pct, pctChange, volume, volumeCompact } from '../lib/format';
+import { count, DASH, money, moneyCompact, moneyTile, numberCompact, pct, pctChange, volume, volumeCompact } from '../lib/format';
 import { BASELINE_PENDING_TEXT, BASELINE_WEEKS, PROPOSED_BASELINE_BY_TYPE, viewBaselineDefault, type BaselineWeeks } from '../lib/baseline';
 import { safeDiv } from '../lib/kpis';
 import { CANN_LEVELS, derive, eventAgg, sumAggs, type Agg, type Basis, type ByUom, type CannLevel, type EventCtx, type Metrics, type U } from '../lib/metrics';
@@ -49,6 +50,45 @@ export function uomPct(v: ByUom, signed = false): ReactNode {
   return f(v.ea ?? v.lb);
 }
 export const uomFirst = (v: ByUom) => v.ea ?? v.lb;
+
+// ---------------------------------------------------------------- Two-value tiles
+
+/**
+ * Promo Sales $ as a two-value tile: the selected sales basis is the main value (Net Customer Sales by default, the
+ * UC1 sales table, #5) and the other basis the secondary one.
+ */
+export function salesPair(gross: number, net: number, basis: Basis): [TileValue, TileValue] {
+  const n: TileValue = { value: moneyTile(net), tag: 'Net Customer', spoken: 'Net Customer Sales' };
+  const g: TileValue = { value: moneyTile(gross), tag: 'Gross', spoken: 'Gross Sales' };
+  return basis === 'net' ? [n, g] : [g, n];
+}
+
+const UOM_SPOKEN = { ea: 'Units (each)', lb: 'Pounds' } as const;
+
+/** Units tile: one value, or each (main) and pounds (secondary) when both are sold. Never added together. */
+export function unitsTile(u: U): Pick<Tile, 'value' | 'pair'> {
+  if (u.ea > 0 && u.lb > 0)
+    return {
+      pair: [
+        { value: numberCompact(u.ea), tag: 'ea', spoken: UOM_SPOKEN.ea },
+        { value: numberCompact(u.lb), tag: 'lb', spoken: UOM_SPOKEN.lb },
+      ],
+    };
+  return { value: u.lb > 0 ? volumeCompact(u.lb, 'lb') : volumeCompact(u.ea, 'ea') };
+}
+
+/** A rate kept per unit of measure: one value, or ea (main) and lb (secondary) when both exist. */
+export function uomTile(v: ByUom, signed = false): Pick<Tile, 'value' | 'pair'> {
+  const f = signed ? pctChange : pct;
+  if (v.ea !== null && v.lb !== null)
+    return {
+      pair: [
+        { value: f(v.ea), tag: 'ea', spoken: UOM_SPOKEN.ea },
+        { value: f(v.lb), tag: 'lb', spoken: UOM_SPOKEN.lb },
+      ],
+    };
+  return { value: f(v.ea ?? v.lb) };
+}
 
 export function eventDates(e: PromoEvent): string {
   return `${shortDay(e.start)}–${shortDay(e.end)}`;

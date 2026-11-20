@@ -36,6 +36,28 @@ export function moneyCompact(n: N): string {
   return sign(n, s);
 }
 
+/**
+ * Money in key-figure tiles: millions and thousands with 2 decimals ($2.55M, $845.20K, $1.24B), smaller amounts as
+ * whole dollars. Tables keep moneyCompact.
+ */
+export function moneyTile(n: N): string {
+  if (!ok(n)) return DASH;
+  const a = Math.abs(n);
+  let s: string;
+  if (a >= 1e9) s = `$${dec2.format(a / 1e9)}B`;
+  else if (a >= 1e6) s = `$${dec2.format(a / 1e6)}M`;
+  else if (a >= 1e3) s = `$${dec2.format(a / 1e3)}K`;
+  else s = `$${int.format(Math.round(a))}`;
+  return sign(n, s);
+}
+
+/** Signed tile money: +$144.72K, −$40.31K. */
+export function signedMoneyTile(n: N): string {
+  if (!ok(n)) return DASH;
+  if (Math.abs(n) < 0.5) return '$0';
+  return `${n > 0 ? '+' : MINUS}${moneyTile(Math.abs(n))}`;
+}
+
 /** $4.99 */
 export function moneyUnit(n: N): string {
   if (!ok(n)) return DASH;
@@ -69,6 +91,15 @@ export function pctChange(n: N): string {
 export function volume(n: N, uom: Uom): string {
   if (!ok(n)) return DASH;
   return `${int.format(Math.round(n))} ${uom}`;
+}
+
+/** 38.6M (no unit of measure; the tile tag carries it). */
+export function numberCompact(n: N): string {
+  if (!ok(n)) return DASH;
+  const a = Math.abs(n);
+  if (a >= 1e6) return `${dec1.format(n / 1e6)}M`;
+  if (a >= 1e4) return `${dec1.format(n / 1e3)}K`;
+  return int.format(Math.round(n));
 }
 
 /** 38.6M ea */

@@ -12,10 +12,10 @@ function cell(text: string): string {
 
 /** "View → KPI → definition" traceability table, one row per KPI and view. */
 export function traceabilityTable(): string {
-  const lines = ['| View | KPI | Priority | Definition | Calculation | Status |', '|---|---|---|---|---|---|'];
+  const lines = ['| View | KPI | Priority | Definition (workbook) | Calculation (workbook) | Prototype note | Status |', '|---|---|---|---|---|---|---|'];
   for (const tab of TABS) {
     for (const d of KPI_DEFINITIONS.filter((k) => k.views.includes(tab.id))) {
-      lines.push(`| ${tab.label} | ${cell(d.name)} | ${d.priority} | ${cell(d.definition)} | ${cell(d.formula)} | ${cell(kpiStatus(d))} |`);
+      lines.push(`| ${tab.label} | ${cell(d.name)} | ${d.priority} | ${cell(d.definition)} | ${cell(d.formula)} | ${cell(d.note ?? '')} | ${cell(kpiStatus(d))} |`);
     }
   }
   return lines.join('\n');

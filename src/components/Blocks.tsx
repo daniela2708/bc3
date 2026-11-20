@@ -93,14 +93,36 @@ export function BannerStack({ children }: { children: ReactNode }) {
   );
 }
 
+/** One of the two values of a two-value tile, with its tag and what a screen reader says. */
+export interface TileValue {
+  value: string;
+  /** Short tag shown next to the value, e.g. "Net Customer" or "ea". */
+  tag: string;
+  /** Spoken label, e.g. "Net Customer Sales"; the value is appended. */
+  spoken: string;
+}
+
 export interface Tile {
   label: string;
   info: string;
   /** Open question number when the KPI definition is pending. */
   pending?: number;
-  value: ReactNode;
+  /** Single value. Ignored when `pair` is set. */
+  value?: ReactNode;
+  /** Two values: [main, secondary]. The main one keeps the tile size; the secondary one is smaller and grey. */
+  pair?: [TileValue, TileValue];
   sub?: ReactNode;
-  two?: boolean;
+}
+
+function TileLine({ v, main }: { v: TileValue; main: boolean }) {
+  return (
+    <div className={main ? 'kpi-value kpi-pair-main' : 'kpi-pair-sub'} role="group" aria-label={`${v.spoken} ${v.value}`}>
+      <span aria-hidden="true">{v.value}</span>
+      <span className="kpi-tag" aria-hidden="true">
+        {v.tag}
+      </span>
+    </div>
+  );
 }
 
 export function KeyFigures({ caption, tiles, note }: { caption: string; tiles: Tile[]; note?: ReactNode }) {
@@ -115,7 +137,14 @@ export function KeyFigures({ caption, tiles, note }: { caption: string; tiles: T
               <InfoTip text={t.info} label={`${t.label} definition`} below />
             </div>
             {t.pending !== undefined && <Pending q={t.pending} />}
-            <div className={`kpi-value${t.two ? ' two' : ''}`}>{t.value}</div>
+            {t.pair ? (
+              <>
+                <TileLine v={t.pair[0]} main />
+                <TileLine v={t.pair[1]} main={false} />
+              </>
+            ) : (
+              <div className="kpi-value">{t.value}</div>
+            )}
             {t.sub && <div className="kpi-sub">{t.sub}</div>}
           </div>
         ))}

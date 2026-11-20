@@ -661,9 +661,33 @@ select {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.kpi-value.two {
-  font-size: 17px;
-  line-height: 1.25;
+/* Two-value tiles: main value at the tile size, secondary at about 62 % in the secondary text colour, each with its
+   tag on the same line. Colours come from the theme variables. */
+.kpi-pair-main,
+.kpi-pair-sub {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-pair-sub {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--n5);
+  margin: 0 0 2px;
+}
+.kpi-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--n5);
+  border: 1px solid var(--n3);
+  border-radius: 999px;
+  padding: 0 6px;
+  line-height: 1.5;
+  align-self: center;
 }
 .kpi-sub {
   font-size: 11.5px;
@@ -1173,6 +1197,9 @@ tr.is-stale td {
 @media (max-width: 1500px) {
   .kpi-value {
     font-size: 21px;
+  }
+  .kpi-pair-sub {
+    font-size: 13px;
   }
   .kpi-row {
     gap: 8px;
@@ -1703,6 +1730,12 @@ table.hier tr.total-row td:first-child {
 }
 table.hier tbody tr:not(.total-row):hover td:first-child {
   background: #faf9f5;
+}
+.defs-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--n5);
 }
 .defs-views {
   font-size: 12.5px;

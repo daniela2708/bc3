@@ -7,12 +7,12 @@ import { shortDay } from '../data/calendar';
 import { CATS, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
 import { useFilters } from '../lib/filterStore';
-import { moneyCompact, moneyUnit, pct, pctChange, signedMoney, volumeCompact } from '../lib/format';
+import { moneyCompact, moneyTile, moneyUnit, pct, pctChange, signedMoney, signedMoneyTile, volumeCompact } from '../lib/format';
 import { baselineText } from '../lib/baseline';
 import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
 import { CANN_LEVELS, dailySeries, derive, eventAgg, eventBaselineWeeks, sumAggs } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
-import { basisWord, columnsOf, EmptyState, eventDates, performanceRows, unitsText, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
+import { basisWord, columnsOf, EmptyState, eventDates, performanceRows, salesPair, unitsTile, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
 import { RunsCompare } from './RunsCompare';
 
 
@@ -95,17 +95,9 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
     {
       label: 'Promo Sales $',
       info: 'Gross Sales (before discounts) and Net Customer Sales (after discounts) of the promoted items on promo days.',
-      value: (
-        <>
-          {moneyCompact(all.gross)}
-          <br />
-          {moneyCompact(all.net)}
-        </>
-      ),
-      two: true,
-      sub: 'Gross · Net Customer',
+      pair: salesPair(all.gross, all.net, basis),
     },
-    { label: 'Promo Units', info: `Units (ea) and pounds (lb) sold on promo days; random-weight items count pounds, as in Total Volume (UC2). Never added together. ${RANDOM_WEIGHT_NOTE}`, value: unitsText(all.units), two: all.units.ea > 0 && all.units.lb > 0, sub: `Baseline ${all.baseUnits.ea > 0 ? volumeCompact(all.baseUnits.ea, 'ea') : volumeCompact(all.baseUnits.lb, 'lb')}` },
+    { label: 'Promo Units', info: `Units (ea) and pounds (lb) sold on promo days; random-weight items count pounds, as in Total Volume (UC2). Never added together. ${RANDOM_WEIGHT_NOTE}`, ...unitsTile(all.units), sub: `Baseline ${all.baseUnits.ea > 0 ? volumeCompact(all.baseUnits.ea, 'ea') : volumeCompact(all.baseUnits.lb, 'lb')}` },
     {
       label: 'Sales / Unit Lift %',
       info: `Incremental ÷ Baseline, on ${basisWord(basis)} and on units. Baseline: ${baseWord}, average of the weeks before each event.`,
@@ -116,15 +108,15 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
     {
       label: 'Promo GM $ / %',
       info: `${basisWord(basis)} − cost of goods sold. Cost (#15): DC items use the DC average cost minus scan-downs; DSD items the replacement cost that day. GM % = GM $ ÷ ${basisWord(basis)}; denominator pending (#5). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`,
-      value: moneyCompact(all.gm),
+      value: moneyTile(all.gm),
       sub: <>{pct(all.gmPct)} margin rate</>,
       pending: 15,
     },
-    { label: 'Incremental GM $', info: `Promo GM $ − Baseline GM $ (before cannibalization and the vendor funding Net GM adds). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: signedMoney(all.incGm), sub: <>Baseline GM {moneyCompact(all.baseGm)}</>, pending: 7 },
+    { label: 'Incremental GM $', info: `Promo GM $ − Baseline GM $ (before cannibalization and the vendor funding Net GM adds). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: signedMoneyTile(all.incGm), sub: <>Baseline GM {moneyTile(all.baseGm)}</>, pending: 7 },
     {
       label: 'Net Incremental GM $',
       info: `Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (#7: scan-downs at the expected amount, bill-backs only for DSD items, no slotting or lump sums; DC scan-downs are already in the cost, #15). The main "did it pay off" number. ${RANDOM_WEIGHT_NOTE}`,
-      value: signedMoney(all.netIncGm),
+      value: signedMoneyTile(all.netIncGm),
       sub: <>{losers.length} of {perEvent.length} below zero</>,
       pending: 7,
     },

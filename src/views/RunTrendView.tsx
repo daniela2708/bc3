@@ -7,10 +7,10 @@ import { ITEMS, pgByName, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL, type PromoType } from '../data/promos';
 import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
 import { useFilters } from '../lib/filterStore';
-import { count, moneyCompact, pct, pctChange, signedMoney } from '../lib/format';
+import { count, moneyCompact, moneyTile, pct, pctChange, signedMoney, signedMoneyTile } from '../lib/format';
 import { derive, eventAgg, sumAggs } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
-import { EmptyState, unitsText, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
+import { EmptyState, unitsTile, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
 import { RunsCompare, runLabel } from './RunsCompare';
 
 const DEFAULT_PG = pgByName('Cheerios Family Size').idx;
@@ -64,12 +64,12 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
 
   const tiles: Tile[] = [
     { label: 'Promo Event Count', info: 'Number of runs of this promotion (same price group and promo type) in the period.', value: count(runs.length), sub: `${PROMO_LABEL[runType!]} runs` },
-    { label: 'Total Gross Sales', info: 'Gross sales of the promoted items on promo days, all runs.', value: moneyCompact(all.gross) },
-    { label: 'Promo Units', info: `Units or pounds sold on promo days, all runs; random-weight items count pounds, as in Total Volume (UC2). ${RANDOM_WEIGHT_NOTE}`, value: unitsText(all.units) },
-    { label: 'Promo GM $ / %', info: `Promo GM $ (cost per #15: DC average cost minus scan-downs, DSD replacement cost); GM % on the selected sales basis, denominator pending (#5). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: moneyCompact(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 15 },
+    { label: 'Total Gross Sales', info: 'Gross sales of the promoted items on promo days, all runs.', value: moneyTile(all.gross) },
+    { label: 'Promo Units', info: `Units or pounds sold on promo days, all runs; random-weight items count pounds, as in Total Volume (UC2). ${RANDOM_WEIGHT_NOTE}`, ...unitsTile(all.units) },
+    { label: 'Promo GM $ / %', info: `Promo GM $ (cost per #15: DC average cost minus scan-downs, DSD replacement cost); GM % on the selected sales basis, denominator pending (#5). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: moneyTile(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 15 },
     { label: 'Sales / Unit Lift %', info: 'Incremental ÷ Baseline, all runs (ratio of totals).', value: pctChange(all.salesLift), sub: <>Units {uomPct(all.unitLift, true)}</>, pending: 4 },
-    { label: 'Net Incremental GM $', info: `Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (the funding #7 allows). ${RANDOM_WEIGHT_NOTE}`, value: signedMoney(all.netIncGm), sub: <>Incremental GM {signedMoney(all.incGm)}</>, pending: 7 },
-    { label: 'YoY Gross Sales Growth', info: 'Promo-day gross sales vs. the same days last year (364 days earlier), runs with last-year history.', value: pctChange(all.yoy.pct), sub: <>LY {moneyCompact(all.ly)} · {signedMoney(all.yoy.abs)}</> },
+    { label: 'Net Incremental GM $', info: `Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (the funding #7 allows). ${RANDOM_WEIGHT_NOTE}`, value: signedMoneyTile(all.netIncGm), sub: <>Incremental GM {signedMoneyTile(all.incGm)}</>, pending: 7 },
+    { label: 'YoY Gross Sales Growth', info: 'Promo-day gross sales vs. the same days last year (364 days earlier), runs with last-year history.', value: pctChange(all.yoy.pct), sub: <>LY {moneyTile(all.ly)} · {signedMoneyTile(all.yoy.abs)}</> },
   ];
 
   const trendData = runs.map((e, i) => ({ x: shortDay(EVENTS[e].start), sales: metrics[i].salesLift, units: uomFirst(metrics[i].unitLift) }));

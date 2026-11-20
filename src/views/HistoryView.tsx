@@ -7,10 +7,10 @@ import { fiscalOfDay } from '../data/calendar';
 import { ITEMS, pgByName, PRICE_GROUPS } from '../data/products';
 import { AD_TYPES, DEPTH_BANDS, depthBandOf, EVENTS } from '../data/promos';
 import { useFilters } from '../lib/filterStore';
-import { count, moneyCompact, moneyUnit, pct, pctChange, signedMoney } from '../lib/format';
+import { count, moneyCompact, moneyUnit, pct, pctChange, signedMoney, signedMoneyTile } from '../lib/format';
 import { derive, sumAggs, type Agg } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
-import { columnsOf, EmptyState, performanceRows, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
+import { columnsOf, EmptyState, performanceRows, uomFirst, uomTile, ViewControls, type ViewProps } from './common';
 
 const DEFAULT_PG = pgByName('Coca-Cola 12 pk 12 oz Cans').idx;
 const COLS = ['dates', 'type', 'depth', 'ad', 'avgRetail', 'gross', 'salesLift', 'unitLift', 'incGm', 'netIncGm'];
@@ -69,9 +69,9 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
     { label: 'Promo Depth %', info: 'Average (Regular retail − Promo retail) ÷ Regular retail across the events.', value: pct(all.avgDepth, 0), sub: 'average across events' },
     { label: 'Avg Promo Retail $', info: 'Promo Sales $ (selected sales basis) ÷ Promo Units; per lb for random-weight items.', value: moneyUnit(uomFirst(all.avgRetail)), sub: all.avgRetail.lb !== null ? 'per lb' : 'per unit' },
     { label: 'Sales Lift %', info: 'Incremental Sales $ ÷ Baseline Sales $, all events.', value: pctChange(all.salesLift), pending: 4 },
-    { label: 'Unit Lift %', info: 'Incremental Units ÷ Baseline Units, all events.', value: uomPct(all.unitLift, true), pending: 4 },
-    { label: 'Incremental GM $', info: 'Promo GM $ − Baseline GM $, before cannibalization and funding.', value: signedMoney(all.incGm) },
-    { label: 'Net Incremental GM $', info: 'Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $.', value: signedMoney(all.netIncGm), pending: 7 },
+    { label: 'Unit Lift %', info: 'Incremental Units ÷ Baseline Units, all events.', ...uomTile(all.unitLift, true), pending: 4 },
+    { label: 'Incremental GM $', info: 'Promo GM $ − Baseline GM $, before cannibalization and funding.', value: signedMoneyTile(all.incGm) },
+    { label: 'Net Incremental GM $', info: 'Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $.', value: signedMoneyTile(all.netIncGm), pending: 7 },
   ];
 
   const lift = (rows: typeof byDepth) => rows.map((r) => ({ label: `${r.label} (${r.n})`, value: r.m.salesLift ?? 0 }));
