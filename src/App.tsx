@@ -6,6 +6,7 @@ import { Disclaimer, Header } from './components/Header';
 import { actions, FilterProvider, useFilters } from './lib/filterStore';
 import { PerformanceView } from './views/PerformanceView';
 
+const PostPromoView = lazy(() => import('./views/PostPromoView'));
 const RunTrendView = lazy(() => import('./views/RunTrendView'));
 const HistoryView = lazy(() => import('./views/HistoryView'));
 const ShopperView = lazy(() => import('./views/ShopperView'));
@@ -44,6 +45,8 @@ function Shell() {
     switch (state.tab) {
       case 'other':
         return <PerformanceView variant="other" openDefinitions={openDefinitions} />;
+      case 'post':
+        return <PostPromoView openDefinitions={openDefinitions} />;
       case 'trend':
         return <RunTrendView openDefinitions={openDefinitions} />;
       case 'history':

@@ -3,7 +3,7 @@
  * 4 weeks before the promo for Hot Buys, 13 weeks for TPRs, BOGOs and price locks.
  *  - Hot Buy Performance: 4 weeks.
  *  - Other Promo Performance: 13 weeks.
- *  - Promo Run Trend, Promo History and Promo Shopper Impact: the default of each event's promo type.
+ *  - Post-Promo Trend, Promo History, Promo Shopper Impact and Promo Run Trend: the default of each event's promo type.
  * The user can still pick 2, 4, 8, 13 or 52 weeks in every view.
  */
 import type { PromoType } from '../data/promos';

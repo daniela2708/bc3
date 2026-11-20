@@ -1,6 +1,6 @@
 import { ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { KeyFigures, SectionHeading, type Tile } from '../components/Blocks';
+import { KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
 import { HierTable, type HierCol, type HierRow } from '../components/HierTable';
 import { InfoTip, Pending, Var } from '../components/ui';
 import { PRICE_GROUPS } from '../data/products';
@@ -13,8 +13,6 @@ import { getScope } from '../lib/selectors';
 import { deriveShopper, eventShopper, REPEAT_WINDOW_DAYS, shopperOf, type ShopperMetrics } from '../lib/shopper';
 import { EmptyState, eventDates, ViewControls, type ViewProps } from './common';
 
-const STORY =
-  'As a Category Manager I want to see how shoppers who bought my promoted items behaved (basket size, spend vs. their usual, new-to-category buyers and category trips) so that I can tell whether a promotion grew baskets and the category, not just the promoted item.';
 const PANEL_LIMIT = 12;
 export const SUM_LABEL = 'Sum across events (not unique households)';
 const SUM_TIP = 'Each event counts its own buyers. A household that bought in two events counts twice, so this total is not a count of unique households. Unique households across events would need the club card data itself, which the dashboard does not hold (aggregates only).';
@@ -145,9 +143,14 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
 
   return (
     <>
-      <Heading>
-        {scope.events.length} promotions starting {scope.range.label}: <b>{count(all.buyers)}</b> promo buyers{scope.events.length > 1 ? ' (sum across events, not unique households)' : ''} spent <b>{<Var value={all.spendChange} kind="pct" />}</b> vs. their usual, with <b>{pct(all.newToCat)}</b> new to the category.
-      </Heading>
+      <Heading />
+
+      <ViewControls cann={false} basis={false} />
+      <KeyFigures caption={`${scope.range.name} · ${scope.events.length} events · club card households`} tiles={tiles} />
+
+      <ViewSummary>
+      {scope.events.length} promotions starting {scope.range.label}: <b>{count(all.buyers)}</b> promo buyers{scope.events.length > 1 ? ' (sum across events, not unique households)' : ''} spent <b>{<Var value={all.spendChange} kind="pct" />}</b> vs. their usual, with <b>{pct(all.newToCat)}</b> new to the category.
+      </ViewSummary>
       <p className="privacy-note" role="note">
         <ShieldCheck size={15} aria-hidden="true" />
         Aggregates only: every figure is a total or average per promo event. No customer- or card-level detail is stored or shown. Club card data refreshed weekly; “usual” = the same buyers over the {baselineText(scope.ctx.baselineWeeks)} window.
@@ -155,8 +158,6 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
       <p className="privacy-note approval-note" role="note">
         Aggregates only. Individual-level detail requires approval (#16).
       </p>
-      <ViewControls cann={false} basis={false} />
-      <KeyFigures caption={`${scope.range.name} · ${scope.events.length} events · club card households`} tiles={tiles} />
 
       <section aria-label="Panel per event">
         <h3 className="secondary-title">One panel per event</h3>
@@ -192,17 +193,6 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
   );
 }
 
-function Heading({ children }: { children?: React.ReactNode }) {
-  return (
-    <SectionHeading
-      eyebrow="Should Have · View 5 of 5"
-      title="Promo Shopper Impact"
-      question="Did the promotion grow baskets and the category, not just the promoted item?"
-      story={STORY}
-      badge={<Pending q={16} />}
-      validate="Symphony AI cannot be a data source, only a reference for comparison (#12); shopper metrics are calculated from the Weis T-log and Club Card tables. Household vs. card level per metric (#16). New-to-category logic from a third-party system (#11). About 6 to 8 core metrics, which ones pending (#9). Rewards and loyalty campaigns are out of scope."
-    >
-      {children}
-    </SectionHeading>
-  );
+function Heading() {
+  return <SectionHeading title="Promo Shopper Impact" badge={<Pending q={16} />} />;
 }

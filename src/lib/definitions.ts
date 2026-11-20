@@ -291,7 +291,7 @@ export const KPI_DEFINITIONS: KpiDef[] = [
     priority: 'Nice to have',
     definition: 'Change in promoted item units after the promotion ends vs. baseline (pantry loading). Shown as — until the 4 weeks have passed.',
     formula: '(Units after the promo − Baseline Units for the same days) ÷ Baseline Units, using a 4-week post-promo window by default.',
-    views: ['trend'],
+    views: ['post', 'trend'],
     level2: true,
   },
   {
@@ -372,7 +372,7 @@ export const KPI_DEFINITIONS: KpiDef[] = [
     priority: 'Nice to have',
     definition: 'Share of promo buyers who bought the item again at regular price after the promotion. The prototype uses 28 days after the promotion.',
     formula: 'Promo buyers who bought the item again at regular price after the event ÷ Promo Buyer Count, using the window CMs use today. Confirm.',
-    views: ['shopper'],
+    views: ['post', 'shopper'],
     pending: 16,
     level2: true,
   },

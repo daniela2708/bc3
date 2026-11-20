@@ -494,25 +494,11 @@ select {
 .section-head {
   margin: 26px 0 14px;
 }
-.eyebrow {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--red);
-  margin: 0 0 4px;
-}
 .section-title {
   font-size: 30px;
   font-weight: 800;
   margin: 0 0 4px;
   letter-spacing: -0.01em;
-}
-.section-question {
-  font-weight: 800;
-  font-size: 16px;
-  margin: 0 0 6px;
 }
 .section-narrative {
   margin: 0;
@@ -522,6 +508,10 @@ select {
 }
 .section-narrative b {
   color: var(--dark);
+}
+/* Reading of the key figures, right after the tiles (layout rule 1). */
+.view-summary {
+  margin: -4px 0 14px;
 }
 
 /* ---------------------------------------------------------------- Banners */
@@ -1722,6 +1712,26 @@ table.hier tbody tr:not(.total-row):hover td:first-child {
   margin: 22px 10px 8px;
   font-size: 15px;
 }
+.defs-views-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0 10px;
+  display: grid;
+  gap: 14px;
+  font-size: 13.5px;
+}
+.defs-views-list p {
+  margin: 4px 0 0;
+}
+.defs-view-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.defs-view-question {
+  font-weight: 700;
+}
 .defs-questions {
   list-style: none;
   margin: 0 0 12px;
@@ -2107,18 +2117,7 @@ b.pos {
   letter-spacing: 0;
 }
 
-/* Section heading: pain point addressed and what is still to validate */
-.section-pain,
-.section-validate {
-  display: block;
-  margin: 6px 0 0;
-  font-size: 14px;
-  color: var(--dark);
-  max-width: 1100px;
-}
-.section-validate {
-  color: var(--n5);
-}
+/* Tags used in the KPI definitions dialog (user story, to validate) */
 .section-tag {
   display: inline-block;
   margin-right: 8px;

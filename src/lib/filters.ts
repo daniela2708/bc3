@@ -37,14 +37,18 @@ import { CANN_LEVELS, DEFAULT_BASIS, DEFAULT_CANN_LEVEL, type Basis, type CannLe
 
 // ---------------------------------------------------------------- Views
 
-export type TabId = 'hotbuy' | 'other' | 'trend' | 'history' | 'shopper';
-/** The five views, in the order of the requirements. Promo Funding is not part of this dashboard (#2: vendor funding analytics live in the DNP tool). */
+export type TabId = 'hotbuy' | 'other' | 'post' | 'history' | 'shopper' | 'trend';
+/**
+ * The tabs: the views of the requirements workbook, in its order. Promo Funding is not part of this dashboard (#2:
+ * vendor funding analytics live in the DNP tool).
+ */
 export const TABS: { id: TabId; label: string }[] = [
   { id: 'hotbuy', label: 'Hot Buy Performance' },
   { id: 'other', label: 'Other Promo Performance' },
-  { id: 'trend', label: 'Promo Run Trend' },
+  { id: 'post', label: 'Post-Promo Trend' },
   { id: 'history', label: 'Promo History' },
   { id: 'shopper', label: 'Promo Shopper Impact' },
+  { id: 'trend', label: 'Promo Run Trend' },
 ];
 
 export type FilterKey =
@@ -65,6 +69,7 @@ export type FilterKey =
 const VIEW_FILTERS: Record<TabId, FilterKey[]> = {
   hotbuy: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'event', 'location'],
   other: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'event'],
+  post: ['dept', 'cat', 'sub', 'item', 'vb', 'promoType', 'event'],
   trend: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'event'],
   history: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'adType', 'depthBand', 'holiday'],
   shopper: ['dept', 'cat', 'sub', 'pg', 'item', 'promoType', 'event'],

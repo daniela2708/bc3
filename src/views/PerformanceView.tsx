@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Banner, BannerStack, KeyFigures, SectionHeading, type Tile } from '../components/Blocks';
+import { Banner, BannerStack, KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
 import { Bridge, ChartCard, ChartGrid, DailyVsBaseline, type BridgeStep } from '../components/Charts';
 import { HierTable } from '../components/HierTable';
 import { Pending, Segmented } from '../components/ui';
@@ -15,10 +15,6 @@ import { getScope } from '../lib/selectors';
 import { basisWord, columnsOf, EmptyState, eventDates, performanceRows, unitsText, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
 import { RunsCompare } from './RunsCompare';
 
-const HB_STORY =
-  'As a Category Manager, I want to track the effectiveness of Hot Buys starting at the price group level, with the ability to drill down to each item and roll up to category (including cannibalization), so that I can make better decisions on when to run certain promotions for certain items.';
-const OTHER_STORY =
-  'As a Category Manager, I want to track TPRs, BOGOs, price locks and other promotions by price group, with item-level drill down and a category-level view, so that I can evaluate overall program performance, see which items drive the result (e.g., seasonal vs. everyday items), and adjust future runs and orders.';
 
 const HB_COLS = ['dates', 'gross', 'net', 'units', 'baseSales', 'baseUnits', 'incSales', 'incUnits', 'salesLift', 'unitLift', 'gm', 'gmPct', 'baseGm', 'incGm', 'netGm', 'catIncSales', 'catIncGm', 'cannSales', 'cannRate', 'netIncSales', 'netIncGm'];
 const HB_HIDDEN = ['dates', 'net', 'catIncGm', 'netGm', 'incSales'];
@@ -145,12 +141,31 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
 
   return (
     <>
-      <Heading hb={hb}>
-        {scope.events.length} {typeWord} starting {scope.range.label}: Promo Sales <b>{moneyCompact(all.sales)}</b> ({basisWord(basis)}), Sales Lift <b>{pctChange(all.salesLift)}</b>, Net Incremental GM{' '}
-        <b>{signedMoney(all.netIncGm)}</b> after cannibalization ({levelWord} level) and vendor funding.
-        {scope.ctx.storeShare && ' Store values are the chain value × the selected stores’ share of each department.'}
-        {scope.itemFiltered && ' Product filters narrow the items inside each price group; cannibalization stays measured for the whole price group.'}
-      </Heading>
+      <Heading hb={hb} />
+
+      <ViewControls rollup />
+
+      <KeyFigures
+        caption={`${scope.range.name} · ${scope.events.length} ${typeWord} · ${basisWord(basis)} · ${baseWord}`}
+        tiles={tiles}
+        note={
+          hb ? (
+            <>
+              <b>Hot Buy Score:</b> Scoring method to be defined. It will rate each Hot Buy from the core metrics once Weis agrees the method.{' '}
+              <button type="button" className="btn-link" onClick={() => openDefinitions('score')}>
+                Definition
+              </button>
+            </>
+          ) : undefined
+        }
+      />
+
+      <ViewSummary>
+      {scope.events.length} {typeWord} starting {scope.range.label}: Promo Sales <b>{moneyCompact(all.sales)}</b> ({basisWord(basis)}), Sales Lift <b>{pctChange(all.salesLift)}</b>, Net Incremental GM{' '}
+      <b>{signedMoney(all.netIncGm)}</b> after cannibalization ({levelWord} level) and vendor funding.
+      {scope.ctx.storeShare && ' Store values are the chain value × the selected stores’ share of each department.'}
+      {scope.itemFiltered && ' Product filters narrow the items inside each price group; cannibalization stays measured for the whole price group.'}
+      </ViewSummary>
 
       <BannerStack>
         {cannTop && (
@@ -170,44 +185,6 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
           </Banner>
         )}
       </BannerStack>
-
-      <ViewControls rollup />
-
-      <KeyFigures
-        caption={`${scope.range.name} · ${scope.events.length} ${typeWord} · ${basisWord(basis)} · ${baseWord}`}
-        tiles={tiles}
-        note={
-          hb ? (
-            <>
-              <b>Hot Buy Score:</b> Scoring method to be defined. It will rate each Hot Buy from the core metrics once Weis agrees the method.{' '}
-              <button type="button" className="btn-link" onClick={() => openDefinitions('score')}>
-                Definition
-              </button>
-            </>
-          ) : undefined
-        }
-      />
-
-      <section className="card table-card" aria-label={hb ? 'Hot Buy events' : 'Promotions by price group'}>
-        <header className="table-head">
-          <div>
-            <h3 className="chart-title">{hb ? 'Hot Buy events by price group' : 'Promotions by price group'}</h3>
-            <p className="chart-sub">
-              One row per event at price group level. Expand a row for its SKU Numbers{hb ? '' : ' and each item’s share of the price group result'}; click a row to show it in the charts. Cannibalization is measured for the price group, so SKU rows show —.
-            </p>
-          </div>
-        </header>
-        <HierTable
-          hierarchy={state.rollup === 'event' ? 'Price group · event' : 'Hierarchy'}
-          columns={cols}
-          rows={table.rows}
-          total={table.total}
-          defaultSort={{ key: 'netIncGm', dir: 'desc' }}
-          tableId={hb ? 'hb' : 'oth'}
-          exportTitle={hb ? 'Hot Buy Performance' : 'Other Promo Performance'}
-          maxHeight={560}
-        />
-      </section>
 
       {selEvent && selM && (
         <ChartGrid cols={2}>
@@ -252,6 +229,27 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
         </ChartGrid>
       )}
 
+      <section className="card table-card" aria-label={hb ? 'Hot Buy events' : 'Promotions by price group'}>
+        <header className="table-head">
+          <div>
+            <h3 className="chart-title">{hb ? 'Hot Buy events by price group' : 'Promotions by price group'}</h3>
+            <p className="chart-sub">
+              One row per event at price group level. Expand a row for its SKU Numbers{hb ? '' : ' and each item’s share of the price group result'}; click a row to show it in the charts above. Cannibalization is measured for the price group, so SKU rows show —.
+            </p>
+          </div>
+        </header>
+        <HierTable
+          hierarchy={state.rollup === 'event' ? 'Price group · event' : 'Hierarchy'}
+          columns={cols}
+          rows={table.rows}
+          total={table.total}
+          defaultSort={{ key: 'netIncGm', dir: 'desc' }}
+          tableId={hb ? 'hb' : 'oth'}
+          exportTitle={hb ? 'Hot Buy Performance' : 'Other Promo Performance'}
+          maxHeight={560}
+        />
+      </section>
+
       {!hb && selEvent && (
         <section className="card table-card" aria-label="Runs of the same promotion">
           <header className="table-head">
@@ -269,16 +267,6 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
   );
 }
 
-function Heading({ hb, children }: { hb: boolean; children?: React.ReactNode }) {
-  return (
-    <SectionHeading
-      eyebrow={hb ? 'Must Have · View 1 of 5' : 'Must Have · View 2 of 5'}
-      title={hb ? 'Hot Buy Performance' : 'Other Promo Performance'}
-      question={hb ? 'Did each Hot Buy pay off, for the item and for the category?' : 'How did TPRs, BOGOs, price locks and other reductions perform, and which items drove the result?'}
-      story={hb ? HB_STORY : OTHER_STORY}
-      validate="Baseline (#4), cannibalization (#3), sales basis and GM % denominator (#5), margin scope and funding (#7), cost (#15)."
-    >
-      {children}
-    </SectionHeading>
-  );
+function Heading({ hb }: { hb: boolean }) {
+  return <SectionHeading title={hb ? 'Hot Buy Performance' : 'Other Promo Performance'} />;
 }

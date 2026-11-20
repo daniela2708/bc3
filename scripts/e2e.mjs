@@ -1,4 +1,4 @@
-// End-to-end check of the production build (adapted from UC2): access gate, the five views, typed dates and the
+// End-to-end check of the production build (adapted from UC2): access gate, the six views (tabs), typed dates and the
 // pasted UPC list.
 //
 //   npm run test:e2e                          builds a throwaway copy with a one-time password, serves it, runs the checks
@@ -26,10 +26,13 @@ const CHROME_CANDIDATES = [
 const TABS = [
   ['hotbuy', 'Hot Buy Performance'],
   ['other', 'Other Promo Performance'],
-  ['trend', 'Promo Run Trend'],
+  ['post', 'Post-Promo Trend'],
   ['history', 'Promo History'],
   ['shopper', 'Promo Shopper Impact'],
+  ['trend', 'Promo Run Trend'],
 ];
+/** Key figures per view: 5–8, except Post-Promo Trend, whose workbook view lists two (Post-Promo Dip %, Repeat Purchase Rate %). */
+const TILE_RANGE = { post: [2, 2] };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const children = [];
@@ -147,7 +150,21 @@ async function main() {
     await until(`document.querySelector('#section-title')?.textContent.includes(${JSON.stringify(title)})`, `${title} heading`, 30000);
     await sleep(400);
     const info = await evaluate(`({ tiles: document.querySelectorAll('.kpi-tile').length, error: !!document.querySelector('.app-error'), pending: document.querySelectorAll('.pending-chip').length, rows: document.querySelectorAll('table.hier tbody tr').length, charts: document.querySelectorAll('.recharts-surface').length })`);
-    check(`${title} renders`, !info.error && info.tiles >= 5 && info.tiles <= 8 && info.pending > 0 && info.rows > 0, `${info.tiles} tiles · ${info.rows} table rows · ${info.charts} charts · ${info.pending} pending marks`);
+    const [minTiles, maxTiles] = TILE_RANGE[tab] ?? [5, 8];
+    check(`${title} renders`, !info.error && info.tiles >= minTiles && info.tiles <= maxTiles && info.pending > 0 && info.rows > 0, `${info.tiles} tiles · ${info.rows} table rows · ${info.charts} charts · ${info.pending} pending marks`);
+    // Layout rules 1 and 2: title, then tiles; charts (or panels) before tables; Level 2 sections last; no story / validate on top.
+    const layout = await evaluate(`(() => {
+      const main = document.querySelector('#section-title').closest('main') ?? document.body;
+      const blocks = [...main.querySelectorAll('.section-head, .kpi-row, .chart-card, .shopper-grid, .table-card, .secondary-section')].filter((el) => !el.parentElement.closest('.chart-card, .table-card, .secondary-section'));
+      const kind = (el) => el.matches('.section-head') ? 'title' : el.matches('.kpi-row') ? 'tiles' : el.matches('.chart-card, .shopper-grid') ? 'charts' : el.matches('.table-card') ? 'tables' : 'level2';
+      const order = blocks.map(kind).filter((k, i, a) => k !== a[i - 1]);
+      const rank = { title: 0, tiles: 1, charts: 2, tables: 3, level2: 4 };
+      const sorted = order.every((k, i) => i === 0 || rank[k] > rank[order[i - 1]]);
+      const head = document.querySelector('.section-head');
+      const bare = head.children.length === 1 && !document.querySelector('.eyebrow, .section-question, .section-pain, .section-validate');
+      return { order: order.join(' → '), ok: sorted && order[0] === 'title' && order[1] === 'tiles' && bare };
+    })()`);
+    check(`${title} follows the layout rules`, layout.ok, layout.order);
     if (process.env.SCREENSHOTS) {
       await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
       const h = await evaluate(`document.documentElement.scrollHeight`);
@@ -195,19 +212,34 @@ async function main() {
   await send('Page.navigate', { url: `${base}/?tab=other` });
   await until(`!!document.querySelector('.baseline-note')`, 'Other Promo baseline control');
   check('Other Promo Performance: 13-week baseline by default', (await evaluate(pressed('Baseline window in weeks'))) === '13 wk');
-  // 6. Per the requirements: no Promo Funding view (#2); Promo Run Trend is Must Have with a level-2 Post-Promo Trend (#8).
+  // 6. Tabs = the workbook views in its order, without Promo Funding (#2); Post-Promo Trend is its own level-2 tab (#8).
   await send('Page.navigate', { url: `${base}/?tab=funding&fu=bill` });
   await until(`!!document.querySelector('#section-title')`, 'fallback view for tab=funding');
   check(
     'tab=funding falls back to Hot Buy Performance and no funding UI remains',
-    await evaluate(`document.querySelector('#section-title').textContent.includes('Hot Buy Performance') && document.querySelectorAll('[role=tab]').length === 5 && ![...document.querySelectorAll('[role=tab]')].some((t) => t.textContent.includes('Funding')) && !document.body.textContent.includes('Funding Type') && !document.body.textContent.includes('Promo ROI') && !location.search.includes('fu=')`),
+    await evaluate(`document.querySelector('#section-title').textContent.includes('Hot Buy Performance') && [...document.querySelectorAll('[role=tab]')].map((t) => t.textContent.trim()).join('|') === 'Hot Buy Performance|Other Promo Performance|Post-Promo Trend|Promo History|Promo Shopper Impact|Promo Run Trend' && ![...document.querySelectorAll('[role=tab]')].some((t) => t.textContent.includes('Funding')) && !document.body.textContent.includes('Funding Type') && !document.body.textContent.includes('Promo ROI') && !location.search.includes('fu=')`),
+  );
+  await send('Page.navigate', { url: `${base}/?tab=post` });
+  await until(`document.querySelector('#section-title')?.textContent.includes('Post-Promo Trend')`, 'Post-Promo Trend tab');
+  check(
+    'Post-Promo Trend is its own tab, marked Level 2, with Post-Promo Dip % and Repeat Purchase Rate %',
+    await evaluate(`(() => { const labels = [...document.querySelectorAll('.kpi-label')].map((l) => l.textContent.trim()); return /^Post-Promo Trend\\s*Level 2 · not MVP$/.test(document.querySelector('#section-title').textContent.trim()) && labels.length === 2 && labels[0].startsWith('Post-Promo Dip %') && labels[1].startsWith('Repeat Purchase Rate %'); })()`),
   );
   await send('Page.navigate', { url: `${base}/?tab=trend` });
-  await until(`!!document.querySelector('.secondary-title')`, 'Run Trend secondary section');
+  await until(`document.querySelector('#section-title')?.textContent.includes('Promo Run Trend')`, 'Promo Run Trend tab');
   check(
-    'Promo Run Trend is Must Have; the Post-Promo Trend section is Level 2',
-    await evaluate(`document.querySelector('.eyebrow').textContent.includes('Must Have') && document.querySelector('.eyebrow').textContent.includes('of 5') && document.querySelector('.secondary-title').textContent.trim() === 'Post-Promo Trend Level 2 · not MVP' && !document.body.textContent.includes('View content pending')`),
+    'Promo Run Trend no longer holds a Post-Promo section',
+    await evaluate(`!document.querySelector('.secondary-section') && !document.body.textContent.includes('View content pending')`),
   );
+
+  // 7. Layout rule 2: the business context moved to the KPI definitions dialog, one entry per view.
+  await evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'KPI definitions').click(), 1`);
+  await until(`!!document.querySelector('.defs-views-list')`, 'views section in the KPI definitions dialog');
+  check(
+    'KPI definitions dialog lists each view with priority, user story and what to validate',
+    await evaluate(`(() => { const items = [...document.querySelectorAll('.defs-views-list li')]; return items.length === 6 && items.every((li) => li.textContent.includes('User story') && li.textContent.includes('To validate') && /Must Have|Should Have|Nice to have/.test(li.textContent) && /View \\d of 6/.test(li.textContent)); })()`),
+  );
+  await evaluate(`document.querySelector('.defs-close').click(), 1`);
 
   check('No console errors or exceptions', errors.length === 0, errors.slice(0, 3).join(' | '));
   if (process.env.E2E_DEBUG) console.log(debug.join('\n'));

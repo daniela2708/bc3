@@ -28,3 +28,6 @@ tmp/
 # Local Claude Code settings
 .claude/settings.local.json
 
+
+# e2e screenshots (SCREENSHOTS=./screens npm run test:e2e)
+screens/

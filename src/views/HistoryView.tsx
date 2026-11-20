@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { KeyFigures, SectionHeading, type Tile } from '../components/Blocks';
+import { KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
 import { ChartCard, ChartGrid, HBars, hbarHeight, SignedColumns } from '../components/Charts';
 import { HierTable } from '../components/HierTable';
 import { Pending, Segmented } from '../components/ui';
@@ -12,7 +12,6 @@ import { derive, sumAggs, type Agg } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
 import { columnsOf, EmptyState, performanceRows, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
 
-const STORY = 'As a Category Manager, I want to review historical promotions for the same items so that I can determine the best times / depths / ad types to run the promotion.';
 const DEFAULT_PG = pgByName('Coca-Cola 12 pk 12 oz Cans').idx;
 const COLS = ['dates', 'type', 'depth', 'ad', 'avgRetail', 'gross', 'salesLift', 'unitLift', 'incGm', 'netIncGm'];
 
@@ -81,22 +80,52 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
 
   return (
     <>
-      <Heading>
-        {name}: <b>{events.length}</b> promotions in {scope.range.name.toLowerCase()}, average depth <b>{pct(all.avgDepth, 0)}</b>, Sales Lift <b>{pctChange(all.salesLift)}</b>. {best && <>The <b>{best.label}</b> depth band returned the most Net Incremental GM ({signedMoney(best.m.netIncGm)}).</>}
-        {nothing && ' Showing Coca-Cola 12 pk by default; pick a SKU Number or price group in the filters.'}
-      </Heading>
+      <Heading />
+
       <ViewControls cann />
       <KeyFigures caption={`${name} · ${scope.range.name}`} tiles={tiles} />
 
-      <section className="card table-card" aria-label="Every past promotion">
-        <header className="table-head">
-          <div>
-            <h3 className="chart-title">Every past promotion</h3>
-            <p className="chart-sub">One row per event with dates, Promo Type, Promo Depth %, Ad Type / Vehicle and results. Expand a row for its SKU Numbers.</p>
-          </div>
-        </header>
-        <HierTable hierarchy="Price group · event" columns={cols} rows={table.rows} total={table.total} defaultSort={{ key: 'dates', dir: 'desc' }} tableId="hist" exportTitle="Promo History" maxHeight={480} />
-      </section>
+      <ViewSummary>
+      {name}: <b>{events.length}</b> promotions in {scope.range.name.toLowerCase()}, average depth <b>{pct(all.avgDepth, 0)}</b>, Sales Lift <b>{pctChange(all.salesLift)}</b>. {best && <>The <b>{best.label}</b> depth band returned the most Net Incremental GM ({signedMoney(best.m.netIncGm)}).</>}
+      {nothing && ' Showing Coca-Cola 12 pk by default; pick a SKU Number or price group in the filters.'}
+      </ViewSummary>
+
+      <ChartGrid cols={1}>
+        <ChartCard
+          title={`Results by ${grain === 'period' ? 'fiscal period' : 'fiscal week'}`}
+          subtitle={
+            <span className="chart-sub-tools">
+              Net Incremental GM $ of the promotions that started in each {grain}; hover for lift and event count.
+              <Segmented<'period' | 'week'>
+                small
+                label="Group results by"
+                value={grain}
+                onChange={setGrain}
+                options={[
+                  { value: 'period', label: 'Period' },
+                  { value: 'week', label: 'Week' },
+                ]}
+              />
+            </span>
+          }
+          table={{ head: [grain === 'period' ? 'Period' : 'Week', 'Events', 'Sales Lift %', 'Net Incremental GM $'], rows: byTime.map((r) => [r.x, r.n, pctChange(r.m.salesLift), Math.round(r.m.netIncGm ?? 0)]) }}
+          height={240}
+        >
+          <SignedColumns
+            data={byTime.map((r) => ({
+              x: r.x,
+              value: r.m.netIncGm,
+              tip: [
+                { label: 'Net Incremental GM $', value: moneyCompact(r.m.netIncGm) },
+                { label: 'Sales Lift %', value: pctChange(r.m.salesLift) },
+                { label: 'Events', value: String(r.n) },
+              ],
+            }))}
+            format={moneyCompact}
+            valueLabel="Net Incremental GM $"
+          />
+        </ChartCard>
+      </ChartGrid>
 
       <ChartGrid cols={2}>
         <ChartCard title="Sales Lift % by Promo Depth Band" subtitle={<>Number of events in brackets <Pending q={10} /></>} table={tbl(byDepth, 'Depth band')} height={hbarHeight(byDepth.length)}>
@@ -113,40 +142,15 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
         </ChartCard>
       </ChartGrid>
 
-      <ChartCard
-        title={`Results by ${grain === 'period' ? 'fiscal period' : 'fiscal week'}`}
-        subtitle={
-          <span className="chart-sub-tools">
-            Net Incremental GM $ of the promotions that started in each {grain}; hover for lift and event count.
-            <Segmented<'period' | 'week'>
-              small
-              label="Group results by"
-              value={grain}
-              onChange={setGrain}
-              options={[
-                { value: 'period', label: 'Period' },
-                { value: 'week', label: 'Week' },
-              ]}
-            />
-          </span>
-        }
-        table={{ head: [grain === 'period' ? 'Period' : 'Week', 'Events', 'Sales Lift %', 'Net Incremental GM $'], rows: byTime.map((r) => [r.x, r.n, pctChange(r.m.salesLift), Math.round(r.m.netIncGm ?? 0)]) }}
-        height={240}
-      >
-        <SignedColumns
-          data={byTime.map((r) => ({
-            x: r.x,
-            value: r.m.netIncGm,
-            tip: [
-              { label: 'Net Incremental GM $', value: moneyCompact(r.m.netIncGm) },
-              { label: 'Sales Lift %', value: pctChange(r.m.salesLift) },
-              { label: 'Events', value: String(r.n) },
-            ],
-          }))}
-          format={moneyCompact}
-          valueLabel="Net Incremental GM $"
-        />
-      </ChartCard>
+      <section className="card table-card" aria-label="Every past promotion">
+        <header className="table-head">
+          <div>
+            <h3 className="chart-title">Every past promotion</h3>
+            <p className="chart-sub">One row per event with dates, Promo Type, Promo Depth %, Ad Type / Vehicle and results. Expand a row for its SKU Numbers.</p>
+          </div>
+        </header>
+        <HierTable hierarchy="Price group · event" columns={cols} rows={table.rows} total={table.total} defaultSort={{ key: 'dates', dir: 'desc' }} tableId="hist" exportTitle="Promo History" maxHeight={480} />
+      </section>
       <p className="table-note">
         Use Fiscal Calendar › Holiday period in the Time filter to line up holiday promotions year over year.{' '}
         <button type="button" className="btn-link" onClick={() => openDefinitions('depth')}>
@@ -157,16 +161,6 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
   );
 }
 
-function Heading({ children }: { children?: React.ReactNode }) {
-  return (
-    <SectionHeading
-      eyebrow="Should Have · View 4 of 5"
-      title="Promo History"
-      question="When, how deep and with which ad type should this item be promoted?"
-      story={STORY}
-      validate="Ad Type / Vehicle and Promo Depth Band values follow the workbook; the objective of this view is pending (#10). Baseline (#4): each event uses the proposed default of its promo type. Margin scope and funding (#7), cost (#15)."
-    >
-      {children}
-    </SectionHeading>
-  );
+function Heading() {
+  return <SectionHeading title="Promo History" />;
 }

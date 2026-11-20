@@ -4,58 +4,24 @@ import { AS_OF_DAY, fiscalOfDay, formatDay } from '../data/calendar';
 import { TABS, type TabId } from '../lib/filters';
 import { InfoTip, Pending } from './ui';
 
-export function SectionHeading({
-  eyebrow,
-  title,
-  question,
-  children,
-  badge,
-  painPoint,
-  validate,
-  story,
-}: {
-  eyebrow: string;
-  title: string;
-  question: string;
-  children?: ReactNode;
-  /** A chip next to the title (e.g. "Scope TBD"). */
-  badge?: ReactNode;
-  /** The pain point from requirements collection that this view addresses. */
-  painPoint?: ReactNode;
-  /** Data sources or feasibility still to be confirmed for this view. */
-  validate?: ReactNode;
-  /** The user story from the requirements workbook. */
-  story?: ReactNode;
-}) {
+/**
+ * View heading: the title and an optional chip, nothing else (layout rule 2). Priority, user story and what is
+ * still to validate live in the KPI definitions dialog (src/lib/viewInfo.ts).
+ */
+export function SectionHeading({ title, badge }: { title: string; badge?: ReactNode }) {
   return (
     <section className="section-head" aria-labelledby="section-title">
-      <p className="eyebrow">{eyebrow}</p>
       <h2 className="section-title" id="section-title">
         {title}
         {badge && <span className="title-badge">{badge}</span>}
       </h2>
-      <p className="section-question">{question}</p>
-      {story && (
-        <p className="section-pain">
-          <span className="section-tag">User story</span>
-          {story}
-        </p>
-      )}
-      {painPoint && (
-        <p className="section-pain">
-          <span className="section-tag">Pain point addressed</span>
-          {painPoint}
-        </p>
-      )}
-      {validate && (
-        <p className="section-validate">
-          <span className="section-tag dashed">Definition pending</span>
-          {validate}
-        </p>
-      )}
-      {children && <p className="section-narrative">{children}</p>}
     </section>
   );
+}
+
+/** One-line reading of the key figures, shown right after the tiles (layout rule 1). */
+export function ViewSummary({ children }: { children: ReactNode }) {
+  return <p className="section-narrative view-summary">{children}</p>;
 }
 
 export interface BannerDetails {

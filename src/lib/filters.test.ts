@@ -67,7 +67,7 @@ describe('URL state', () => {
     expect(fromQuery('x'.repeat(3000), EVENTS.length)).toEqual(DEFAULT_STATE);
   });
   it('Promo Funding is gone: tab=funding and funding filters fall back to the defaults', () => {
-    expect(TABS.map((t) => t.id)).toEqual(['hotbuy', 'other', 'trend', 'history', 'shopper']);
+    expect(TABS.map((t) => t.id)).toEqual(['hotbuy', 'other', 'post', 'history', 'shopper', 'trend']);
     expect(fromQuery('tab=funding', EVENTS.length)).toEqual(DEFAULT_STATE);
     expect(fromQuery('tab=funding&fu=bill&funding=scan', EVENTS.length)).toEqual(DEFAULT_STATE);
     const s = fromQuery('tab=other&fu=bill&fundingType=other', EVENTS.length);
@@ -102,7 +102,7 @@ describe('baseline default per view (#4)', () => {
   it('Hot Buy Performance 4 weeks, Other Promo Performance 13, the other views by promo type', () => {
     expect(viewBaselineDefault('hotbuy')).toBe(4);
     expect(viewBaselineDefault('other')).toBe(13);
-    for (const tab of ['trend', 'history', 'shopper'] as const) expect(viewBaselineDefault(tab)).toBe('byType');
+    for (const tab of ['post', 'history', 'shopper', 'trend'] as const) expect(viewBaselineDefault(tab)).toBe('byType');
     expect(PROPOSED_BASELINE_BY_TYPE).toEqual({ HB: 4, TPR: 13, BOGO: 13, PL: 13, OTH: 13 });
   });
   it('the scope uses the view default until the user picks a window, and the pick wins in every view', () => {

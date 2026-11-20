@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { KPI_DEFINITIONS, kpiStatus, OPEN_QUESTIONS } from '../lib/definitions';
 import { sanitizeSearch, SEARCH_MAX, TABS } from '../lib/filters';
+import { VIEW_INFO } from '../lib/viewInfo';
 
 const TAB_LABEL = Object.fromEntries(TABS.map((t) => [t.id, t.label]));
 
@@ -39,7 +40,7 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
           <h2 id="defs-title">KPI definitions</h2>
           <div className="defs-intro">
             <p>
-              Definitions from the requirements workbook UC3_KPIs_Definitions_and_Mapping.xlsx, for validation with Weis. Every rate is a ratio of totals. Items marked Definition pending depend on an open question (numbers follow the workbook tab “UC #3 - Open Questions”); the assumption the prototype uses is listed at the end. Level 2 items are useful but not part of the MVP. Illustrative data only.
+              Definitions from the requirements workbook UC3_KPIs_Definitions_and_Mapping.xlsx, for validation with Weis, followed by each view's priority, user story and what is still to validate. Every rate is a ratio of totals. Items marked Definition pending depend on an open question (numbers follow the workbook tab “UC #3 - Open Questions”); the assumption the prototype uses is listed at the end. Level 2 items are useful but not part of the MVP. Illustrative data only.
             </p>
             <input
               className="text-input defs-search"
@@ -87,6 +88,32 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
               )}
             </tbody>
           </table>
+          <h3 className="defs-q-title">Views: priority, user story and what is still to validate</h3>
+          <ul className="defs-views-list">
+            {TABS.map((t, i) => {
+              const v = VIEW_INFO[t.id];
+              return (
+                <li key={t.id} id={`view-${t.id}`}>
+                  <p className="defs-view-head">
+                    <b>{t.label}</b>
+                    <span className="chip neutral">
+                      {v.priority}
+                      {v.priorityNote ? ` (${v.priorityNote})` : ''} · View {i + 1} of {TABS.length}
+                    </span>
+                  </p>
+                  <p className="defs-view-question">{v.question}</p>
+                  <p>
+                    <span className="section-tag">User story</span>
+                    {v.story}
+                  </p>
+                  <p>
+                    <span className="section-tag dashed">To validate</span>
+                    {v.validate}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
           <h3 className="defs-q-title">Open questions and the assumption used</h3>
           <ul className="defs-questions">
             {OPEN_QUESTIONS.map((q) => (

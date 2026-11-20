@@ -1,20 +1,18 @@
 import { useMemo, useState } from 'react';
-import { Banner, BannerStack, KeyFigures, SectionHeading, type Tile } from '../components/Blocks';
-import { C, ChartCard, ChartGrid, DailyVsBaseline, SignedColumns, TrendLines } from '../components/Charts';
-import { Level2, Pending, Segmented } from '../components/ui';
+import { Banner, BannerStack, KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
+import { C, ChartCard, ChartGrid, SignedColumns, TrendLines } from '../components/Charts';
+import { Pending, Segmented } from '../components/ui';
 import { shortDay } from '../data/calendar';
 import { ITEMS, pgByName, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL, type PromoType } from '../data/promos';
 import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
 import { useFilters } from '../lib/filterStore';
-import { count, moneyCompact, pct, pctChange, signedMoney, volume } from '../lib/format';
-import { dailySeries, derive, eventAgg, POST_PROMO_WINDOW_DAYS, sumAggs } from '../lib/metrics';
+import { count, moneyCompact, pct, pctChange, signedMoney } from '../lib/format';
+import { derive, eventAgg, sumAggs } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
 import { EmptyState, unitsText, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
 import { RunsCompare, runLabel } from './RunsCompare';
 
-const STORY =
-  'As a Category Manager, I want to compare how the same promotion performs each time it runs (e.g., a Hot Buy run in Q1, Q2 and Q3, and vs. prior years) at the price group level down to the item level, so that I can see whether it is trending up or down and adjust future runs.';
 const DEFAULT_PG = pgByName('Cheerios Family Size').idx;
 
 export default function RunTrendView({ openDefinitions }: ViewProps) {
@@ -49,20 +47,8 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
   const [selRun, setSelRun] = useState(-1);
   const sel = runs.includes(selRun) ? selRun : runs[runs.length - 1] ?? -1;
 
-  const units = useMemo(() => {
-    if (sel < 0) return null;
-    const e = EVENTS[sel];
-    const s = dailySeries(e, scope.ctx, e.start - 28, e.end + POST_PROMO_WINDOW_DAYS);
-    return s.days.map((d) => ({
-      x: shortDay(d.day),
-      actual: d.units,
-      baseline: s.baseline.units,
-      phase: d.day < s.window.from ? ('before' as const) : d.day < e.start ? ('baseline' as const) : d.day <= e.end ? ('promo' as const) : ('after' as const),
-    }));
-  }, [sel, scope.ctx]);
 
   const name = pg >= 0 ? (state.item >= 0 && ITEMS[state.item].pg === pg ? ITEMS[state.item].name : PRICE_GROUPS[pg].name) : '';
-  const uom = pg >= 0 ? PRICE_GROUPS[pg].uom : 'ea';
   const first = metrics[0];
   const last = metrics[metrics.length - 1];
   const trendDown = first && last && runs.length >= 3 && (last.salesLift ?? 0) < (first.salesLift ?? 0) - 0.15;
@@ -90,18 +76,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
 
   return (
     <>
-      <Heading>
-        {name}: {runs.length} {PROMO_LABEL[runType!]} runs in {scope.range.name.toLowerCase()}. Sales Lift went from <b>{pctChange(first.salesLift)}</b> ({runLabel(runs[0])}) to <b>{pctChange(last.salesLift)}</b> ({runLabel(runs[runs.length - 1])}); Net Incremental GM per run from{' '}
-        <b>{signedMoney(first.netIncGm)}</b> to <b>{signedMoney(last.netIncGm)}</b>.{isDefault && ' Showing the Cheerios Family Size Hot Buy by default; pick a price group or SKU Number in the filters.'}
-      </Heading>
-
-      <BannerStack>
-        {trendDown && (
-          <Banner lead="Trending down:">
-            each run of this promotion lifts less than the one before it ({pctChange(first.salesLift)} → {pctChange(last.salesLift)}); consider a different depth, ad type or timing (see Promo History).
-          </Banner>
-        )}
-      </BannerStack>
+      <Heading />
 
       <ViewControls cann>
         {typesHere.length > 1 && state.promoType === 'all' && (
@@ -114,15 +89,18 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
 
       <KeyFigures caption={`${name} · ${PROMO_LABEL[runType!]} · ${scope.range.name}`} tiles={tiles} />
 
-      <section className="card table-card" aria-label="Runs side by side">
-        <header className="table-head">
-          <div>
-            <h3 className="chart-title">Each run side by side</h3>
-            <p className="chart-sub">One column per run, oldest first. Click a run to show it in the before / during / after chart.</p>
-          </div>
-        </header>
-        <RunsCompare runs={runs} metrics={metrics} selected={sel} onSelect={setSelRun} title="Promo Run Trend" />
-      </section>
+      <ViewSummary>
+      {name}: {runs.length} {PROMO_LABEL[runType!]} runs in {scope.range.name.toLowerCase()}. Sales Lift went from <b>{pctChange(first.salesLift)}</b> ({runLabel(runs[0])}) to <b>{pctChange(last.salesLift)}</b> ({runLabel(runs[runs.length - 1])}); Net Incremental GM per run from{' '}
+      <b>{signedMoney(first.netIncGm)}</b> to <b>{signedMoney(last.netIncGm)}</b>.{isDefault && ' Showing the Cheerios Family Size Hot Buy by default; pick a price group or SKU Number in the filters.'}
+      </ViewSummary>
+
+      <BannerStack>
+        {trendDown && (
+          <Banner lead="Trending down:">
+            each run of this promotion lifts less than the one before it ({pctChange(first.salesLift)} → {pctChange(last.salesLift)}); consider a different depth, ad type or timing (see Promo History).
+          </Banner>
+        )}
+      </BannerStack>
 
       <ChartGrid cols={2}>
         <ChartCard
@@ -155,48 +133,24 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
         </ChartCard>
       </ChartGrid>
 
-      <section className="secondary-section" aria-label="Post-Promo Trend">
-        <h3 className="secondary-title">
-          Post-Promo Trend <Level2 />
-        </h3>
-        <p className="chart-sub">
-          Units before, during and after each promo vs. baseline. Useful but outside the MVP (#8). Post-Promo Dip % compares units in the 4 weeks after the promo with baseline units for the same days; a negative value suggests pantry loading. It shows — until the 4 weeks have passed.{' '}
-          <button type="button" className="btn-link" onClick={() => openDefinitions('dip')}>
-            Definition
-          </button>
-        </p>
-        <ChartGrid cols={2}>
-          <ChartCard
-            title={`Daily ${uom === 'lb' ? 'pounds' : 'units'} vs. baseline · ${runLabel(sel)}`}
-            subtitle={`${EVENTS[sel].id} · four weeks before, the promo and four weeks after`}
-            legend={[
-              { label: uom === 'lb' ? 'Pounds' : 'Units', color: C.s1 },
-              { label: 'Baseline (daily average)', color: C.axis },
-            ]}
-            table={units ? { head: ['Day', 'Phase', 'Volume', 'Baseline'], rows: units.map((d) => [d.x, d.phase, Math.round(d.actual), Math.round(d.baseline)]) } : undefined}
-            height={240}
-          >
-            <DailyVsBaseline data={units ?? []} format={(v) => volume(v, uom)} tickFormat={(v) => volume(v, uom)} actualLabel={uom === 'lb' ? 'Pounds' : 'Units'} />
-          </ChartCard>
-          <ChartCard title="Post-Promo Dip % per run" subtitle="Units in the 4 weeks after vs. baseline (— until the 4 weeks have passed)" table={{ head: ['Run', 'Post-Promo Dip %'], rows: runs.map((e, i) => [runLabel(e), pctChange(uomFirst(metrics[i].dip))]) }} height={240}>
-            <SignedColumns data={runs.map((e, i) => ({ x: shortDay(EVENTS[e].start), value: uomFirst(metrics[i].dip), tip: [{ label: `${runLabel(e)} · Post-Promo Dip %`, value: pctChange(uomFirst(metrics[i].dip)) }] }))} format={(v) => pct(v, 0)} valueLabel="Post-Promo Dip %" />
-          </ChartCard>
-        </ChartGrid>
+      <section className="card table-card" aria-label="Runs side by side">
+        <header className="table-head">
+          <div>
+            <h3 className="chart-title">Each run side by side</h3>
+            <p className="chart-sub">
+              One column per run, oldest first. The Post-Promo Trend tab shows units before, during and after each promo.{' '}
+              <button type="button" className="btn-link" onClick={() => openDefinitions('yoy')}>
+                Definitions
+              </button>
+            </p>
+          </div>
+        </header>
+        <RunsCompare runs={runs} metrics={metrics} selected={sel} onSelect={setSelRun} title="Promo Run Trend" />
       </section>
     </>
   );
 }
 
-function Heading({ children }: { children?: React.ReactNode }) {
-  return (
-    <SectionHeading
-      eyebrow="Must Have · View 3 of 5"
-      title="Promo Run Trend"
-      question="Is the same promotion trending up or down each time it runs?"
-      story={STORY}
-      validate="Baseline (#4), sales basis and GM % denominator (#5), margin scope and funding (#7), cost (#15). Last Year Gross Sales and YoY growth reuse the UC1 definition."
-    >
-      {children}
-    </SectionHeading>
-  );
+function Heading() {
+  return <SectionHeading title="Promo Run Trend" />;
 }
