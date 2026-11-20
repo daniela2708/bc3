@@ -55,12 +55,20 @@ One line under each title, in the secondary text colour, with what the view answ
 ### Rule 6: active-value tag on every affected block
 
 - Every key-figure group, chart or table that a Calculation settings control changes shows `<SettingTags block="…" />` in its header (`KeyFigures` / `ChartCard` take a `tags` prop; table headers use a `block-tags` line).
-- A value different from the view default is highlighted and says what changed ("Baseline 13 wk (default: 4 wk)").
+- Shown as one line of small secondary text. A value different from the view default is in the accent colour with its default in brackets ("Baseline 2 wk (default 4)").
 - Blocks no setting changes show no tag. Hover or focus shows the "Affects: …" text. Theme variables only.
 
 ### Rule 7: glossary
 
 Key terms use <Term> with a plain-language explanation, once per view: `<Term id="…">` from `src/components/Term.tsx`, texts only in `src/lib/glossary.ts` (also listed under "Glossary" in the KPI definitions dialog). Underline the first appearance in each view, never every appearance. `Pending term` and `Level2 term` mark the one chip per view that carries the explanation.
+
+### Rule 8: chart cards
+
+Use the shared `ChartCard` header for every chart: row 1 title (+ one term at most, + small chip) and icon-only Excel / Table buttons; row 2 the card's own controls (`controls`: Event dropdown inline, Daily / Weekly); row 3 the settings line (`tags`). One short subtitle (ellipsis, full text in the tooltip); technical notes in `tableNote` or the chart tooltip. Round axis ticks (`niceTicks`, `moneyAxis`), horizontal grid only. Spacing from the `--sp-*` scale. Change the shared component, not one card.
+
+## Illustrative items from the prototype review
+
+The Hot Buy Score, the promo fatigue flag and the Promo Run Trend lift colours are examples until the business defines them: change their criteria, weights and thresholds only in `src/lib/scoring.ts`, `src/lib/fatigue.ts` and `src/lib/thresholds.ts`, keep their chips ("Illustrative …", "Definition pending …", "Proposal for review") and mark new items "Requested in the prototype review" in `definitions.ts` (the README tables follow).
 
 ## Checks before finishing a change
 

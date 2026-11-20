@@ -1,8 +1,10 @@
 /* eslint-disable react-refresh/only-export-components -- chart palette constants live with the charts */
 import { ArrowDownWideNarrow, ArrowUpNarrowWide, BarChart3, Table2 } from 'lucide-react';
 import { ExportButton, nodeText } from './ExportButton';
+import { niceTicks } from '../lib/format';
 import { cloneElement, isValidElement, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  CartesianGrid,
   Bar,
   BarChart,
   Cell,
@@ -36,6 +38,11 @@ export const C = {
   pos: '#2e7d4f',
   neg: '#c62828',
   soft: '#d5e0ec',
+  /** Brand accent (promo window tint). */
+  accent: '#e93d44',
+  /** Muted change colours of the bridge (with a sign on every label, never colour alone). */
+  posSoft: '#4f8a66',
+  negSoft: '#b4524d',
   /** Recessive bars for a secondary panel (e.g. volume under a cost line). */
   qty: '#b3bfcc',
 };
@@ -77,16 +84,26 @@ export function ChartCard({
   rank,
   tags,
   titleNode,
+  titleChip,
+  controls,
+  tableNote,
 }: {
   /** Title with glossary terms; `title` stays the plain text (aria-label, Excel file name). */
   titleNode?: ReactNode;
-  /** Active-value tags of the settings that change this chart, and any control that changes only it. */
+  /** Small chip right after the title (e.g. "Definition pending #3"). */
+  titleChip?: ReactNode;
+  /** Row 2: the card's own controls in one line (Event dropdown, Daily / Weekly, a control that changes only it). */
+  controls?: ReactNode;
+  /** Row 3: one line with the active calculation settings (SettingTags). */
   tags?: ReactNode;
+  /** Technical notes kept out of the header: shown under the table view and added to the Excel export. */
+  tableNote?: string;
   /** Ranking charts: a Top first | Bottom first switch in the header. */
   rank?: { order: RankOrder; onChange: (o: RankOrder) => void };
   /** Full height of the chart when it is taller than `height`; the body then scrolls. */
   contentHeight?: number;
   title: string;
+  /** One short line that identifies the chart; cut with an ellipsis, full text in the tooltip. */
   subtitle?: ReactNode;
   legend?: LegendItem[];
   table?: ChartTable;
@@ -95,46 +112,52 @@ export function ChartCard({
   className?: string;
 }) {
   const [asTable, setAsTable] = useState(false);
+  const subText = nodeText(subtitle);
   return (
     <section className={`card chart-card${className ? ` ${className}` : ''}`} aria-label={title}>
       <header className="chart-head">
-        <div>
+        <div className="chart-row1">
           <h3 className="chart-title">{titleNode ?? title}</h3>
-          {subtitle && <div className="chart-sub">{subtitle}</div>}
-          {tags && <div className="block-tags">{tags}</div>}
-        </div>
-        {(table || rank) && (
-          <span className="chart-actions">
-          {rank && (
-            <span className="rank-toggle" role="group" aria-label="Ranking order">
-              {(['top', 'bottom'] as const).map((o) => (
-                <button key={o} type="button" className={`rank-btn${rank.order === o ? ' is-on' : ''}`} aria-pressed={rank.order === o} onClick={() => rank.onChange(o)}>
-                  {o === 'top' ? <ArrowDownWideNarrow size={13} aria-hidden="true" /> : <ArrowUpNarrowWide size={13} aria-hidden="true" />}
-                  {o === 'top' ? 'Top first' : 'Bottom first'}
-                </button>
-              ))}
+          {titleChip && <span className="chart-title-chip">{titleChip}</span>}
+          {(table || rank) && (
+            <span className="chart-actions">
+              {rank && (
+                <span className="rank-toggle" role="group" aria-label="Ranking order">
+                  {(['top', 'bottom'] as const).map((o) => (
+                    <button key={o} type="button" className={`rank-btn${rank.order === o ? ' is-on' : ''}`} aria-pressed={rank.order === o} onClick={() => rank.onChange(o)}>
+                      {o === 'top' ? <ArrowDownWideNarrow size={13} aria-hidden="true" /> : <ArrowUpNarrowWide size={13} aria-hidden="true" />}
+                      {o === 'top' ? 'Top first' : 'Bottom first'}
+                    </button>
+                  ))}
+                </span>
+              )}
+              {table && (
+                <>
+                  <ExportButton
+                    iconOnly
+                    fileName={title}
+                    getSheet={() => ({ title, subtitle: [subText, tableNote].filter(Boolean).join(' · '), head: table.head, rows: table.rows.map((r) => r.map((c) => c)) })}
+                  />
+                  <button
+                    type="button"
+                    className="chart-view-btn icon-only"
+                    aria-pressed={asTable}
+                    aria-label={asTable ? 'Show chart' : 'Show as table'}
+                    title={asTable ? 'Show chart' : 'Show as table'}
+                    onClick={() => setAsTable((v) => !v)}
+                  >
+                    {asTable ? <BarChart3 size={15} aria-hidden="true" /> : <Table2 size={15} aria-hidden="true" />}
+                  </button>
+                </>
+              )}
             </span>
           )}
-          {table && (
-            <>
-          <ExportButton
-            fileName={title}
-            getSheet={() => ({ title, subtitle: nodeText(subtitle), head: table.head, rows: table.rows.map((r) => r.map((c) => c)) })}
-          />
-          <button
-            type="button"
-            className="chart-view-btn"
-            aria-pressed={asTable}
-            onClick={() => setAsTable((v) => !v)}
-            title={asTable ? 'Show chart' : 'Show as table'}
-          >
-            {asTable ? <BarChart3 size={14} aria-hidden="true" /> : <Table2 size={14} aria-hidden="true" />}
-            {asTable ? 'Chart' : 'Table'}
-          </button>
-            </>
-          )}
-          </span>
-        )}
+        </div>
+        <div className="chart-sub" title={subText || undefined}>
+          {subtitle}
+        </div>
+        <div className="chart-controls">{controls}</div>
+        <div className="chart-settings">{tags}</div>
       </header>
       {legend && legend.length > 1 && !asTable && (
         <ul className="chart-legend">
@@ -170,6 +193,7 @@ export function ChartCard({
               ))}
             </tbody>
           </table>
+          {tableNote && <p className="table-note chart-table-note">{tableNote}</p>}
         </div>
       ) : (
         <Sized height={height} contentHeight={contentHeight}>
@@ -673,31 +697,35 @@ export interface WindowPoint {
   partial: boolean;
 }
 
+/** Window shading: Baseline light neutral, Promo a soft tint of the brand accent, After an even lighter neutral. */
 const WINDOW_SHADE = {
-  baseline: { fill: C.grid, opacity: 0.45, label: 'Baseline' },
-  promo: { fill: C.soft, opacity: 0.6, label: 'Promo' },
-  after: { fill: C.grid, opacity: 0.85, label: 'After' },
+  baseline: { fill: C.grid, opacity: 0.75, label: 'Baseline' },
+  promo: { fill: C.accent, opacity: 0.09, label: 'Promo' },
+  after: { fill: C.grid, opacity: 0.35, label: 'After' },
 } as const;
 
 /**
- * Actuals (line) against the baseline (dashed) across the three windows, each shaded and labelled: Baseline, Promo
- * and After. Daily points compare with the baseline daily average; weekly points with the weekly baseline, scaled to
- * the days of a partial week.
+ * Actuals (line) against the baseline (dashed, named at its right end) across the three windows. The window names sit
+ * in a fixed band above the plot, never on the line. Round axis ticks, horizontal grid only, dots on hover only.
  */
 export function PromoWindowChart({
   data,
   format,
-  tickFormat,
+  axisFormat,
   actualLabel,
   weekly,
+  note,
   width,
   height,
 }: {
   data: WindowPoint[];
   format: (v: number) => string;
-  tickFormat: (v: number) => string;
+  /** Round axis labels ($260K, not $260.0K). */
+  axisFormat: (v: number) => string;
   actualLabel: string;
   weekly: boolean;
+  /** Technical note shown at the end of the tooltip (baseline per week, windows). */
+  note?: string;
   width?: number;
   height?: number;
 }) {
@@ -705,14 +733,20 @@ export function PromoWindowChart({
     const p = data.filter((d) => d.phase === phase);
     return p.length ? { x1: p[0].x, x2: p[p.length - 1].x } : null;
   };
+  const max = data.reduce((m, d) => Math.max(m, d.actual, d.baseline), 0);
+  const ticks = niceTicks(0, max, 4);
+  const last = data.length - 1;
   return (
-    <ComposedChart width={width} height={height} data={data} margin={{ top: 16, right: 16, bottom: 0, left: 4 }}>
+    <ComposedChart width={width} height={height} data={data} margin={{ top: 22, right: 64, bottom: 0, left: 4 }}>
+      <CartesianGrid vertical={false} stroke={C.grid} strokeOpacity={0.8} />
       <XAxis dataKey="x" {...axisProps} interval="preserveStartEnd" minTickGap={weekly ? 12 : 28} />
-      <YAxis {...axisProps} width={56} tickFormatter={tickFormat} />
+      <YAxis {...axisProps} width={56} tickFormatter={axisFormat} ticks={ticks} domain={[ticks[0], ticks[ticks.length - 1]]} />
       {(['baseline', 'promo', 'after'] as const).map((ph) => {
         const sp = span(ph);
         const sh = WINDOW_SHADE[ph];
-        return sp ? <ReferenceArea key={ph} x1={sp.x1} x2={sp.x2} fill={sh.fill} fillOpacity={sh.opacity} label={{ value: sh.label, position: 'insideTop', fill: C.axis, fontSize: 11 }} /> : null;
+        return sp ? (
+          <ReferenceArea key={ph} x1={sp.x1} x2={sp.x2} fill={sh.fill} fillOpacity={sh.opacity} ifOverflow="extendDomain" label={{ value: sh.label, position: 'top', fill: C.axis, fontSize: 11, fontWeight: 700 }} />
+        ) : null;
       })}
       <Tooltip
         cursor={{ stroke: C.axis, strokeWidth: 1 }}
@@ -727,13 +761,33 @@ export function PromoWindowChart({
                 { label: actualLabel, value: format(p.actual), color: C.s1 },
                 { label: weekly ? (p.partial ? `Baseline (${p.days} days)` : 'Baseline (weekly)') : 'Baseline (daily average)', value: format(p.baseline), color: C.axis },
                 { label: 'Difference', value: format(p.diff) },
+                ...(note ? [{ label: note, value: '' }] : []),
               ]}
             />
           );
         }}
       />
-      <Line type="stepAfter" dataKey="baseline" stroke={C.axis} strokeDasharray="5 4" strokeWidth={1.5} dot={false} isAnimationActive={false} activeDot={false} />
-      <Line type="linear" dataKey="actual" stroke={C.s1} strokeWidth={2} dot={weekly ? { r: 3, fill: C.s1, strokeWidth: 0 } : false} isAnimationActive={false} activeDot={{ r: 4, stroke: '#fff', strokeWidth: 2 }} />
+      <Line
+        type="stepAfter"
+        dataKey="baseline"
+        name="Baseline"
+        stroke={C.axis}
+        strokeDasharray="5 4"
+        strokeWidth={1.5}
+        dot={false}
+        isAnimationActive={false}
+        activeDot={false}
+        label={(props: { index?: number; x?: number; y?: number }) =>
+          props.index === last && props.x !== undefined && props.y !== undefined ? (
+            <text key="baseline-end" x={props.x + 6} y={props.y} dy={4} fontSize={11} fontWeight={700} fill={C.axis}>
+              Baseline
+            </text>
+          ) : (
+            <g key={`b${props.index}`} />
+          )
+        }
+      />
+      <Line type="linear" dataKey="actual" name={actualLabel} stroke={C.s1} strokeWidth={2.5} dot={false} isAnimationActive={false} activeDot={{ r: 4, stroke: '#fff', strokeWidth: 2 }} />
     </ComposedChart>
   );
 }
@@ -748,7 +802,17 @@ export interface BridgeStep {
 }
 
 /** Waterfall: promo item lift → cannibalization → net, then the rest of the category → category incremental. */
-export function Bridge({ steps, format, width, height }: { steps: BridgeStep[]; format: (v: number) => string; width?: number; height?: number }) {
+/** Bars shorter than this many pixels are drawn at this height (from their baseline side) so they stay visible. */
+const MIN_BAR_PX = 4;
+/** Share of its slot a bridge bar takes (at most 60 %). */
+const BAR_SHARE = 0.6;
+
+/**
+ * Waterfall: promo item lift → cannibalization → net incremental → rest of the category → category incremental.
+ * Sober theme colours (muted green / red for changes, brand blue for totals), thin dotted connectors between bars,
+ * a sign on every change label, round axis ticks and bars no wider than 60 % of their slot.
+ */
+export function Bridge({ steps, format, axisFormat = format, width, height }: { steps: BridgeStep[]; format: (v: number) => string; axisFormat?: (v: number) => string; width?: number; height?: number }) {
   let run = 0;
   const data = steps.map((s) => {
     let lo: number;
@@ -762,32 +826,57 @@ export function Bridge({ steps, format, width, height }: { steps: BridgeStep[]; 
       hi = Math.max(run, run + s.value);
       run += s.value;
     }
-    return { ...s, range: [lo, hi] as [number, number] };
+    return { ...s, range: [lo, hi] as [number, number], end: run };
   });
+  const ticks = niceTicks(Math.min(...data.map((d) => d.range[0])), Math.max(...data.map((d) => d.range[1])), 4);
+  const label = (d: BridgeStep) => (d.kind === 'delta' && d.value > 0 ? `+${format(d.value)}` : format(d.value));
+  const fillOf = (d: BridgeStep) => (d.kind === 'total' ? C.s1 : d.value >= 0 ? C.posSoft : C.negSoft);
   return (
-    <BarChart width={width} height={height} data={data} margin={{ top: 22, right: 12, bottom: 0, left: 4 }} barCategoryGap="28%">
+    <BarChart width={width} height={height} data={data} margin={{ top: 22, right: 12, bottom: 0, left: 4 }} barCategoryGap={`${Math.round(((1 - BAR_SHARE) / 2) * 100)}%`}>
+      <CartesianGrid vertical={false} stroke={C.grid} strokeOpacity={0.8} />
       <XAxis dataKey="label" {...axisProps} interval={0} tick={{ fill: '#211e1e', fontSize: 11.5 }} />
-      <YAxis {...axisProps} width={58} tickFormatter={format} />
+      <YAxis {...axisProps} width={58} tickFormatter={axisFormat} ticks={ticks} domain={[ticks[0], ticks[ticks.length - 1]]} />
       <ReferenceLine y={0} stroke={C.axis} strokeWidth={1} />
       <Tooltip
         cursor={{ fill: 'rgba(33,30,30,0.05)' }}
         content={({ active, payload }) => {
           if (!active || !payload?.length) return null;
           const d = payload[0].payload as BridgeStep;
-          return <TipBox title={d.label} rows={[{ label: d.kind === 'total' ? 'Total' : 'Change', value: `${d.kind === 'delta' && d.value > 0 ? '+' : ''}${format(d.value)}` }]} />;
+          return <TipBox title={d.label} rows={[{ label: d.kind === 'total' ? 'Total' : 'Change', value: label(d) }]} />;
         }}
       />
-      <Bar dataKey="range" isAnimationActive={false} radius={[3, 3, 3, 3]}>
+      <Bar
+        dataKey="range"
+        isAnimationActive={false}
+        shape={(props: unknown) => {
+          const { x, y, width: w, height: h, index, payload } = props as { x: number; y: number; width: number; height: number; index: number; payload: (typeof data)[number] };
+          const up = payload.kind === 'total' ? payload.value >= 0 : payload.value >= 0;
+          const hh = Math.max(Math.abs(h), MIN_BAR_PX);
+          // A short bar grows away from its baseline side, so the running total stays where the scale puts it.
+          const top = Math.abs(h) >= MIN_BAR_PX ? Math.min(y, y + h) : up ? Math.min(y, y + h) + Math.abs(h) - hh : Math.min(y, y + h);
+          const endY = payload.kind === 'total' ? (up ? Math.min(y, y + h) : Math.max(y, y + h)) : up ? Math.min(y, y + h) : Math.max(y, y + h);
+          // Recharts puts barCategoryGap on each side: bars take 60 % of their slot, so the next bar starts one slot (width ÷ 0.6) later.
+          const next = index < data.length - 1 ? x + w / BAR_SHARE : null;
+          return (
+            <g>
+              <rect x={x} y={top} width={w} height={hh} rx={3} fill={fillOf(payload)} />
+              {next !== null && <line x1={x + w} x2={next} y1={endY} y2={endY} stroke={C.axis} strokeWidth={1} strokeDasharray="2 3" />}
+            </g>
+          );
+        }}
+      >
         {data.map((d) => (
-          <Cell key={d.label} fill={d.kind === 'total' ? C.s1 : d.value >= 0 ? C.pos : C.neg} />
+          <Cell key={d.label} fill={fillOf(d)} />
         ))}
         <LabelList
           dataKey="value"
           content={(props) => {
-            const { x, y, width, value } = props as { x: number; y: number; width: number; value: number };
+            const { x, y, width, height: h, index } = props as { x: number; y: number; width: number; height: number; index: number };
+            const d = data[index];
+            const above = Math.min(y, y + h) - 6;
             return (
-              <text x={x + width / 2} y={y - 6} fontSize={11.5} fontWeight={700} fill="#211e1e" textAnchor="middle">
-                {format(value)}
+              <text x={x + width / 2} y={above} fontSize={11.5} fontWeight={700} fill="#211e1e" textAnchor="middle">
+                {label(d)}
               </text>
             );
           }}
@@ -806,12 +895,15 @@ export function SignedColumns({
   width,
   height,
   valueLabel,
+  neutral = false,
 }: {
   data: { x: string; value: number | null; tip?: TipRow[] }[];
   format: (v: number) => string;
   width?: number;
   height?: number;
   valueLabel: string;
+  /** One neutral colour for values that are not a gain or a loss (e.g. buyers before, during and after). */
+  neutral?: boolean;
 }) {
   return (
     <BarChart width={width} height={height} data={data} margin={{ top: 20, right: 8, bottom: 0, left: 4 }} barCategoryGap="22%">
@@ -828,7 +920,7 @@ export function SignedColumns({
       />
       <Bar dataKey="value" isAnimationActive={false} radius={[3, 3, 0, 0]} maxBarSize={36}>
         {data.map((d, i) => (
-          <Cell key={i} fill={(d.value ?? 0) >= 0 ? C.pos : C.neg} />
+          <Cell key={i} fill={neutral ? C.s1 : (d.value ?? 0) >= 0 ? C.pos : C.neg} />
         ))}
       </Bar>
     </BarChart>

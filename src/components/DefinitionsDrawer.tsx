@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { KPI_DEFINITIONS, kpiStatus, OPEN_QUESTIONS, WORKBOOK_NAME, WORKBOOK_URL } from '../lib/definitions';
+import { SCORE_CRITERIA } from '../lib/scoring';
 import { sanitizeSearch, SEARCH_MAX, TABS } from '../lib/filters';
 import { GLOSSARY, TERM_IDS } from '../lib/glossary';
 import { VIEW_INFO } from '../lib/viewInfo';
@@ -78,6 +79,18 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
                   <td>
                     {d.definition}
                     {d.note && <span className="defs-note">Prototype: {d.note}</span>}
+                    {d.id === 'score' && (
+                      <ul className="defs-criteria" aria-label="Illustrative criteria and weights">
+                        {SCORE_CRITERIA.map((c) => (
+                          <li key={c.id}>
+                            <b>
+                              {c.label} · {c.weight} %
+                            </b>{' '}
+                            {c.description}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </td>
                   <td>{d.formula}</td>
                   <td className="defs-views">{d.views.map((v) => TAB_LABEL[v]).join(' · ')}</td>

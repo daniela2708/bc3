@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from '
 import { useFilters } from '../lib/filterStore';
 import { ExportButton, nodeText } from './ExportButton';
 
-export type ColGroup = 'Promo' | 'Sales' | 'Baseline' | 'Margin' | 'Category' | 'Trend';
+export type ColGroup = 'Promo' | 'Sales' | 'Baseline' | 'Margin' | 'Category' | 'Trend' | 'Score';
 
 export interface HierCol {
   key: string;
@@ -15,6 +15,8 @@ export interface HierCol {
   group?: ColGroup;
   /** Proposed or secondary columns start hidden; the column chooser shows them. */
   defaultHidden?: boolean;
+  /** Shown after the column title in the header (e.g. a status chip and its (i)); not part of the sort button. */
+  headExtra?: ReactNode;
 }
 
 export interface HierRow {
@@ -231,6 +233,7 @@ export function HierTable({
                     </span>
                   </button>
                 )}
+                {c.headExtra && <span className="th-extra">{c.headExtra}</span>}
               </th>
             ))}
           </tr>
@@ -253,7 +256,7 @@ export function HierTable({
   );
 }
 
-const GROUP_ORDER: ColGroup[] = ['Promo', 'Sales', 'Baseline', 'Margin', 'Category', 'Trend'];
+const GROUP_ORDER: ColGroup[] = ['Score', 'Promo', 'Sales', 'Baseline', 'Margin', 'Category', 'Trend'];
 
 /** Column chooser popover: checkboxes by group, plus Reset to default. */
 function ColumnChooser({

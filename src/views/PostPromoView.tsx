@@ -7,7 +7,7 @@ import { Level2 } from '../components/ui';
 import { CATS, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
 import { useFilters } from '../lib/filterStore';
-import { count, moneyCompact, moneyUnit, pct, pctChange, volume } from '../lib/format';
+import { count, moneyAxis, moneyCompact, moneyUnit, pct, pctChange, volume, volumeAxis } from '../lib/format';
 import { derive, eventAgg, POST_PROMO_WINDOW_DAYS, sumAggs, type Agg } from '../lib/metrics';
 import { SALES_COLUMNS, UNITS_COLUMNS } from '../lib/series';
 import { getScope } from '../lib/selectors';
@@ -133,7 +133,7 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
             measure={uom === 'lb' ? 'Pounds' : 'Units'}
             columns={uom === 'lb' ? { value: 'Pounds', baseline: 'Baseline pounds', diff: 'Difference' } : UNITS_COLUMNS}
             format={(v) => volume(v, uom)}
-            tickFormat={(v) => volume(v, uom)}
+            tickFormat={(v) => volumeAxis(v, uom)}
             baselineFormat={(v) => volume(v, uom)}
             height={240}
             block="unitsChart"
@@ -146,7 +146,7 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
             measure={basisWord(basis)}
             columns={SALES_COLUMNS}
             format={moneyUnit}
-            tickFormat={moneyCompact}
+            tickFormat={moneyAxis}
             baselineFormat={moneyCompact}
             height={240}
             block="salesChart"

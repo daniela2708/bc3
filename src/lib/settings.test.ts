@@ -62,10 +62,10 @@ describe('active-value tags (layout rule 6)', () => {
     expect(activeTag('trend', 'baseline', S).text).toBe('Baseline by promo type');
   });
   it('highlights a value that differs from the default and says what changed', () => {
-    expect(activeTag('hotbuy', 'baseline', { ...S, baseline: 13 })).toMatchObject({ changed: true, text: 'Baseline 13 wk (default: 4 wk)' });
-    expect(activeTag('hotbuy', 'basis', { ...S, basis: 'gross' })).toMatchObject({ changed: true, text: 'Using Gross Sales (default: Net Customer)' });
-    expect(activeTag('hotbuy', 'cann', { ...S, level: 'category' })).toMatchObject({ changed: true, text: 'Category level (default: Subcategory)' });
-    expect(activeTag('trend', 'baseline', { ...S, baseline: 4 })).toMatchObject({ changed: true, text: 'Baseline 4 wk (default: by promo type)' });
+    expect(activeTag('hotbuy', 'baseline', { ...S, baseline: 13 })).toMatchObject({ changed: true, text: 'Baseline 13 wk (default 4)' });
+    expect(activeTag('hotbuy', 'basis', { ...S, basis: 'gross' })).toMatchObject({ changed: true, text: 'Gross Sales (default Net Customer)' });
+    expect(activeTag('hotbuy', 'cann', { ...S, level: 'category' })).toMatchObject({ changed: true, text: 'Category level (default Subcategory)' });
+    expect(activeTag('trend', 'baseline', { ...S, baseline: 4 })).toMatchObject({ changed: true, text: 'Baseline 4 wk (default by promo type)' });
     expect(activeTag('other', 'baseline', { ...S, baseline: 13 }).changed).toBe(false);
   });
   it('each tag carries the same "Affects: …" text as its control', () => {

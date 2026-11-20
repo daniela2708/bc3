@@ -45,12 +45,21 @@ export const ALL_EVENTS = 'all';
 
 export interface EventOption {
   value: string;
+  /** Full text: "Price group · Promo type · mm/dd/yy–mm/dd/yy". */
   label: string;
+  /** Two-line list rendering: price group on top, promo type and dates below. */
+  primary?: string;
+  secondary?: string;
 }
 
 /** Dropdown options: optionally "All events in the table (N)", then one per event, latest start first. */
 export function eventOptions(events: number[], withAll: boolean): EventOption[] {
-  const list = [...events].sort((a, b) => EVENTS[b].start - EVENTS[a].start || a - b).map((e) => ({ value: String(e), label: eventOptionLabel(EVENTS[e]) }));
+  const list = [...events]
+    .sort((a, b) => EVENTS[b].start - EVENTS[a].start || a - b)
+    .map((e) => {
+      const ev = EVENTS[e];
+      return { value: String(e), label: eventOptionLabel(ev), primary: PRICE_GROUPS[ev.pg].name, secondary: `${PROMO_LABEL[ev.type]} · ${shortDay(ev.start)}–${shortDay(ev.end)}` };
+    });
   return withAll ? [{ value: ALL_EVENTS, label: `All events in the table (${events.length})` }, ...list] : list;
 }
 

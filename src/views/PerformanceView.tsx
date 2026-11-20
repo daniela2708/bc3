@@ -3,20 +3,23 @@ import { Banner, BannerStack, KeyFigures, SectionHeading, ViewSummary, type Tile
 import { Bridge, ChartCard, ChartGrid, type BridgeStep } from '../components/Charts';
 import { HierTable } from '../components/HierTable';
 import { EventPicker } from '../components/EventPicker';
+import { ScoreCell, ScoreChip } from '../components/Score';
 import { Term } from '../components/Term';
-import { Pending } from '../components/ui';
+import { CellBar, Pending } from '../components/ui';
 import { CATS, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
 import { useFilters } from '../lib/filterStore';
-import { moneyCompact, moneyTile, moneyUnit, pct, pctChange, signedMoney, signedMoneyTile, volumeCompact } from '../lib/format';
+import { moneyAxis, moneyCompact, moneyTile, moneyUnit, pct, pctChange, signedMoney, signedMoneyTile, volumeCompact } from '../lib/format';
 import { baselineText } from '../lib/baseline';
-import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
+import { FUNDING_BEHIND_SCENES, RANDOM_WEIGHT_NOTE } from '../lib/definitions';
+import { averageScore, hotBuyScores } from '../lib/hotBuyScore';
+import { criteriaText, SCORE_METHOD } from '../lib/scoring';
 import { CANN_LEVELS, derive, eventAgg, sumAggs } from '../lib/metrics';
 import { SALES_COLUMNS } from '../lib/series';
 import { ALL_EVENTS, bridgeEvent, bridgeSteps, chartEvent, eventOptions, selectedInTable } from '../lib/eventPick';
 import { getScope } from '../lib/selectors';
 import { VIEW_INFO } from '../lib/viewInfo';
-import { basisWord, columnsOf, EmptyState, eventDates, performanceRows, RowsControl, salesPair, SettingTags, unitsTile, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
+import { basisWord, columnsOf, EmptyState, eventDates, performanceRows, RowsControl, salesPair, SettingTags, unitsTile, uomFirst, uomPct, ViewControls, withEventColumn, type MetricCol, type ViewProps } from './common';
 import { PromoWindowCard } from './PromoWindowCard';
 import { RunsCompare } from './RunsCompare';
 
@@ -26,6 +29,8 @@ const HB_HIDDEN = ['dates', 'net', 'catIncGm', 'netGm', 'incSales'];
 // Same layout as Hot Buy Performance (workbook); the extra KPI columns start hidden in the column chooser.
 const OTHER_COLS = ['type', 'dates', 'gross', 'net', 'units', 'baseSales', 'baseUnits', 'incSales', 'incUnits', 'salesLift', 'unitLift', 'gm', 'gmPct', 'baseGm', 'incGm', 'netGm', 'catIncSales', 'catIncGm', 'cannSales', 'cannRate', 'netIncSales', 'netIncGm'];
 const OTHER_HIDDEN = ['dates', 'net', 'netGm', 'incSales', 'cannRate', 'netIncSales'];
+/** Hot Buy Score column (illustrative); its cells are filled per event after the rows are built (withEventColumn). */
+const SCORE_COL: MetricCol = { key: 'score', label: 'Hot Buy Score', group: 'Score', title: `Illustrative. ${SCORE_METHOD}`, cell: () => null, sort: () => null };
 
 export function PerformanceView({ openDefinitions, variant }: ViewProps & { variant: 'hotbuy' | 'other' }) {
   const { state, update } = useFilters();
@@ -34,12 +39,14 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
   const basis = state.basis;
   const cols = useMemo(() => {
     const c = columnsOf(hb ? HB_COLS : OTHER_COLS, hb ? HB_HIDDEN : OTHER_HIDDEN);
-    return hb ? c : [...c.slice(0, 5), { key: 'share', label: 'Share of price group %', group: 'Sales' as const, cell: () => '', sort: () => null }, ...c.slice(5)];
+    return hb ? [SCORE_COL, ...c] : [...c.slice(0, 5), { key: 'share', label: 'Share of price group %', group: 'Sales' as const, cell: () => '', sort: () => null }, ...c.slice(5)];
   }, [hb]);
   /** The selected event when the user picked "All events" in the bridge (see eventPick.ts). */
   const [allAt, setAllAt] = useState<number | null>(null);
 
-  const table = useMemo(
+  // Hot Buy Score (illustrative): each Hot Buy ranked against the other Hot Buys of the selection.
+  const scores = useMemo(() => (hb ? hotBuyScores(scope.events, scope.ctx, basis) : new Map()), [hb, scope.events, scope.ctx, basis]);
+  const built = useMemo(
     () =>
       performanceRows({
         events: scope.events,
@@ -53,6 +60,22 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
       }),
     [scope, basis, state.rollup, state.sel, cols, hb, update],
   );
+  const table = useMemo(() => {
+    if (!hb) return built;
+    return withEventColumn(
+      built,
+      'score',
+      (events) => {
+        if (events.length === 1) return { cell: <ScoreCell s={scores.get(events[0])} />, sort: scores.get(events[0])?.score ?? null };
+        const avg = averageScore(scores, events);
+        return { cell: avg === null ? '—' : <CellBar value={avg} max={100} text={`avg ${Math.round(avg)}`} />, sort: avg };
+      },
+      <span className="flat" title="Scored per event">
+        —
+      </span>,
+    );
+  }, [hb, built, scores]);
+  const avgScore = averageScore(scores);
   const all = useMemo(() => derive(sumAggs([...table.aggs.values()]), basis), [table, basis]);
   const perEvent = useMemo(() => scope.events.map((e) => ({ e, m: derive(table.aggs.get(e)!, basis) })), [scope.events, table, basis]);
 
@@ -116,11 +139,27 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
     { label: 'Incremental GM $', labelNode: <><Term id="incremental">Incremental</Term> GM $</>, info: `Promo GM $ − Baseline GM $ (before cannibalization and the vendor funding Net GM adds). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: signedMoneyTile(all.incGm), sub: <>Baseline GM {moneyTile(all.baseGm)}</>, pending: 7 },
     {
       label: 'Net Incremental GM $',
-      info: `Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (#7: scan-downs at the expected amount, bill-backs only for DSD items, no slotting or lump sums; DC scan-downs are already in the cost, #15). The main "did it pay off" number. ${RANDOM_WEIGHT_NOTE}`,
+      labelNode: (
+        <>
+          <Term id="netIncremental">Net Incremental</Term> GM $
+        </>
+      ),
+      info: `${FUNDING_BEHIND_SCENES} Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (#7: scan-downs at the expected amount, bill-backs only for DSD items, no slotting or lump sums; DC scan-downs are already in the cost, #15). The main "did it pay off" number. ${RANDOM_WEIGHT_NOTE}`,
       value: signedMoneyTile(all.netIncGm),
       sub: <>{losers.length} of {perEvent.length} below zero</>,
       pending: 7,
     },
+    ...(hb
+      ? [
+          {
+            label: 'Hot Buy Score',
+            info: `Average of the Hot Buys in the selection. ${SCORE_METHOD} Criteria and weights: ${criteriaText()}.`,
+            chip: <ScoreChip info={false} />,
+            value: avgScore === null ? '—' : String(Math.round(avgScore)),
+            sub: <>average of {scores.size} · scale 0–100</>,
+          } satisfies Tile,
+        ]
+      : []),
   ];
 
   if (scope.events.length === 0)
@@ -145,9 +184,9 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
         note={
           hb ? (
             <>
-              <b>Hot Buy Score:</b> Scoring method to be defined. It will rate each Hot Buy from the core metrics once Weis agrees the method.{' '}
+              <b>Hot Buy Score:</b> illustrative criteria and weights until the business defines the method; hover a score in the table for its breakdown.{' '}
               <button type="button" className="btn-link" onClick={() => openDefinitions('score')}>
-                Definition
+                Criteria and weights
               </button>
             </>
           ) : undefined
@@ -190,10 +229,10 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
             measure={basisWord(basis)}
             columns={SALES_COLUMNS}
             format={moneyUnit}
-            tickFormat={moneyCompact}
+            tickFormat={moneyAxis}
             baselineFormat={moneyCompact}
             block="salesChart"
-            picker={<EventPicker value={String(selEvent.idx)} options={optionsOne} onChange={pick} />}
+            picker={<EventPicker inline value={String(selEvent.idx)} options={optionsOne} onChange={pick} />}
           />
           <ChartCard
             title={`${hb ? 'Category / subcategory' : 'Category'} bridge`}
@@ -202,24 +241,14 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
                 {hb ? 'Category / subcategory' : 'Category'} <Term id="bridge">bridge</Term>
               </>
             }
-            tags={
-              <>
-                <EventPicker value={bridgeSel === null ? ALL_EVENTS : String(bridgeSel)} options={optionsAll} onChange={pick} />
-                <SettingTags block="bridge" />
-              </>
-            }
-            subtitle={
-              <>
-                {bridgePg ? `${bridgePg.name} in ${CATS[bridgePg.cat].name}` : `All ${scope.events.length} events in the table`} · {levelWord} level <Pending q={3} />
-                <br />
-                Promo item lift, minus <Term id="cannibalization">cannibalization</Term> (or plus <Term id="halo">halo</Term>), equals <Term id="netIncremental">net incremental</Term>; plus the rest of the category equals{' '}
-                <Term id="categoryIncremental">category incremental</Term>.
-              </>
-            }
+            titleChip={<Pending q={3} />}
+            controls={<EventPicker inline value={bridgeSel === null ? ALL_EVENTS : String(bridgeSel)} options={optionsAll} onChange={pick} />}
+            tags={<SettingTags block="bridge" />}
+            subtitle={bridgePg ? `${bridgePg.name} in ${CATS[bridgePg.cat].name}` : `All ${scope.events.length} events in the table`}
             table={{ head: ['Step', 'Sales $'], rows: bridge.map((b) => [b.label, Math.round(b.value)]) }}
             height={260}
           >
-            <Bridge steps={bridge} format={moneyCompact} />
+            <Bridge steps={bridge} format={moneyCompact} axisFormat={moneyAxis} />
           </ChartCard>
         </ChartGrid>
       )}
@@ -230,12 +259,13 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
             <h3 className="chart-title">
               {hb ? 'Hot Buy events by ' : 'Promotions by '}
               <Term id="priceGroup">price group</Term>
+              {hb && <ScoreChip />}
             </h3>
             <p className="block-tags">
               <SettingTags block="table" />
             </p>
             <p className="chart-sub">
-              One row per <Term id="event">event</Term> at price group level. Expand a row for its SKU Numbers{hb ? '' : ' and each item’s share of the price group result'}. Click a row, or pick an event in the charts above, to see it in detail. Cannibalization is measured for the price group, so SKU rows show —.
+              One row per <Term id="event">event</Term> at price group level. Expand a row for its SKU Numbers{hb ? '' : ' and each item’s share of the price group result'}. Click a row, or pick an event in the charts above, to see it in detail. <Term id="cannibalization">Cannibalization</Term> is measured for the price group, so SKU rows show —.
             </p>
           </div>
           <RowsControl />

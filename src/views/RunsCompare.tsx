@@ -4,7 +4,8 @@ import { ExportButton, nodeText } from '../components/ExportButton';
 import { fiscalOfDay } from '../data/calendar';
 import { PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
-import { moneyCompact, pct, pctChange } from '../lib/format';
+import { count, moneyCompact, pct, pctChange } from '../lib/format';
+import { LIFT_BAND_LABEL, liftBand, liftLegend, THRESHOLD_CHIP } from '../lib/thresholds';
 import type { Metrics } from '../lib/metrics';
 import { eventDates, unitsText, uomPct } from './common';
 
@@ -15,6 +16,8 @@ export interface RunRow {
   pending?: number;
   /** Level 2: useful but not part of the MVP. */
   level2?: boolean;
+  /** Added in the prototype review. */
+  review?: boolean;
 }
 
 export const RUN_ROWS: RunRow[] = [
@@ -31,6 +34,65 @@ export const RUN_ROWS: RunRow[] = [
   { key: 'yoy', label: 'YoY Gross Sales $ / %', cell: (m) => (m.yoy.abs === null ? '—' : `${moneyCompact(m.yoy.abs)} · ${pctChange(m.yoy.pct)}`) },
   { key: 'dip', label: 'Post-Promo Dip % (4 weeks)', cell: (m) => uomPct(m.dip, true), level2: true },
 ];
+
+/** A lift value with its illustrative colour band; the value and the band name are always shown (never colour alone). */
+export function LiftValue({ v, children }: { v: number | null; children: ReactNode }) {
+  const band = liftBand(v);
+  if (!band) return <>{children}</>;
+  return (
+    <span className={`lift-band band-${band}`} title={`${LIFT_BAND_LABEL[band]} lift (illustrative threshold)`}>
+      <span className="band-dot" aria-hidden="true" />
+      {children}
+      <span className="sr-only"> ({LIFT_BAND_LABEL[band]})</span>
+    </span>
+  );
+}
+
+/** Legend of the lift bands with the "Illustrative thresholds" chip. */
+export function LiftLegend({ onMore }: { onMore?: () => void }) {
+  return (
+    <p className="lift-legend" aria-label="Lift colour thresholds">
+      <span className="chip status-proposed">{THRESHOLD_CHIP}</span>
+      {liftLegend().map((l) => (
+        <span key={l.band} className={`lift-band band-${l.band}`}>
+          <span className="band-dot" aria-hidden="true" />
+          {l.text}
+        </span>
+      ))}
+      <span className="lift-legend-note">Sales Lift % and Unit Lift %</span>
+      {onMore && (
+        <button type="button" className="btn-link" onClick={onMore}>
+          Thresholds
+        </button>
+      )}
+    </p>
+  );
+}
+
+/** Events of the run's price group (any promo type) that started in the run's fiscal quarter. */
+export function eventsInRunQuarter(e: number): number {
+  const ev = EVENTS[e];
+  const f = fiscalOfDay(ev.start);
+  return EVENTS.filter((o) => o.pg === ev.pg && fiscalOfDay(o.start).fy === f.fy && fiscalOfDay(o.start).quarter === f.quarter).length;
+}
+
+/**
+ * Promo Run Trend rows (prototype review): an Event count row on top and the lift rows with illustrative colour
+ * bands. The other views keep RUN_ROWS.
+ */
+export function trendRunRows(runs: number[], metrics: Metrics[]): RunRow[] {
+  const countOf = new Map(metrics.map((m, i) => [m, eventsInRunQuarter(runs[i])]));
+  return [
+    { key: 'eventCount', label: 'Event count (price group, quarter)', cell: (m) => count(countOf.get(m) ?? null), review: true },
+    ...RUN_ROWS.map((r) =>
+      r.key === 'salesLift'
+        ? { ...r, cell: (m: Metrics) => <LiftValue v={m.salesLift}>{pctChange(m.salesLift)}</LiftValue> }
+        : r.key === 'unitLift'
+          ? { ...r, cell: (m: Metrics) => <LiftValue v={m.unitLift.ea ?? m.unitLift.lb}>{uomPct(m.unitLift, true)}</LiftValue> }
+          : r,
+    ),
+  ];
+}
 
 export function runLabel(e: number): string {
   const ev = EVENTS[e];
@@ -85,6 +147,11 @@ export function RunsCompare({ runs, metrics, rows = RUN_ROWS, selected, onSelect
                   {r.label}
                   {r.pending && <span className="pending-dot" title={`Definition pending #${r.pending}`}>*</span>}
                   {r.level2 && <span className="pending-dot level2-dot" title="Level 2 · not MVP">†</span>}
+                  {r.review && (
+                    <span className="pending-dot" title="Requested in the prototype review: events of the price group, any promo type, that started in the run's fiscal quarter">
+                      ‡
+                    </span>
+                  )}
                 </th>
                 {metrics.map((m, i) => (
                   <td key={runs[i]} className={runs[i] === selected ? 'is-selected' : undefined}>
@@ -96,7 +163,9 @@ export function RunsCompare({ runs, metrics, rows = RUN_ROWS, selected, onSelect
           </tbody>
         </table>
       </div>
-      <p className="table-note">* Definition pending (see KPI definitions). † Level 2 · not MVP.</p>
+      <p className="table-note">
+        * Definition pending (see KPI definitions). † Level 2 · not MVP.{rows.some((r) => r.review) && ' ‡ Requested in the prototype review: events of the price group (any promo type) that started in the run’s fiscal quarter.'}
+      </p>
     </>
   );
 }

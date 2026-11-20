@@ -5,7 +5,10 @@
  * KPI and the open questions with the assumption the prototype uses. Question numbers and statuses follow the
  * workbook tab "UC #3 - Open Questions". Shown in the KPI definitions dialog and in the README (see readme.ts).
  */
+import { FATIGUE_INFO, FATIGUE_RULE } from './fatigue';
 import type { TabId } from './filters';
+import { criteriaText, SCORE_CHIP, SCORE_METHOD } from './scoring';
+import { LIFT_THRESHOLDS, THRESHOLD_CHIP } from './thresholds';
 
 /** The requirements workbook on the Weis SharePoint (opens with a Weis account). A fixed https URL, not user input. */
 export const WORKBOOK_NAME = 'UC3_KPIs_Definitions_and_Mapping.xlsx';
@@ -35,6 +38,12 @@ export interface KpiDef {
   /** Source status when the KPI is not a row of the workbook's KPI sheet. */
   status?: string;
 }
+
+/** Added to the (i) of Net Gross Margin $ and Net Incremental Gross Margin $ (prototype review). */
+export const FUNDING_BEHIND_SCENES = 'Includes vendor funding. Funding data is brought in behind the scenes even though funding KPIs are not shown.';
+
+/** Status of the items added after the prototype review. */
+export const REVIEW_STATUS = 'Requested in the prototype review';
 
 /** Shown in the tooltips of Promo Units and of the margin metrics (#15). */
 export const RANDOM_WEIGHT_NOTE = 'Random weight cost is being corrected; meat scope pending (#15).';
@@ -213,7 +222,7 @@ export const KPI_DEFINITIONS: KpiDef[] = [
     definition: "Gross margin dollars on the promoted item(s) after adding vendor promo funding for the event.",
     formula: "Promo Gross Margin $ + Vendor Promo Funding $",
     views: PERF,
-    note: `${FUNDING_NOTE} ${RANDOM_WEIGHT_NOTE}`,
+    note: `${FUNDING_BEHIND_SCENES} ${FUNDING_NOTE} ${RANDOM_WEIGHT_NOTE}`,
     pending: 7,
   },
   {
@@ -277,7 +286,7 @@ export const KPI_DEFINITIONS: KpiDef[] = [
     definition: "Promoted item incremental gross margin after cannibalization and vendor funding. The main 'did it pay off' number.",
     formula: "Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $",
     views: ['hotbuy', 'other', 'trend', 'history'],
-    note: `${FUNDING_NOTE} ${RANDOM_WEIGHT_NOTE}`,
+    note: `${FUNDING_BEHIND_SCENES} ${FUNDING_NOTE} ${RANDOM_WEIGHT_NOTE}`,
     pending: 7,
   },
   {
@@ -411,8 +420,87 @@ export const KPI_DEFINITIONS: KpiDef[] = [
     priority: "Nice to have",
     definition: "Overall rating of a Hot Buy's success built from the core metrics. To be layered on after the core metrics are agreed.",
     formula: "Weighted score of agreed metrics (e.g., Net Incremental GM $, Lift %, Cannibalization Rate %). Weights to be defined.",
-    views: ['hotbuy'],
-    note: 'Shown as a placeholder only; the scoring method is not built.',
+    views: ['hotbuy', 'shopper'],
+    note: `${SCORE_CHIP}. Example criteria and weights (one config file, src/lib/scoring.ts): ${criteriaText()}. ${SCORE_METHOD} The margin criterion uses Net Gross Margin (with vendor funding), as the business asked. Shown in Hot Buy Performance (tile, table column) and in the Promo Shopper Impact proposal C.`,
+    status: REVIEW_STATUS,
+  },
+  {
+    id: "promos52",
+    name: "Promos in Last 52 Weeks",
+    unit: "#",
+    priority: "Nice to have",
+    definition: "Number of promo events the same price group had in the 52 weeks before the event started (any promo type).",
+    formula: "Count of events of the same price group with a start date in the 364 days before the event's start date",
+    views: ['history'],
+    note: 'Promo fatigue column of "Every past promotion". Events before the start of the data (FY2024) are not counted.',
+    status: `${REVIEW_STATUS} · illustrative`,
+  },
+  {
+    id: "daysSince",
+    name: "Days Since Previous Promo",
+    unit: "days",
+    priority: "Nice to have",
+    definition: "Days between the end of the latest earlier promo of the same price group and the start of this event.",
+    formula: "Event start date − end date of the previous event of the same price group (0 when they overlap); — when there is no earlier promo in the data",
+    views: ['history'],
+    note: 'Promo fatigue column of "Every past promotion".',
+    status: `${REVIEW_STATUS} · illustrative`,
+  },
+  {
+    id: "fatigue",
+    name: "Promoted Often (promo fatigue flag)",
+    unit: "flag",
+    priority: "Nice to have",
+    definition: "Flags events whose price group is promoted so often that shoppers may wait for the deal.",
+    formula: `${FATIGUE_RULE} Example threshold, configurable in src/lib/fatigue.ts.`,
+    views: ['history'],
+    note: `Definition pending · threshold to align with Cognira promo fatigue. ${FATIGUE_INFO}`,
+    status: `${REVIEW_STATUS} · illustrative`,
+  },
+  {
+    id: "timing",
+    name: "Promotion Timing Heat Map",
+    unit: "map",
+    priority: "Nice to have",
+    definition: "When in the year promotions work best: rows are price groups (or categories), columns the month of the year, colour the lift or Net Incremental GM $ of the events that started in that month.",
+    formula: "Sales Lift % of the events in the cell (ratio of totals), or their average Net Incremental GM $ per event; empty when no event started in that month",
+    views: ['history'],
+    note: 'New request · production data from Cognira (pending). Uses every event of the current selection, not only the price group of the table.',
+    status: `${REVIEW_STATUS} · new request`,
+  },
+  {
+    id: "runEventCount",
+    name: "Event Count (each run side by side)",
+    unit: "#",
+    priority: "Nice to have",
+    definition: "Number of promo events of the price group (any promo type) that started in the same fiscal quarter as the run.",
+    formula: "Count of events of the run's price group with a start date in the run's fiscal quarter",
+    views: ['trend'],
+    note: 'Row of "Each run side by side"; the run columns are labelled by fiscal quarter.',
+    status: REVIEW_STATUS,
+  },
+  {
+    id: "liftBands",
+    name: "Lift Colour Thresholds",
+    unit: "band",
+    priority: "Nice to have",
+    definition: "Colour band of Sales Lift % and Unit Lift % in each run, with the value always shown.",
+    formula: `High ≥ ${Math.round(LIFT_THRESHOLDS.good * 100)} % (green), Medium ${Math.round(LIFT_THRESHOLDS.watch * 100)} %–${Math.round(LIFT_THRESHOLDS.good * 100)} % (amber), Low < ${Math.round(LIFT_THRESHOLDS.watch * 100)} % (red). Example thresholds, configurable in src/lib/thresholds.ts.`,
+    views: ['trend'],
+    note: `${THRESHOLD_CHIP}.`,
+    status: `${REVIEW_STATUS} · illustrative`,
+  },
+  {
+    id: "buyerLift",
+    name: "Promo Buyer Lift vs. Previous Week / Same Week Last Year %",
+    unit: "%",
+    priority: "Nice to have",
+    definition: "Change in Promo Buyer Count vs. the week before the promotion and vs. the same week last year (club card aggregates).",
+    formula: "Promo Buyer Count ÷ buyers over the same number of days right before the event − 1; Promo Buyer Count ÷ buyers over the same days 52 weeks earlier − 1 (events with last-year data)",
+    views: ['shopper'],
+    note: 'Proposal for review (Promo Shopper Impact layout A, Category summary). For an event longer than one week the comparison uses the same number of days right before it.',
+    status: `${REVIEW_STATUS} · proposal for review`,
+    pending: 16,
   },
 ];
 
@@ -422,7 +510,6 @@ export function kpiStatus(d: KpiDef): string {
   if (d.status) parts.push(d.status);
   if (d.pending) parts.push(`Definition pending #${d.pending}${d.alsoPending?.length ? ` (also #${d.alsoPending.join(', #')})` : ''}`);
   if (d.level2) parts.push('Level 2 · not MVP');
-  if (d.id === 'score') parts.push('Placeholder');
   return parts.length ? parts.join(' · ') : 'Workbook';
 }
 

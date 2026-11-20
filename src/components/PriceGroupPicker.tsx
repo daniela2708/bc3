@@ -100,6 +100,9 @@ export function PriceGroupPicker({
             <label htmlFor={`${id}-text`} className="field-label">
               Paste UPCs or PLUs (up to {PASTE_MAX_CODES})
             </label>
+            <p className="paste-concept" role="note">
+              Concept for review: this is the functionality we want to bring to Power BI. The final input format may differ.
+            </p>
             <textarea
               id={`${id}-text`}
               className="text-input paste-area"

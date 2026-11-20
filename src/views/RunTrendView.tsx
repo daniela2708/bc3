@@ -6,14 +6,14 @@ import { Pending, Segmented } from '../components/ui';
 import { shortDay } from '../data/calendar';
 import { ITEMS, pgByName, PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL, type PromoType } from '../data/promos';
-import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
+import { FUNDING_BEHIND_SCENES, RANDOM_WEIGHT_NOTE } from '../lib/definitions';
 import { useFilters } from '../lib/filterStore';
 import { count, moneyCompact, moneyTile, pct, pctChange, signedMoney, signedMoneyTile } from '../lib/format';
 import { derive, eventAgg, sumAggs } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
 import { VIEW_INFO } from '../lib/viewInfo';
 import { EmptyState, SettingTags, unitsTile, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
-import { RunsCompare, runLabel } from './RunsCompare';
+import { LiftLegend, RunsCompare, runLabel, trendRunRows } from './RunsCompare';
 
 const DEFAULT_PG = pgByName('Cheerios Family Size').idx;
 
@@ -46,6 +46,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
   const aggs = useMemo(() => runs.map((e) => eventAgg(EVENTS[e], scope.ctx)), [runs, scope.ctx]);
   const metrics = useMemo(() => aggs.map((a) => derive(a, basis)), [aggs, basis]);
   const all = useMemo(() => derive(sumAggs(aggs), basis), [aggs, basis]);
+  const runRows = useMemo(() => trendRunRows(runs, metrics), [runs, metrics]);
   const [selRun, setSelRun] = useState(-1);
   const sel = runs.includes(selRun) ? selRun : runs[runs.length - 1] ?? -1;
 
@@ -70,7 +71,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
     { label: 'Promo Units', info: `Units or pounds sold on promo days, all runs; random-weight items count pounds, as in Total Volume (UC2). ${RANDOM_WEIGHT_NOTE}`, ...unitsTile(all.units) },
     { label: 'Promo GM $ / %', info: `Promo GM $ (cost per #15: DC average cost minus scan-downs, DSD replacement cost); GM % on the selected sales basis, denominator pending (#5). Margin scope pending (#7). ${RANDOM_WEIGHT_NOTE}`, value: moneyTile(all.gm), sub: <>{pct(all.gmPct)} margin rate</>, pending: 15 },
     { label: 'Sales / Unit Lift %', info: 'Incremental ÷ Baseline, all runs (ratio of totals).', value: pctChange(all.salesLift), sub: <>Units {uomPct(all.unitLift, true)}</>, pending: 4 },
-    { label: 'Net Incremental GM $', info: `Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (the funding #7 allows). ${RANDOM_WEIGHT_NOTE}`, value: signedMoneyTile(all.netIncGm), sub: <>Incremental GM {signedMoneyTile(all.incGm)}</>, pending: 7 },
+    { label: 'Net Incremental GM $', info: `${FUNDING_BEHIND_SCENES} Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $ (the funding #7 allows). ${RANDOM_WEIGHT_NOTE}`, value: signedMoneyTile(all.netIncGm), sub: <>Incremental GM {signedMoneyTile(all.incGm)}</>, pending: 7 },
     { label: 'YoY Gross Sales Growth', info: 'Promo-day gross sales vs. the same days last year (364 days earlier), runs with last-year history.', value: pctChange(all.yoy.pct), sub: <>LY {moneyTile(all.ly)} · {signedMoneyTile(all.yoy.abs)}</> },
   ];
 
@@ -146,15 +147,11 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
             <p className="block-tags">
               <SettingTags block="table" />
             </p>
-            <p className="chart-sub">
-              One column per run, oldest first. The Post-Promo Trend tab shows units before, during and after each promo.{' '}
-              <button type="button" className="btn-link" onClick={() => openDefinitions('yoy')}>
-                Definitions
-              </button>
-            </p>
+            <p className="chart-sub">One column per run, oldest first. The Post-Promo Trend tab shows units before, during and after each promo.</p>
+            <LiftLegend onMore={() => openDefinitions('liftBands')} />
           </div>
         </header>
-        <RunsCompare runs={runs} metrics={metrics} selected={sel} onSelect={setSelRun} title="Promo Run Trend" />
+        <RunsCompare runs={runs} metrics={metrics} rows={runRows} selected={sel} onSelect={setSelRun} title="Promo Run Trend" />
       </section>
     </>
   );

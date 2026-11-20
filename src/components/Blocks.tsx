@@ -114,6 +114,8 @@ export interface Tile {
   info: string;
   /** Open question number when the KPI definition is pending. */
   pending?: number;
+  /** Other status chip (e.g. "Illustrative scoring · …"). */
+  chip?: ReactNode;
   /** Single value. Ignored when `pair` is set. */
   value?: ReactNode;
   /** Two values: [main, secondary]. The main one keeps the tile size; the secondary one is smaller and grey. */
@@ -153,6 +155,7 @@ export function KeyFigures({ caption, tiles, note, tags }: { caption: string; ti
               <InfoTip text={t.info} label={`${t.label} definition`} below />
             </div>
             {t.pending !== undefined && <Pending q={t.pending} />}
+            {t.chip}
             {t.pair ? (
               <>
                 <TileLine v={t.pair[0]} main />

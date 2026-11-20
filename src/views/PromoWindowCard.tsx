@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { C, ChartCard, PromoWindowChart } from '../components/Charts';
+import { ChartCard, PromoWindowChart } from '../components/Charts';
 import { Segmented } from '../components/ui';
 import { PRICE_GROUPS } from '../data/products';
 import type { PromoEvent } from '../data/promos';
@@ -37,8 +37,9 @@ export function PromoWindowCard({
   measure: string;
   columns: SeriesColumns;
   format: (v: number) => string;
+  /** Round axis labels (moneyAxis / volumeAxis). */
   tickFormat: (v: number) => string;
-  /** Format of the weekly baseline in the subtitle. */
+  /** Format of the weekly baseline in the tooltip and table note. */
   baselineFormat: (v: number) => string;
   height?: number;
 }) {
@@ -46,14 +47,15 @@ export function PromoWindowCard({
   const sr = useMemo(() => promoSeries(event, ctx, gran, seriesKey), [event, ctx, gran, seriesKey]);
   const word = gran === 'weekly' ? 'Weekly' : 'Daily';
   const w = sr.windows;
-  const windowText = sr.baselineShownWeeks < w.baseline.weeks ? `baseline window: ${w.baseline.weeks} weeks, last ${sr.baselineShownWeeks} shown` : `baseline window: ${w.baseline.weeks} weeks`;
+  const windowText = sr.baselineShownWeeks < w.baseline.weeks ? `baseline window ${w.baseline.weeks} weeks (last ${sr.baselineShownWeeks} shown in Daily)` : `baseline window ${w.baseline.weeks} weeks`;
+  const note = `Baseline ${baselineFormat(sr.baselinePerWeek)} / week · ${windowText}${w.baseline.partial ? ', cut at the start of the data' : ''} · after 4 weeks`;
   return (
     <ChartCard
       title={`${word} ${measure} vs. baseline`}
-      subtitle={
-        <span className="chart-sub-tools">
-          {PRICE_GROUPS[event.pg].name} · {event.id} · baseline {baselineFormat(sr.baselinePerWeek)} / week · {windowText}
-          {w.baseline.partial ? ' (cut at the start of the data)' : ''} · after: 4 weeks
+      subtitle={`${PRICE_GROUPS[event.pg].name}, ${event.id}`}
+      controls={
+        <>
+          {picker}
           <Segmented<Granularity>
             small
             label="Chart granularity"
@@ -64,23 +66,15 @@ export function PromoWindowCard({
               { value: 'weekly', label: 'Weekly' },
             ]}
           />
-        </span>
-      }
-      legend={[
-        { label: `${word} ${measure}`, color: C.s1 },
-        { label: gran === 'weekly' ? 'Baseline (weekly; scaled for partial weeks)' : 'Baseline (daily average)', color: C.axis },
-      ]}
-      table={seriesTable(sr, columns)}
-      tags={
-        <>
-          {picker}
-          <SettingTags block={block} />
           <BlockSettings block={block} />
         </>
       }
+      tags={<SettingTags block={block} />}
+      table={seriesTable(sr, columns)}
+      tableNote={note}
       height={height}
     >
-      <PromoWindowChart data={sr.points} format={format} tickFormat={tickFormat} actualLabel={`${word} ${measure}`} weekly={gran === 'weekly'} />
+      <PromoWindowChart data={sr.points} format={format} axisFormat={tickFormat} actualLabel={`${word} ${measure}`} weekly={gran === 'weekly'} note={note} />
     </ChartCard>
   );
 }

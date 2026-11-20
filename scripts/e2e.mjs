@@ -286,7 +286,7 @@ async function main() {
   const grossTags = await evaluate(tagsOf);
   check(
     'Changing Sales basis highlights its tag on every affected block and leaves the others plain',
-    ['tiles', 'salesChart', 'bridge', 'table'].every((b) => grossTags[b].includes('basis*=Using Gross Sales (default: Net Customer)') && grossTags[b].some((t) => t.startsWith('baseline=Baseline 4 wk'))),
+    ['tiles', 'salesChart', 'bridge', 'table'].every((b) => grossTags[b].includes('basis*=Gross Sales (default Net Customer)') && grossTags[b].some((t) => t.startsWith('baseline=Baseline 4 wk'))),
     JSON.stringify(grossTags),
   );
   await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Sales basis"] button')].find((b) => b.textContent === 'Net Customer').click(), 1`);
@@ -305,7 +305,7 @@ async function main() {
   const shopTags = await evaluate(tagsOf);
   check(
     'Promo Shopper Impact: only the baseline tag, highlighted when changed from the default',
-    Object.values(shopTags).flat().every((t) => t === 'baseline*=Baseline 8 wk (default: by promo type)') && Object.keys(shopTags).sort().join() === 'panels,table,tiles',
+    Object.values(shopTags).flat().every((t) => t === 'baseline*=Baseline 8 wk (default by promo type)') && Object.keys(shopTags).sort().join() === 'panels,table,tiles',
     JSON.stringify(shopTags),
   );
   await send('Page.navigate', { url: `${base}/?tab=hotbuy` });
@@ -313,9 +313,9 @@ async function main() {
   // Local "Event" filters of the charts: bridge defaults to All events; pickers, table rows and the URL stay in sync.
   const bridgeCard = `[...document.querySelectorAll('section.chart-card')].find((c) => / bridge$/.test(c.getAttribute('aria-label') ?? ''))`;
   const salesCard = `[...document.querySelectorAll('section.chart-card')].find((c) => / vs\\. baseline$/.test(c.getAttribute('aria-label') ?? ''))`;
-  const pickerState = `(() => { const b = ${bridgeCard}; const s = ${salesCard}; const val = (c) => { const i = c.querySelector('.event-picker input, .event-picker select'); return i.tagName === 'SELECT' ? i.selectedOptions[0].textContent : i.value; }; return { bridge: val(b), bridgeSub: b.querySelector('.chart-sub').textContent, sales: val(s), salesSub: s.querySelector('.chart-sub').textContent, label: [...b.querySelectorAll('.event-picker label')].map((l) => l.textContent.trim()).join(), oldButtons: !!b.querySelector('[aria-label="Bridge scope"]'), selected: document.querySelector('tr.is-selected .lbl, tr.is-selected th')?.textContent ?? null, url: location.search }; })()`;
+  const pickerState = `(() => { const b = ${bridgeCard}; const s = ${salesCard}; const val = (c) => { const i = c.querySelector('.event-picker input, .event-picker select'); return i.tagName === 'SELECT' ? i.selectedOptions[0].textContent : i.value; }; return { bridge: val(b), bridgeSub: b.querySelector('.chart-sub').textContent, sales: val(s), salesSub: s.querySelector('.chart-sub').textContent, label: [...b.querySelectorAll('.event-picker .inline-label')].map((l) => l.textContent.trim()).join(), oldButtons: !!b.querySelector('[aria-label="Bridge scope"]'), selected: document.querySelector('tr.is-selected .lbl, tr.is-selected th')?.textContent ?? null, url: location.search }; })()`;
   const p0 = await evaluate(pickerState);
-  check('Bridge Event filter defaults to "All events in the table (N)" and the old buttons are gone', /^All events in the table \(\d+\)$/.test(p0.bridge) && /^All \d+ events in the table · subcategory level/.test(p0.bridgeSub) && p0.label.startsWith('Event') && !p0.oldButtons && / · Hot Buy · \d\d\/\d\d\/\d\d–\d\d\/\d\d\/\d\d$/.test(p0.sales), JSON.stringify(p0));
+  check('Bridge Event filter defaults to "All events in the table (N)" and the old buttons are gone', /^All events in the table \(\d+\)$/.test(p0.bridge) && /^All \d+ events in the table$/.test(p0.bridgeSub) && p0.label === 'Event' && !p0.oldButtons && / · Hot Buy · \d\d\/\d\d\/\d\d–\d\d\/\d\d\/\d\d$/.test(p0.sales), JSON.stringify(p0));
   // Pick the second event in the bridge combobox with the keyboard.
   await evaluate(`(() => { const i = (${bridgeCard}).querySelector('.event-picker input'); i.focus(); i.click(); return 1; })()`);
   await until(`!!(${bridgeCard}).querySelector('[role=listbox]')`, 'bridge Event list');
@@ -332,7 +332,7 @@ async function main() {
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
   await until(`location.search.includes('sel=')`, 'event picked in the bridge');
   const p1 = await evaluate(pickerState);
-  check('Picking an event in the bridge (keyboard) updates the URL, the table row and the sales chart; Esc closes the list', pickerEsc && p1.bridge === p1.sales && !p1.bridge.startsWith('All') && / in .+ · subcategory level/.test(p1.bridgeSub) && !!p1.selected && p1.selected.startsWith(p1.bridge.split(' · ')[0]), JSON.stringify({ pickerEsc, ...p1 }));
+  check('Picking an event in the bridge (keyboard) updates the URL, the table row and the sales chart; Esc closes the list', pickerEsc && p1.bridge === p1.sales && !p1.bridge.startsWith('All') && / in .+/.test(p1.bridgeSub) && !!p1.selected && p1.selected.startsWith(p1.bridge.split(' · ')[0]), JSON.stringify({ pickerEsc, ...p1 }));
   // A row click selects that event in both dropdowns.
   await evaluate(`(() => { const rows = [...document.querySelectorAll('table.hier tbody tr:not(.total-row):not(.is-selected)')].filter((r) => !r.classList.contains('sku-row')); rows[2].click(); return 1; })()`);
   await sleep(300);
@@ -368,13 +368,19 @@ async function main() {
   };
   await until(`!!(${cardOf('Daily')})`, 'Daily chart for a one-week Hot Buy');
   const hbChart = await evaluate(`(() => { const c = ${cardOf('')}; return { title: c.querySelector('.chart-title').textContent, sub: c.querySelector('.chart-sub').textContent, shades: [...c.querySelectorAll('.recharts-reference-area')].length, labels: [...c.querySelectorAll('.recharts-reference-area text, .recharts-label')].map((t) => t.textContent).join('|') }; })()`);
-  check('Hot Buy chart: Daily Net Customer Sales vs. baseline with Baseline, Promo and After shaded', hbChart.title === 'Daily Net Customer Sales vs. baseline' && hbChart.shades === 3 && /Baseline/.test(hbChart.labels) && /Promo/.test(hbChart.labels) && /After/.test(hbChart.labels) && hbChart.sub.includes('baseline window: 4 weeks'), JSON.stringify(hbChart));
+  check('Hot Buy chart: Daily Net Customer Sales vs. baseline with Baseline, Promo and After shaded', hbChart.title === 'Daily Net Customer Sales vs. baseline' && hbChart.shades === 3 && /Baseline/.test(hbChart.labels) && /Promo/.test(hbChart.labels) && /After/.test(hbChart.labels) && /^[^·]+, HB-\d{4}-\d{3}$/.test(hbChart.sub), JSON.stringify(hbChart));
   await shoot(cardOf('Daily'), 'chart-hotbuy-daily.png');
-  await evaluate(`[...(${cardOf('')}).querySelectorAll('button')].find((b) => /^(Table|Chart)$/.test(b.textContent.trim())).click(), 1`);
+  // Hot Buy Performance, the two top chart cards, light and dark colour scheme (the app has one theme today).
+  await shoot(`document.querySelector('.chart-grid')`, 'hotbuy-cards-light.png');
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
+  await shoot(`document.querySelector('.chart-grid')`, 'hotbuy-cards-dark.png');
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
+  await evaluate(`(${cardOf('')}).querySelector('button[aria-label="Show as table"], button[aria-label="Show chart"]').click(), 1`);
   await sleep(200);
   const hbHead = await evaluate(`[...(${cardOf('')}).querySelectorAll('th')].map((t) => t.textContent.trim()).join('|')`);
-  check('Chart table view: Day, Phase, Days, Sales $, Baseline $, Difference $', hbHead === 'Day|Phase|Days|Sales $|Baseline $|Difference $', hbHead);
-  await evaluate(`[...(${cardOf('')}).querySelectorAll('button')].find((b) => /^(Table|Chart)$/.test(b.textContent.trim())).click(), 1`);
+  const hbNote = await evaluate(`(${cardOf('')}).querySelector('.chart-table-note')?.textContent ?? ''`);
+  check('Chart table view: Day, Phase, Days, Sales $, Baseline $, Difference $', hbHead === 'Day|Phase|Days|Sales $|Baseline $|Difference $' && hbNote.includes('baseline window 4 weeks') && hbNote.includes('after 4 weeks'), `${hbHead} · ${hbNote}`);
+  await evaluate(`(${cardOf('')}).querySelector('button[aria-label="Show as table"], button[aria-label="Show chart"]').click(), 1`);
   await send('Page.navigate', { url: `${base}/?tab=other&tm=all&pt=TPR` });
   await until(`!!(${cardOf('')})`, 'Other Promo chart');
   await evaluate(`(() => { const rows = [...document.querySelectorAll('table.hier tbody tr:not(.total-row)')]; const r = rows.find((tr) => / \\+ [2-9] wk/.test(tr.textContent) || /TPR-/.test(tr.textContent) && / \\+ \\d+ wk/.test(tr.textContent)); (r ?? rows[0]).click(); return 1; })()`);
@@ -383,12 +389,13 @@ async function main() {
   if (!tprChart.title.startsWith('Weekly')) await evaluate(`[...(${cardOf('')}).querySelectorAll('button')].find((b) => b.textContent === 'Weekly').click(), 1`);
   await sleep(300);
   const tprWeekly = await evaluate(`(() => { const c = ${cardOf('Weekly')}; return c ? { title: c.querySelector('.chart-title').textContent, sub: c.querySelector('.chart-sub').textContent, shades: c.querySelectorAll('.recharts-reference-area').length } : null; })()`);
-  check('TPR chart: Weekly Net Customer Sales vs. baseline, 13-week baseline window, three windows', !!tprWeekly && tprWeekly.title === 'Weekly Net Customer Sales vs. baseline' && tprWeekly.sub.includes('baseline window: 13 weeks') && tprWeekly.shades === 3, JSON.stringify({ tprChart, tprWeekly }));
+  check('TPR chart: Weekly Net Customer Sales vs. baseline, 13-week baseline window, three windows', !!tprWeekly && tprWeekly.title === 'Weekly Net Customer Sales vs. baseline' && /^[^·]+, TPR-\d{4}-\d{3}b?$/.test(tprWeekly.sub) && tprWeekly.shades === 3, JSON.stringify({ tprChart, tprWeekly }));
   await shoot(cardOf('Weekly'), 'chart-tpr-weekly.png');
-  await evaluate(`[...(${cardOf('Weekly')}).querySelectorAll('button')].find((b) => /^(Table|Chart)$/.test(b.textContent.trim())).click(), 1`);
+  await evaluate(`(${cardOf('Weekly')}).querySelector('button[aria-label="Show as table"], button[aria-label="Show chart"]').click(), 1`);
   await sleep(200);
   const tprHead = await evaluate(`[...(${cardOf('Weekly')}).querySelectorAll('th')].map((t) => t.textContent.trim()).join('|')`);
-  check('Weekly table view: Week, Phase, Days, Sales $, Baseline $, Difference $', tprHead === 'Week|Phase|Days|Sales $|Baseline $|Difference $', tprHead);
+  const tprNote = await evaluate(`(${cardOf('Weekly')}).querySelector('.chart-table-note')?.textContent ?? ''`);
+  check('Weekly table view: Week, Phase, Days, Sales $, Baseline $, Difference $', tprHead === 'Week|Phase|Days|Sales $|Baseline $|Difference $' && tprNote.includes('baseline window 13 weeks'), `${tprHead} · ${tprNote}`);
   await send('Page.navigate', { url: `${base}/?tab=hotbuy` });
   await until(`!!document.querySelector('table.hier tbody tr:not(.total-row) button[aria-expanded]')`, 'Hot Buy table again');
   await evaluate(`document.querySelector('table.hier tbody tr:not(.total-row) button[aria-expanded]').click(), 1`);
@@ -433,6 +440,123 @@ async function main() {
     await evaluate(`(() => { const l = [...document.querySelectorAll('.defs-intro a')].find((x) => x.textContent.trim() === 'UC3_KPIs_Definitions_and_Mapping.xlsx'); return !!l && l.href.startsWith('https://weismarketsinc.sharepoint.com/') && l.target === '_blank' && l.rel.includes('noopener') && l.rel.includes('noreferrer'); })()`),
   );
   await evaluate(`document.querySelector('.defs-close').click(), 1`);
+
+  // 8. Prototype review: Hot Buy Score, promo fatigue, timing heat map, Run Trend rows, Shopper Impact proposals, notes.
+  const hoverAt = async (selectorExpr) => {
+    await evaluate(`(${selectorExpr}).scrollIntoView({ block: 'center' }), 1`);
+    await sleep(150);
+    const r = await evaluate(`(() => { const b = (${selectorExpr}).getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x, y: r.y });
+    await sleep(200);
+  };
+  await send('Page.navigate', { url: `${base}/?tab=hotbuy` });
+  await until(`!!document.querySelector('table.hier .score-cell')`, 'Hot Buy Score column');
+  const score = await evaluate(`(() => {
+    const heads = [...document.querySelectorAll('table.hier thead th')].map((t) => t.textContent.trim());
+    const values = [...document.querySelectorAll('table.hier tbody tr:not(.sku-row) .score-cell .cell-bar')].map((c) => Number(c.firstChild.textContent));
+    const tile = [...document.querySelectorAll('.kpi-tile')].find((t) => t.querySelector('.kpi-label').textContent.startsWith('Hot Buy Score'));
+    return { col: heads.some((h) => h.startsWith('Hot Buy Score')), n: values.length, inRange: values.every((v) => Number.isFinite(v) && v >= 0 && v <= 100), tile: tile?.querySelector('.kpi-value').textContent ?? null, tileChip: tile?.textContent.includes('Illustrative scoring · method to be defined with the business') ?? false, tableChip: document.querySelector('.table-card .chart-title').textContent.includes('Illustrative scoring · method to be defined with the business') };
+  })()`);
+  check('Hot Buy Score: column with 0–100 values and a small bar, average tile and the "Illustrative scoring" chip', score.col && score.n > 0 && score.inRange && /^\d{1,3}$/.test(score.tile ?? '') && score.tileChip && score.tableChip, JSON.stringify(score));
+  await hoverAt(`document.querySelector('table.hier tbody tr:not(.total-row) .score-cell')`);
+  const breakdown = await evaluate(`(() => { const h = document.querySelector('.hovercard'); if (!h) return null; return { rows: [...h.querySelectorAll('tbody tr')].map((r) => r.firstChild.textContent + '|' + r.lastChild.textContent.replace(/\\s+/g, ' ').trim()), label: document.querySelector('table.hier tbody tr:not(.total-row) .score-cell').getAttribute('aria-label') }; })()`);
+  check(
+    'Hovering a score shows points and weight per criterion (25 / 30 / 20 / 15 / 10)',
+    !!breakdown && breakdown.rows.length === 5 && ['/ 25', '/ 30', '/ 20', '/ 15', '/ 10'].every((w, i) => breakdown.rows[i].endsWith(w)) && /^Hot Buy Score \d+ of 100 \(illustrative\)\. Unit Lift %/.test(breakdown.label),
+    JSON.stringify(breakdown),
+  );
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 });
+  const netInfo = await evaluate(`(() => { const t = document.querySelector('.kpi-tile .tip[aria-label="Net Incremental GM $ definition"]')?.closest('.kpi-tile'); const th = [...document.querySelectorAll('table.hier thead th')].find((x) => x.textContent.trim().startsWith('Net Incremental GM $')); return [t?.querySelector('.tip-body')?.textContent ?? '', th?.title ?? '']; })()`);
+  check('Net Incremental GM $ (i) and column tooltip say funding is brought in behind the scenes', netInfo.every((t) => t.startsWith('Includes vendor funding. Funding data is brought in behind the scenes even though funding KPIs are not shown.')), JSON.stringify(netInfo));
+  await evaluate(`document.querySelector('.paste-btn').click(), 1`);
+  await until(`!!document.querySelector('.paste-pop')`, 'Paste UPCs popover');
+  check('Paste UPCs popover shows the concept note', await evaluate(`document.querySelector('.paste-pop .paste-concept').textContent.trim() === 'Concept for review: this is the functionality we want to bring to Power BI. The final input format may differ.'`));
+  await evaluate(`document.querySelector('.paste-btn').click(), 1`);
+
+  await send('Page.navigate', { url: `${base}/?tab=history` });
+  await until(`!!document.querySelector('.heatmap')`, 'timing heat map');
+  const hist = await evaluate(`(() => {
+    const cards = [...document.querySelectorAll('#tab-panel .chart-card, #tab-panel .table-card')].map((c) => c.getAttribute('aria-label'));
+    const heat = [...document.querySelectorAll('section.chart-card')].find((c) => c.getAttribute('aria-label') === 'Promotion timing heat map');
+    const heads = [...document.querySelectorAll('table.hier thead th')].map((t) => t.textContent.trim());
+    const cells = [...heat.querySelectorAll('.heat-cell[aria-label]:not(.is-empty)')];
+    return {
+      order: cards.indexOf('Promotion timing heat map') === cards.length - 2 && cards[cards.length - 1] === 'Every past promotion',
+      chip: heat.querySelector('.chart-title-chip').textContent === 'New request · production data from Cognira (pending)',
+      legend: !!heat.querySelector('.heat-legend-bar') && heat.querySelector('.heat-legend').textContent.includes('No event'),
+      cells: cells.length,
+      cellLabel: cells[0]?.getAttribute('aria-label') ?? '',
+      empty: heat.querySelectorAll('.heat-cell.is-empty').length > 0,
+      fatigueCols: ['Promos in last 52 weeks', 'Days since previous promo'].every((h) => heads.includes(h)) && heads.some((h) => h.startsWith('Promo fatigue') && h.includes('Definition pending · threshold to align with Cognira promo fatigue')),
+      fatigueTip: [...document.querySelectorAll('table.hier thead .th-extra .tip-body')].some((t) => t.textContent.startsWith('Cognira has promo fatigue and intensity calculations; this flag is illustrative and is not part of the Hot Buy Score.')),
+    };
+  })()`);
+  check('Promo History: timing heat map after the charts and before the table, with chip, legend, labelled and empty cells', hist.order && hist.chip && hist.legend && hist.cells > 0 && /: Sales Lift % [+−-]?\d/.test(hist.cellLabel) && hist.empty, JSON.stringify(hist));
+  check('Promo History: Promos in last 52 weeks, Days since previous promo and the Promo fatigue column with its chip and (i)', hist.fatigueCols && hist.fatigueTip, JSON.stringify(hist));
+  const heatCard = `[...document.querySelectorAll('section.chart-card')].find((c) => c.getAttribute('aria-label') === 'Promotion timing heat map')`;
+  await shoot(heatCard, 'history-heatmap.png');
+  await evaluate(`[...(${heatCard}).querySelectorAll('button')].find((b) => b.textContent === 'Category').click(), 1`);
+  await evaluate(`[...(${heatCard}).querySelectorAll('button')].find((b) => b.textContent === 'Net Incremental GM $').click(), 1`);
+  await sleep(300);
+  const heat2 = await evaluate(`(() => { const c = ${heatCard}; return { rowHead: c.querySelector('.heat-head .heat-rowhead').textContent, legend: c.querySelector('.heat-legend-label').textContent }; })()`);
+  await evaluate(`(${heatCard}).querySelector('button[aria-label="Show as table"]').click(), 1`);
+  await sleep(200);
+  const heatTable = await evaluate(`[...(${heatCard}).querySelectorAll('th')].map((t) => t.textContent).join('|')`);
+  check('Heat map local controls switch rows to Category and colour to Net Incremental GM $; table view lists the 12 months', heat2.rowHead === 'Category' && heat2.legend === 'Avg Net Incremental GM $ per event' && heatTable === 'Category|Events|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec', JSON.stringify({ heat2, heatTable }));
+
+  await send('Page.navigate', { url: `${base}/?tab=trend` });
+  await until(`!!document.querySelector('.runs-table')`, 'runs side by side');
+  const trend = await evaluate(`(() => {
+    const card = [...document.querySelectorAll('.table-card')].find((c) => c.getAttribute('aria-label') === 'Runs side by side');
+    const rows = [...card.querySelectorAll('tbody th')].map((t) => t.textContent);
+    const lift = [...card.querySelectorAll('tbody tr')].find((r) => r.querySelector('th').textContent.startsWith('Sales Lift %'));
+    return { first: rows[0], counts: [...card.querySelector('tbody tr').querySelectorAll('td')].every((td) => /^\\d+$/.test(td.textContent)), bands: [...lift.querySelectorAll('td .lift-band')].map((b) => b.className.replace('lift-band ', '') + ':' + b.textContent).join(' '), legend: card.querySelector('.lift-legend')?.textContent ?? '', definitions: [...card.querySelectorAll('.table-head button')].some((b) => b.textContent.trim() === 'Definitions') };
+  })()`);
+  check(
+    'Promo Run Trend: Event count row, lift colours by illustrative thresholds with legend and value shown, no Definitions link',
+    trend.first.startsWith('Event count') && trend.counts && /band-(good|watch|low):[+−-]?\d/.test(trend.bands) && trend.legend.includes('Illustrative thresholds') && trend.legend.includes('High ≥ 30 %') && trend.legend.includes('Medium 10 %–30 %') && trend.legend.includes('Low < 10 %') && !trend.definitions,
+    JSON.stringify(trend),
+  );
+
+  // Shopper Impact: the "Layout proposal" control switches between A, B and C (default A).
+  await send('Page.navigate', { url: `${base}/?tab=shopper` });
+  await until(`!!document.querySelector('.proposal-bar')`, 'Shopper Impact proposals');
+  const layoutOf = `(() => ({
+    pressed: ${pressed('Layout proposal')},
+    chip: document.querySelector('.proposal-bar .proposal-chip')?.textContent ?? '',
+    approval: document.body.textContent.includes('Aggregates only. Individual-level detail requires approval (#16).'),
+    a: !!document.querySelector('.table-card[aria-label="Category summary"]') && [...document.querySelectorAll('section.chart-card')].some((c) => c.getAttribute('aria-label') === 'Promo buyer lift by category'),
+    b: [...document.querySelectorAll('section.chart-card')].some((c) => c.getAttribute('aria-label') === 'Promo buyers before, during and after') && !!document.querySelector('.proposal-bar .event-picker') && !!document.querySelector('.table-card[aria-label="All events"]'),
+    c: document.querySelectorAll('.snapshot-grid .snapshot-card').length > 0 && !!document.querySelector('.snapshot-card .score-badge b') && !!document.querySelector('.proposal-bar .month-picker'),
+    tiles: document.querySelectorAll('.kpi-tile').length,
+  }))()`;
+  // Whole page: the viewport grows to the page height, so the sticky header and the tab bar stay in place.
+  const shootPage = async (file) => {
+    if (!process.env.SCREENSHOTS) return;
+    await evaluate(`scrollTo(0, 0), 1`);
+    const h = await evaluate(`document.documentElement.scrollHeight`);
+    await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: Math.min(h, 6000), deviceScaleFactor: 1, mobile: false });
+    await sleep(500);
+    const shot = await send('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(join(process.env.SCREENSHOTS, file), Buffer.from(shot.result.data, 'base64'));
+    await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  };
+  const pick = async (label) => {
+    await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Layout proposal"] button')].find((b) => b.textContent.startsWith(${JSON.stringify(label)})).click(), 1`);
+    await sleep(500);
+    return evaluate(layoutOf);
+  };
+  const la = await evaluate(layoutOf);
+  check('Shopper Impact: proposal A (Category summary) by default, with the "Proposal for review" chip and the #16 line', la.pressed === 'A · Category summary' && la.a && !la.b && !la.c && la.chip === 'Proposal for review' && la.approval, JSON.stringify(la));
+  await shootPage('shopper-proposal-a.png');
+  const lb = await pick('B');
+  check('Shopper Impact: the control switches to proposal B (Event detail)', lb.pressed === 'B · Event detail' && lb.b && !lb.a && !lb.c && lb.approval && lb.tiles >= 5, JSON.stringify(lb));
+  await shootPage('shopper-proposal-b.png');
+  const lc = await pick('C');
+  check('Shopper Impact: the control switches to proposal C (Executive snapshot) with the Hot Buy Score per card', lc.pressed === 'C · Executive snapshot' && lc.c && !lc.a && !lc.b && lc.approval, JSON.stringify(lc));
+  await shootPage('shopper-proposal-c.png');
+  const la2 = await pick('A');
+  check('Shopper Impact: back to proposal A', la2.a && !la2.c, JSON.stringify(la2));
 
   check('No console errors or exceptions', errors.length === 0, errors.slice(0, 3).join(' | '));
   if (process.env.E2E_DEBUG) console.log(debug.join('\n'));

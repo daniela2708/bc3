@@ -6,8 +6,9 @@ import { Term } from '../components/Term';
 import { Field, HowItWorks, Impact, InfoTip, Pending, Segmented } from '../components/ui';
 import { formatDay, shortDay } from '../data/calendar';
 import { CATS, DEPTS, ITEMS, itemCode, PRICE_GROUPS, SUBS } from '../data/products';
-import { AD_LABEL, EVENTS, PROMO_LABEL, type PromoEvent } from '../data/promos';
-import { RANDOM_WEIGHT_NOTE } from '../lib/definitions';
+import { AD_LABEL, EVENTS, EVENTS_BY_PG, PROMO_LABEL, type PromoEvent } from '../data/promos';
+import { FUNDING_BEHIND_SCENES, RANDOM_WEIGHT_NOTE } from '../lib/definitions';
+import { daysSincePreviousPromo, FATIGUE_CHIP, FATIGUE_INFO, FATIGUE_RULE, promosInLast52Weeks, promotedOften } from '../lib/fatigue';
 import type { Rollup } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
 import { count, DASH, money, moneyCompact, moneyTile, numberCompact, pct, pctChange, volume, volumeCompact } from '../lib/format';
@@ -127,6 +128,9 @@ const PENDING_TITLE = (q: number) => `Definition pending (#${q})`;
 const MARGIN_TITLE = (pending: string) => `${pending}. ${RANDOM_WEIGHT_NOTE}`;
 const LEVEL2_TITLE = 'Level 2 · not MVP';
 
+/** The events of an event's price group, for the promo fatigue columns. */
+const pgEvents = (e: PromoEvent) => EVENTS_BY_PG[e.pg].map((i) => EVENTS[i]);
+
 /** Every metric column the performance tables can show, keyed for the column chooser. */
 export const METRIC_COLS: Record<string, MetricCol> = {
   dates: { key: 'dates', label: 'Dates', group: 'Promo', left: true, cell: (_m, e) => (e ? eventDates(e) : ''), sort: (_m, e) => e?.start ?? null },
@@ -148,17 +152,42 @@ export const METRIC_COLS: Record<string, MetricCol> = {
   gmPct: { key: 'gmPct', label: 'Promo GM %', group: 'Margin', title: MARGIN_TITLE('Definition pending (#5; also #7, #15)'), cell: (m) => pct(m.gmPct), sort: (m) => m.gmPct },
   baseGm: { key: 'baseGm', label: 'Baseline GM $', group: 'Margin', title: MARGIN_TITLE('Definition pending (#4; also #7)'), defaultHidden: true, cell: (m) => moneyCompact(m.baseGm), sort: (m) => m.baseGm },
   incGm: { key: 'incGm', label: 'Incremental GM $', group: 'Margin', title: MARGIN_TITLE(PENDING_TITLE(7)), cell: (m) => <Impact value={m.incGm} compact />, sort: (m) => m.incGm },
-  netGm: { key: 'netGm', label: 'Net GM $', group: 'Margin', title: MARGIN_TITLE(PENDING_TITLE(7)), cell: (m) => moneyCompact(m.netGm), sort: (m) => m.netGm },
+  netGm: { key: 'netGm', label: 'Net GM $', group: 'Margin', title: `${FUNDING_BEHIND_SCENES} ${MARGIN_TITLE(PENDING_TITLE(7))}`, cell: (m) => moneyCompact(m.netGm), sort: (m) => m.netGm },
   catIncSales: { key: 'catIncSales', label: 'Category Incremental Sales $', group: 'Category', cell: (m) => orPg(m, <Impact value={m.catIncSales} compact />), sort: (m) => m.catIncSales },
   catIncGm: { key: 'catIncGm', label: 'Category Incremental GM $', group: 'Category', title: MARGIN_TITLE(PENDING_TITLE(7)), defaultHidden: true, cell: (m) => orPg(m, <Impact value={m.catIncGm} compact />), sort: (m) => m.catIncGm },
   cannSales: { key: 'cannSales', label: 'Cannibalized Sales $', group: 'Category', title: PENDING_TITLE(3), cell: (m) => orPg(m, <Impact value={m.cannSales} compact />), sort: (m) => m.cannSales },
   cannRate: { key: 'cannRate', label: 'Cannibalization Rate %', group: 'Category', title: PENDING_TITLE(3), cell: (m) => orPg(m, uomPct(m.cannRate)), sort: (m) => uomFirst(m.cannRate) },
   netIncSales: { key: 'netIncSales', label: 'Net Incremental Sales $', group: 'Category', cell: (m) => orPg(m, <Impact value={m.netIncSales} compact />), sort: (m) => m.netIncSales },
-  netIncGm: { key: 'netIncGm', label: 'Net Incremental GM $', group: 'Margin', title: MARGIN_TITLE(PENDING_TITLE(7)), cell: (m) => orPg(m, <Impact value={m.netIncGm} compact />), sort: (m) => m.netIncGm },
+  netIncGm: { key: 'netIncGm', label: 'Net Incremental GM $', group: 'Margin', title: `${FUNDING_BEHIND_SCENES} ${MARGIN_TITLE(PENDING_TITLE(7))}`, cell: (m) => orPg(m, <Impact value={m.netIncGm} compact />), sort: (m) => m.netIncGm },
   ly: { key: 'ly', label: 'LY Gross Sales $', group: 'Trend', cell: (m) => moneyCompact(m.ly), sort: (m) => m.ly },
   yoyAbs: { key: 'yoyAbs', label: 'YoY Gross Sales $', group: 'Trend', cell: (m) => <Impact value={m.yoy.abs} compact />, sort: (m) => m.yoy.abs },
   yoyPct: { key: 'yoyPct', label: 'YoY Gross Sales %', group: 'Trend', cell: (m) => pctChange(m.yoy.pct), sort: (m) => m.yoy.pct },
   dip: { key: 'dip', label: 'Post-Promo Dip %', group: 'Trend', title: LEVEL2_TITLE, cell: (m) => uomPct(m.dip, true), sort: (m) => uomFirst(m.dip) },
+  // Promo fatigue (Promo History, prototype review, illustrative): per event only; group and total rows stay empty.
+  promos52: { key: 'promos52', label: 'Promos in last 52 weeks', group: 'Promo', title: 'Events of the same price group (any promo type) in the 52 weeks before this event started.', cell: (_m, e) => (e ? count(promosInLast52Weeks(e, pgEvents(e))) : ''), sort: (_m, e) => (e ? promosInLast52Weeks(e, pgEvents(e)) : null) },
+  daysSince: {
+    key: 'daysSince',
+    label: 'Days since previous promo',
+    group: 'Promo',
+    title: 'Days from the end of the previous promo of the same price group to this start; — when there is no earlier promo in the data (FY2024 onward).',
+    cell: (_m, e) => (e ? (daysSincePreviousPromo(e, pgEvents(e)) === null ? DASH : count(daysSincePreviousPromo(e, pgEvents(e)))) : ''),
+    sort: (_m, e) => (e ? daysSincePreviousPromo(e, pgEvents(e)) : null),
+  },
+  fatigue: {
+    key: 'fatigue',
+    label: 'Promo fatigue',
+    group: 'Promo',
+    left: true,
+    title: `${FATIGUE_RULE} ${FATIGUE_INFO}`,
+    headExtra: (
+      <>
+        <span className="chip status-pending th-chip">{FATIGUE_CHIP}</span>
+        <InfoTip text={`${FATIGUE_INFO} ${FATIGUE_RULE}`} label="Promoted often: what it means" below />
+      </>
+    ),
+    cell: (_m, e) => (e && promotedOften(e, pgEvents(e)) ? <span className="flag-chip">Promoted often</span> : ''),
+    sort: (_m, e) => (e ? (promotedOften(e, pgEvents(e)) ? 1 : 0) : null),
+  },
 };
 
 function uomPctUnits(v: ByUom): ReactNode {
@@ -171,6 +200,25 @@ function uomPctUnits(v: ByUom): ReactNode {
     );
   return v.lb !== null ? volumeCompact(v.lb, 'lb') : volumeCompact(v.ea, 'ea');
 }
+
+/**
+ * Adds a per-event column to table rows built by performanceRows (e.g. the Hot Buy Score): event rows get the
+ * event's cell, group rows and the total the cell for the events under them, SKU rows `sku`.
+ */
+export function withEventColumn<T extends { rows: HierRow[]; total: HierRow }>(t: T, key: string, cellOf: (events: number[]) => { cell: ReactNode; sort: number | null }, sku: ReactNode): T {
+  const eventsUnder = (r: HierRow): number[] => {
+    const m = /^e(\d+)$/.exec(r.id);
+    if (m) return [Number(m[1])];
+    return (r.children ?? []).flatMap(eventsUnder);
+  };
+  const walk = (r: HierRow): HierRow => {
+    if (r.className === 'sku-row') return { ...r, cells: { ...r.cells, [key]: sku }, sort: { ...r.sort, [key]: null } };
+    const c = cellOf(eventsUnder(r));
+    return { ...r, cells: { ...r.cells, [key]: c.cell }, sort: { ...r.sort, [key]: c.sort }, children: r.children?.map(walk) };
+  };
+  return { ...t, rows: t.rows.map(walk), total: { ...cellsFor(t.total, key, cellOf(t.rows.flatMap(eventsUnder))) } };
+}
+const cellsFor = (r: HierRow, key: string, c: { cell: ReactNode; sort: number | null }): HierRow => ({ ...r, cells: { ...r.cells, [key]: c.cell }, sort: { ...r.sort, [key]: c.sort } });
 
 export function columnsOf(keys: string[], hidden: string[] = []): MetricCol[] {
   return keys.map((k) => ({ ...METRIC_COLS[k], defaultHidden: METRIC_COLS[k].defaultHidden || hidden.includes(k) }));
@@ -335,14 +383,14 @@ function CannControl() {
           </p>
           <p>Which items count as competitors of the promoted price group. Always excludes the promoted price group and compares only items with the same unit of measure.</p>
           <p>
-            <b>How it is calculated:</b> for those items, sales during the promo minus their baseline. A drop is cannibalization (negative), a rise is halo (positive). Cannibalization Rate % = units lost by those items ÷
+            <b>How it is calculated:</b> for those items, sales during the promo minus their baseline. A drop is cannibalization (negative), a rise is <Term id="halo">halo</Term> (positive). Cannibalization Rate % = units lost by those items ÷
             incremental units of the promoted item.
           </p>
           <p>
             <b>What changes:</b> Cannibalized Sales $, Cannibalization Rate %, Net Incremental Sales $, Net Incremental Gross Margin $, and the Cannibalization step in the bridge chart.
           </p>
           <p>
-            <b>What does not change:</b> the promoted item&apos;s own sales, units, lift, incremental results and Promo GM, and Category Incremental Sales $ / GM $, which always use the whole category.
+            <b>What does not change:</b> the promoted item&apos;s own sales, units, lift, incremental results and Promo GM, and <Term id="categoryIncremental">Category Incremental</Term> Sales $ / GM $, which always use the whole category.
           </p>
           <p>
             <b>Levels:</b> Subcategory (default, as in the KPI sheet), Brand, Brand-category, Category. The level is still open (#3).
@@ -431,11 +479,18 @@ export function SettingTags({ block }: { block: BlockId }) {
   if (tags.length === 0) return null;
   return (
     <span className="setting-tags" data-block={block}>
-      {tags.map((t) => (
-        <span key={t.key} className={`setting-tag tip below${t.changed ? ' is-changed' : ''}`} tabIndex={0} data-setting={t.key} aria-label={`${SETTING_LABEL[t.key]}: ${t.text}. ${t.affects}`}>
-          {t.text}
-          <span className="tip-body" role="tooltip" aria-hidden="true">
-            {t.affects}
+      {tags.map((t, i) => (
+        <span key={t.key} className="setting-item">
+          {i > 0 && (
+            <span className="setting-sep" aria-hidden="true">
+              {' · '}
+            </span>
+          )}
+          <span className={`setting-tag tip below${t.changed ? ' is-changed' : ''}`} tabIndex={0} data-setting={t.key} aria-label={`${SETTING_LABEL[t.key]}: ${t.text}. ${t.affects}`}>
+            {t.text}
+            <span className="tip-body" role="tooltip" aria-hidden="true">
+              {t.affects}
+            </span>
           </span>
         </span>
       ))}

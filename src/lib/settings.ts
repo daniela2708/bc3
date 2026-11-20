@@ -9,7 +9,7 @@ import type { FilterState, TabId } from './filters';
 import { CANN_LEVELS, DEFAULT_BASIS, DEFAULT_CANN_LEVEL } from './metrics';
 
 export type SettingKey = 'baseline' | 'basis' | 'cann';
-export type BlockId = 'tiles' | 'salesChart' | 'unitsChart' | 'bridge' | 'table' | 'runs' | 'liftChart' | 'netIncChart' | 'periodChart' | 'depthCharts' | 'adCharts' | 'panels';
+export type BlockId = 'tiles' | 'salesChart' | 'unitsChart' | 'bridge' | 'table' | 'runs' | 'liftChart' | 'netIncChart' | 'periodChart' | 'depthCharts' | 'adCharts' | 'heatmap' | 'panels';
 
 export const SETTING_LABEL: Record<SettingKey, string> = { baseline: 'Baseline window', basis: 'Sales basis', cann: 'Cannibalization level' };
 
@@ -22,9 +22,9 @@ export interface SettingUse {
 /** Per view: the blocks each setting changes. A setting with no entry is not shown in that view. */
 export const AFFECTS: Record<TabId, Partial<Record<SettingKey, SettingUse>>> = {
   hotbuy: {
-    baseline: { blocks: ['tiles', 'salesChart', 'bridge', 'table'], text: 'key figures (Promo Units baseline, Sales / Unit Lift %, Incremental GM $, Net Incremental GM $), the sales vs. baseline chart, the category bridge and the baseline, lift, incremental, cannibalization and net columns of the table.' },
-    basis: { blocks: ['tiles', 'salesChart', 'bridge', 'table'], text: 'key figures (Promo Sales $ order, Sales Lift %, Promo GM $ / %, Incremental GM $, Net Incremental GM $), the sales vs. baseline chart, the category bridge and the sales, lift and margin columns of the table.' },
-    cann: { blocks: ['tiles', 'bridge', 'table'], text: 'the Net Incremental GM $ key figure, the Cannibalization step of the category bridge and the Cannibalized Sales $, Cannibalization Rate %, Net Incremental Sales $ and Net Incremental GM $ columns of the table.' },
+    baseline: { blocks: ['tiles', 'salesChart', 'bridge', 'table'], text: 'key figures (Promo Units baseline, Sales / Unit Lift %, Incremental GM $, Net Incremental GM $, Hot Buy Score), the sales vs. baseline chart, the category bridge and the baseline, lift, incremental, cannibalization and net columns of the table.' },
+    basis: { blocks: ['tiles', 'salesChart', 'bridge', 'table'], text: 'key figures (Promo Sales $ order, Sales Lift %, Promo GM $ / %, Incremental GM $, Net Incremental GM $, Hot Buy Score), the sales vs. baseline chart, the category bridge and the sales, lift and margin columns of the table.' },
+    cann: { blocks: ['tiles', 'bridge', 'table'], text: 'the Net Incremental GM $ and Hot Buy Score key figures, the Cannibalization step of the category bridge and the Cannibalized Sales $, Cannibalization Rate %, Net Incremental Sales $, Net Incremental GM $ and Hot Buy Score columns of the table.' },
   },
   other: {
     baseline: { blocks: ['tiles', 'salesChart', 'bridge', 'table', 'runs'], text: 'key figures (Promo Units baseline, Sales / Unit Lift %, Incremental GM $, Net Incremental GM $), the sales vs. baseline chart, the category bridge, the baseline, lift, incremental, cannibalization and net columns of the table and the runs of the same promo.' },
@@ -38,9 +38,9 @@ export const AFFECTS: Record<TabId, Partial<Record<SettingKey, SettingUse>>> = {
   },
   funding: {},
   history: {
-    baseline: { blocks: ['tiles', 'periodChart', 'depthCharts', 'adCharts', 'table'], text: 'key figures (Sales Lift %, Unit Lift %, Incremental GM $, Net Incremental GM $), the results by period or week, the charts by Promo Depth Band and by Ad Type / Vehicle and the lift and margin columns of the table.' },
-    basis: { blocks: ['tiles', 'periodChart', 'depthCharts', 'adCharts', 'table'], text: 'key figures (Avg Promo Retail $, Sales Lift %, Incremental GM $, Net Incremental GM $), the results by period or week, the charts by Promo Depth Band and by Ad Type / Vehicle and the sales, lift and margin columns of the table.' },
-    cann: { blocks: ['tiles', 'periodChart', 'depthCharts', 'adCharts', 'table'], text: 'the Net Incremental GM $ key figure, the Net Incremental GM $ of the results by period or week and of the charts by depth band and ad type, and the Net Incremental GM $ column of the table.' },
+    baseline: { blocks: ['tiles', 'periodChart', 'depthCharts', 'adCharts', 'heatmap', 'table'], text: 'key figures (Sales Lift %, Unit Lift %, Incremental GM $, Net Incremental GM $), the results by period or week, the charts by Promo Depth Band and by Ad Type / Vehicle, the timing heat map and the lift and margin columns of the table.' },
+    basis: { blocks: ['tiles', 'periodChart', 'depthCharts', 'adCharts', 'heatmap', 'table'], text: 'key figures (Avg Promo Retail $, Sales Lift %, Incremental GM $, Net Incremental GM $), the results by period or week, the charts by Promo Depth Band and by Ad Type / Vehicle, the timing heat map and the sales, lift and margin columns of the table.' },
+    cann: { blocks: ['tiles', 'periodChart', 'depthCharts', 'adCharts', 'heatmap', 'table'], text: 'the Net Incremental GM $ key figure, the Net Incremental GM $ of the results by period or week, of the charts by depth band and ad type and of the timing heat map, and the Net Incremental GM $ column of the table.' },
   },
   shopper: {
     baseline: { blocks: ['tiles', 'panels', 'table'], text: 'the "usual" behaviour of the same buyers (spend change and every vs. usual comparison) in the key figures, the event panels and the table.' },
@@ -65,7 +65,8 @@ export const BLOCK_LABEL: Record<BlockId, string> = {
   periodChart: 'Results by period / week',
   depthCharts: 'Charts by Promo Depth Band',
   adCharts: 'Charts by Ad Type / Vehicle',
-  panels: 'Event panels',
+  heatmap: 'Promotion timing heat map',
+  panels: 'Layout proposal (charts and cards)',
 };
 
 const ORDER: SettingKey[] = ['baseline', 'basis', 'cann'];
@@ -95,6 +96,7 @@ export interface ActiveTag {
 }
 
 const baselineWord = (b: BaselineSetting) => (b === 'byType' ? 'by promo type' : `${b} wk`);
+const baselineDefault = (b: BaselineSetting) => (b === 'byType' ? 'by promo type' : String(b));
 const levelLabel = (id: string) => CANN_LEVELS.find((l) => l.id === id)!.label;
 
 /** The tag of one setting with its active value; highlighted and explicit when it differs from the default. */
@@ -104,14 +106,14 @@ export function activeTag(tab: TabId, key: SettingKey, s: Pick<FilterState, 'bas
     const def = viewBaselineDefault(tab);
     const cur = effectiveBaseline(tab, s.baseline);
     const changed = cur !== def;
-    return { key, affects, changed, text: changed ? `Baseline ${baselineWord(cur)} (default: ${baselineWord(def)})` : `Baseline ${baselineWord(cur)}` };
+    return { key, affects, changed, text: changed ? `Baseline ${baselineWord(cur)} (default ${baselineDefault(def)})` : `Baseline ${baselineWord(cur)}` };
   }
   if (key === 'basis') {
     const changed = s.basis !== DEFAULT_BASIS;
-    return { key, affects, changed, text: changed ? 'Using Gross Sales (default: Net Customer)' : 'Net Customer Sales' };
+    return { key, affects, changed, text: changed ? 'Gross Sales (default Net Customer)' : 'Net Customer Sales' };
   }
   const changed = s.level !== DEFAULT_CANN_LEVEL;
-  return { key, affects, changed, text: changed ? `${levelLabel(s.level)} level (default: ${levelLabel(DEFAULT_CANN_LEVEL)})` : `${levelLabel(s.level)} level` };
+  return { key, affects, changed, text: changed ? `${levelLabel(s.level)} level (default ${levelLabel(DEFAULT_CANN_LEVEL)})` : `${levelLabel(s.level)} level` };
 }
 
 /** Tags a block shows: one per setting that changes it, none when no setting does. */

@@ -16,6 +16,12 @@
   --font: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius: 8px;
+  /* Spacing scale for cards and their headers. */
+  --sp-1: 8px;
+  --sp-2: 12px;
+  --sp-3: 16px;
+  --sp-4: 24px;
+  --sp-5: 32px;
   --tabbar: 52px;
   --footer: 30px;
   color-scheme: light;
@@ -596,23 +602,24 @@ select {
 }
 .setting-tag {
   font-family: var(--font);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
   color: var(--n5);
-  background: var(--n1);
-  border: 1px solid var(--n3);
-  border-radius: 999px;
-  padding: 1px 8px;
-  line-height: 1.5;
   cursor: help;
+  border-bottom: 1px dotted transparent;
+}
+.setting-tag:hover,
+.setting-tag:focus-visible {
+  border-bottom-color: currentColor;
 }
 .setting-tag.is-changed {
-  color: var(--dark);
-  background: var(--white);
-  border-color: var(--info);
-  box-shadow: inset 3px 0 0 var(--info);
+  color: var(--info);
+  font-weight: 800;
+}
+.setting-sep {
+  color: var(--n4);
 }
 .setting-tag:focus-visible {
   outline: 2px solid var(--info);
@@ -1415,8 +1422,8 @@ tr.is-stale td {
 /* Charts */
 .chart-grid {
   display: grid;
-  gap: 14px;
-  margin: 14px 0;
+  gap: var(--sp-3);
+  margin: var(--sp-3) 0;
 }
 .chart-grid.cols-1 {
   grid-template-columns: minmax(0, 1fr);
@@ -1431,14 +1438,158 @@ tr.is-stale td {
   grid-column: span 2;
 }
 .chart-card {
-  padding: 16px 18px 12px;
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
+/* One header structure for every chart card (the chart is the protagonist):
+   1 title, chip and icon actions · 2 the card's own controls · 3 one line of active settings. */
 .chart-head {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.chart-row1 {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 28px;
+  min-width: 0;
+}
+.chart-row1 .chart-actions {
+  margin-left: auto;
+}
+.chart-title-chip .chip {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.chart-sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chart-controls {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.chart-settings {
+  font-size: 11.5px;
+  color: var(--n5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chart-sub:empty,
+.chart-controls:empty,
+.chart-settings:empty {
+  display: none;
+}
+/* Cards side by side: reserve the same rows so title, controls and plot start at the same height. */
+.chart-grid:has(.chart-sub:not(:empty)) .chart-sub {
+  display: block;
+  min-height: 18px;
+}
+.chart-grid:has(.chart-controls:not(:empty)) .chart-controls {
+  display: flex;
+  min-height: 34px;
+}
+.chart-grid:has(.chart-settings:not(:empty)) .chart-settings {
+  display: block;
+  min-height: 18px;
+}
+.chart-card .toggle-label,
+.table-head .toggle-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.chart-view-btn.icon-only {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 14px;
+}
+.chart-table-note {
+  margin: var(--sp-1) 0 0;
+}
+
+/* "Event" inside the control (chart card controls row): no uppercase label above. */
+.inline-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  min-width: 320px;
+  max-width: 100%;
+  border: 1px solid var(--n3);
+  border-radius: 4px;
+  background: var(--white);
+}
+.inline-field:hover {
+  border-color: var(--n4);
+}
+.inline-field:focus-within {
+  outline: 2px solid var(--info);
+  outline-offset: 1px;
+}
+.inline-label {
+  flex: none;
+  padding: 0 6px 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--n5);
+}
+.inline-field select,
+.event-combobox.inline-field .text-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  padding: 0 28px 0 2px;
+  font-size: 13px;
+  appearance: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+}
+.inline-field .combo-chevron,
+.event-combobox > .combo-chevron {
+  position: absolute;
+  right: 9px;
+  left: auto;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  color: var(--n5);
+  pointer-events: none;
+}
+.event-picker.inline {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.typeahead-list li .opt-primary {
+  font-weight: 700;
+}
+.typeahead-list li .opt-secondary {
+  font-size: 11.5px;
+  color: var(--n5);
+}
+.event-combobox .typeahead-list li {
+  flex-direction: column;
   align-items: flex-start;
+  gap: 1px;
 }
 .chart-title {
   margin: 0;
@@ -1503,7 +1654,7 @@ tr.is-stale td {
   border-radius: 50%;
 }
 .chart-body {
-  margin-top: 10px;
+  margin-top: var(--sp-1);
 }
 .chart-table-wrap {
   margin-top: 10px;

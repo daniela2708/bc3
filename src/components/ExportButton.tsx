@@ -23,16 +23,17 @@ export function nodeText(node: ReactNode): string {
   return nodeText(props.children as ReactNode);
 }
 
-export function ExportButton({ getSheet, fileName, label = 'Excel' }: { getSheet: () => XSheet; fileName: string; label?: string }) {
+export function ExportButton({ getSheet, fileName, label = 'Excel', iconOnly = false }: { getSheet: () => XSheet; fileName: string; label?: string; iconOnly?: boolean }) {
   return (
     <button
       type="button"
-      className="chart-view-btn"
+      className={`chart-view-btn${iconOnly ? ' icon-only' : ''}`}
       onClick={() => downloadXlsx(getSheet(), `${fileName} ${new Date().toISOString().slice(0, 10)}`)}
-      title="Download as Excel (.xlsx)"
+      title={iconOnly ? 'Export to Excel' : 'Download as Excel (.xlsx)'}
+      aria-label={iconOnly ? 'Export to Excel' : undefined}
     >
-      <FileSpreadsheet size={14} aria-hidden="true" />
-      {label}
+      <FileSpreadsheet size={iconOnly ? 15 : 14} aria-hidden="true" />
+      {!iconOnly && label}
     </button>
   );
 }

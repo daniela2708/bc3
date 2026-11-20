@@ -3,13 +3,14 @@
  * customer- or card-level record anywhere in the prototype: each event carries only the totals below, derived from
  * the event's promo and baseline volume plus seeded ratios.
  */
-import { AS_OF_DAY } from '../data/calendar';
+import { AS_OF_DAY, LY_OFFSET_DAYS } from '../data/calendar';
+import { getModel, rangeSum } from '../data/generate';
 import { hash01, hashSigned } from '../data/prng';
 import { DEPTS, PRICE_GROUPS } from '../data/products';
 import { EVENTS, type PromoEvent } from '../data/promos';
 import { STORES } from '../data/stores';
 import { newToCategoryPct, repeatRate, safeDiv, spendChange } from './kpis';
-import { eventAgg, eventBaselineWeeks, type EventCtx } from './metrics';
+import { eventAgg, eventBaselineWeeks, POST_PROMO_WINDOW_DAYS, type EventCtx } from './metrics';
 
 const CLUB_SHARE = 0.78;
 /** Days after the promo needed to measure repeat purchases at regular price. */
@@ -35,10 +36,23 @@ export interface ShopperAgg {
   /** Repeat buyers and the promo buyers of events old enough to measure them. */
   repeat: number;
   repeatBase: number;
+  /**
+   * Proposals for review (Shopper Impact layouts A and B), same club card aggregates: promo buyers over the same
+   * number of days right before the event ("previous week" for a one-week Hot Buy), and over the same days last
+   * year (events with last-year data only, with this year's buyers of those events); and the 4 weeks after the
+   * promo scaled to the promo days (events whose 4 weeks have passed).
+   */
+  prevBuyers: number;
+  lyBuyers: number;
+  lyTyBuyers: number;
+  afterN: number;
+  afterBuyers: number;
+  afterTxns: number;
+  afterBasketDollars: number;
 }
 
 export function emptyShopper(): ShopperAgg {
-  return { n: 0, buyers: 0, usualBuyers: 0, txns: 0, usualTxns: 0, basketDollars: 0, usualBasketDollars: 0, basketUnits: 0, usualBasketUnits: 0, spend: 0, usualSpend: 0, newBuyers: 0, catTrips: 0, usualCatTrips: 0, storeTxns: 0, repeat: 0, repeatBase: 0 };
+  return { n: 0, buyers: 0, usualBuyers: 0, txns: 0, usualTxns: 0, basketDollars: 0, usualBasketDollars: 0, basketUnits: 0, usualBasketUnits: 0, spend: 0, usualSpend: 0, newBuyers: 0, catTrips: 0, usualCatTrips: 0, storeTxns: 0, repeat: 0, repeatBase: 0, prevBuyers: 0, lyBuyers: 0, lyTyBuyers: 0, afterN: 0, afterBuyers: 0, afterTxns: 0, afterBasketDollars: 0 };
 }
 
 export function addShopper(a: ShopperAgg, b: ShopperAgg): ShopperAgg {
@@ -88,6 +102,16 @@ export function eventShopper(e: PromoEvent, ctx: EventCtx): ShopperAgg {
   const storeTxns = storeTxnsOf([e.idx]);
   const measurable = e.end + REPEAT_WINDOW_DAYS <= AS_OF_DAY;
   const rate = Math.min(0.6, Math.max(0.08, 0.5 - 0.45 * e.dip - 0.3 * e.depth + 0.06 * hashSigned(k, 12)));
+  // Other windows (layout proposals): buyers from the units sold, with the same "usual" ratios as usualBuyers.
+  const items = pg.items.filter((i) => !ctx.itemMask || ctx.itemMask[i]);
+  const unitsIn = (from: number, to: number) => items.reduce((s, i) => s + rangeSum(getModel().units, i, from, to), 0);
+  const usualTxnsPerBuyer = 1.05 + 0.1 * h(4);
+  const buyersOf = (u: number) => (u / usualPerTxn) * (CLUB_SHARE / usualTxnsPerBuyer);
+  const days = Math.min(e.end, AS_OF_DAY) - e.start + 1;
+  const hasLy = e.start - LY_OFFSET_DAYS >= 0;
+  const hasAfter = e.end + POST_PROMO_WINDOW_DAYS <= AS_OF_DAY;
+  const afterUnits = hasAfter ? (unitsIn(e.end + 1, e.end + POST_PROMO_WINDOW_DAYS) * days) / POST_PROMO_WINDOW_DAYS : 0;
+  const afterBasket = usualBasket * (0.97 + 0.04 * h(15));
   return {
     n: 1,
     buyers,
@@ -106,6 +130,13 @@ export function eventShopper(e: PromoEvent, ctx: EventCtx): ShopperAgg {
     storeTxns,
     repeat: measurable ? buyers * rate : 0,
     repeatBase: measurable ? buyers : 0,
+    prevBuyers: buyersOf(unitsIn(e.start - days, e.start - 1)),
+    lyBuyers: hasLy ? buyersOf(unitsIn(e.start - LY_OFFSET_DAYS, e.start + days - 1 - LY_OFFSET_DAYS)) : 0,
+    lyTyBuyers: hasLy ? buyers : 0,
+    afterN: hasAfter ? 1 : 0,
+    afterBuyers: hasAfter ? buyersOf(afterUnits) : 0,
+    afterTxns: hasAfter ? afterUnits / usualPerTxn : 0,
+    afterBasketDollars: hasAfter ? (afterUnits / usualPerTxn) * afterBasket : 0,
   };
 }
 
@@ -127,6 +158,13 @@ export interface ShopperMetrics {
   catTripsChange: number | null;
   storeTxns: number;
   repeatRate: number | null;
+  /** Promo Buyer Count vs. the same number of days right before the event (the previous week for a one-week Hot Buy). */
+  buyersVsPrev: number | null;
+  /** Promo Buyer Count vs. the same days last year (events with last-year data). */
+  buyersVsLy: number | null;
+  /** Promo buyers over the 4 weeks after the promo, scaled to the promo days; null until they have passed. */
+  afterBuyers: number | null;
+  afterBasket: number | null;
 }
 
 export function deriveShopper(s: ShopperAgg): ShopperMetrics {
@@ -153,6 +191,10 @@ export function deriveShopper(s: ShopperAgg): ShopperMetrics {
     catTripsChange: ch(s.catTrips, s.usualCatTrips),
     storeTxns: s.storeTxns,
     repeatRate: s.repeatBase > 0 ? repeatRate(s.repeat, s.repeatBase) : null,
+    buyersVsPrev: ch(s.buyers, s.n > 0 ? s.prevBuyers : null),
+    buyersVsLy: s.lyBuyers > 0 ? ch(s.lyTyBuyers, s.lyBuyers) : null,
+    afterBuyers: s.afterN > 0 ? s.afterBuyers : null,
+    afterBasket: s.afterN > 0 ? safeDiv(s.afterBasketDollars, s.afterTxns) : null,
   };
 }
 

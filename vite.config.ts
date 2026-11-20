@@ -42,6 +42,8 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           react: ['react', 'react-dom'],
+          // Charting library in its own vendor chunk (cached apart from the app code).
+          charts: ['recharts'],
         },
       },
     },

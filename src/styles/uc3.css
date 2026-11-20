@@ -194,32 +194,32 @@
   gap: 12px;
   margin: 8px 0;
 }
-.shopper-panel {
+.snapshot-card {
   padding: 12px 14px;
 }
-.shopper-panel header h4 {
+.snapshot-card header h4 {
   margin: 0;
   font-size: 14px;
   font-weight: 800;
 }
-.shopper-panel header p {
+.snapshot-card header p {
   margin: 2px 0 8px;
   font-size: 11.5px;
   color: var(--n5);
 }
-.shopper-panel dl {
+.snapshot-card dl {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px 12px;
   margin: 0 0 8px;
 }
-.shopper-panel dt {
+.snapshot-card dt {
   font-size: 11px;
   color: var(--n5);
   line-height: 1.25;
   min-height: 2.5em;
 }
-.shopper-panel dd {
+.snapshot-card dd {
   margin: 2px 0 0;
   font-weight: 800;
   font-size: 16px;
@@ -232,7 +232,7 @@
 }
 
 @media (max-width: 700px) {
-  .shopper-panel dl {
+  .snapshot-card dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .pg-picker {
@@ -263,4 +263,356 @@
   font-size: 11px;
   color: var(--n5);
   margin-bottom: 2px;
+}
+
+/* ---------------------------------------------------------------- Prototype review additions */
+
+/* Hover card: rich tooltip in fixed position, so a table's scroll box never cuts it. */
+.hovercard-trigger {
+  cursor: help;
+  border-radius: 4px;
+}
+.hovercard-trigger:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+.hovercard {
+  position: fixed;
+  z-index: 200;
+  transform: translate(-50%, -100%);
+  width: max-content;
+  max-width: 340px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--dark);
+  color: var(--white);
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.hovercard.below {
+  transform: translate(-50%, 0);
+}
+.hovercard p {
+  margin: 0 0 4px;
+}
+.hovercard-title {
+  font-weight: 800;
+}
+.hovercard-title span,
+.hovercard-note {
+  font-weight: 600;
+  color: #cfcdc6;
+}
+.hovercard-note {
+  margin: 6px 0 0 !important;
+  font-size: 11px;
+}
+.score-breakdown {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.score-breakdown th,
+.score-breakdown td {
+  padding: 2px 6px;
+  text-align: right;
+  white-space: nowrap;
+}
+.score-breakdown th {
+  font-size: 10.5px;
+  color: #cfcdc6;
+  font-weight: 700;
+}
+.score-breakdown .left {
+  text-align: left;
+  padding-left: 0;
+}
+.score-breakdown small {
+  color: #cfcdc6;
+}
+
+/* Status chips of illustrative items, proposals and new requests. */
+.illustrative-chip,
+.proposal-chip,
+.th-chip {
+  white-space: nowrap;
+}
+.score-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+  font-weight: 600;
+}
+.kpi-tile .illustrative-chip {
+  margin-top: 2px;
+  font-size: 10px;
+  height: auto;
+  white-space: normal;
+  line-height: 1.3;
+  padding: 2px 6px;
+}
+.th-extra {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.th-chip {
+  font-size: 10.5px;
+  height: 18px;
+  padding: 0 6px;
+}
+.flag-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid #e7c98a;
+  background: #fff6e0;
+  color: #7a5200;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Hot Buy Score badge on cards (Shopper Impact proposal C). */
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 4px 8px;
+  border: 1px solid var(--n3);
+  border-radius: 6px;
+  background: var(--n1);
+  font-size: 12px;
+}
+.score-badge b {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.score-badge-label {
+  color: var(--n5);
+  font-weight: 700;
+}
+.score-badge .track {
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  background: #eef2f8;
+  overflow: hidden;
+}
+.score-badge .fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: #2d63a0;
+}
+.score-badge.is-empty {
+  color: var(--n5);
+}
+
+/* Promotion timing heat map. */
+.heatmap {
+  font-size: 12px;
+}
+.heat-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  margin-bottom: 8px;
+  color: var(--n5);
+  font-variant-numeric: tabular-nums;
+}
+.heat-legend-label {
+  font-weight: 700;
+  color: var(--dark);
+}
+.heat-legend-bar {
+  width: 160px;
+  height: 10px;
+  border-radius: 5px;
+}
+.heat-legend-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+}
+.heat-swatch-empty {
+  width: 14px;
+  height: 10px;
+  border: 1px dashed var(--n3);
+  border-radius: 2px;
+}
+.heat-grid {
+  display: grid;
+}
+.heat-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 230px) repeat(12, minmax(28px, 1fr));
+  gap: 2px;
+  height: 26px;
+  align-items: stretch;
+}
+.heat-head {
+  height: 26px;
+  align-items: end;
+  color: var(--n5);
+  font-weight: 700;
+}
+.heat-colhead {
+  text-align: center;
+  padding-bottom: 4px;
+}
+.heat-rowhead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.heat-rowhead small {
+  color: var(--n5);
+}
+.heat-row.is-highlight .heat-rowhead {
+  font-weight: 800;
+}
+.heat-row.is-highlight .heat-rowhead::before {
+  content: '';
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--accent, #e93d44);
+  flex: none;
+}
+.heat-cell-wrap {
+  display: flex;
+  padding: 1px 0;
+}
+.heat-cell {
+  display: flex;
+  flex: 1;
+}
+.heat-fill {
+  flex: 1;
+  border-radius: 3px;
+}
+.heat-cell:hover .heat-fill,
+.heat-cell:focus-visible .heat-fill {
+  box-shadow: inset 0 0 0 2px var(--dark);
+}
+.heat-cell.is-empty {
+  margin: 1px 0;
+  border: 1px dashed var(--n3);
+  border-radius: 3px;
+}
+
+/* Lift colour bands (Promo Run Trend, illustrative thresholds): a dot and the value, never colour alone. */
+.lift-band {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.band-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.band-good .band-dot {
+  background: #2e7d4f;
+}
+.band-watch .band-dot {
+  background: #e0a100;
+}
+.band-low .band-dot {
+  background: #c62828;
+}
+td .lift-band.band-good {
+  color: #1f5e3a;
+}
+td .lift-band.band-watch {
+  color: #7a5200;
+}
+td .lift-band.band-low {
+  color: #a32020;
+}
+.lift-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--n5);
+}
+.lift-legend .lift-band {
+  font-weight: 700;
+  color: var(--dark);
+}
+
+/* Shopper Impact layout proposals. */
+.proposal-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 16px;
+  margin: 12px 0;
+}
+.proposal-desc {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--n5);
+}
+.proposal-bar .month-picker {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.snapshot-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.snapshot-card dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+.snapshot-card header h4 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Paste UPCs: concept note. */
+.paste-concept {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--info);
+  background: #eef4fb;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dark);
+}
+.defs-criteria {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+.defs-criteria li {
+  margin: 2px 0;
+}
+.proposal-bar .month-picker select {
+  min-width: 240px;
 }

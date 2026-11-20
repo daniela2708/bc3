@@ -137,3 +137,39 @@ export function signedMoney(n: N, compact = true): string {
   if (Math.abs(n) < 0.5) return '$0';
   return `${n > 0 ? '+' : MINUS}${s}`;
 }
+
+// ---------------------------------------------------------------- Chart axes
+
+/** Round axis ticks (0, 50K, 100K…): about `target` steps of 1, 2, 2.5 or 5 × 10^k covering [min, max] and zero. */
+export function niceTicks(min: number, max: number, target = 4): number[] {
+  const lo = Math.min(0, Number.isFinite(min) ? min : 0);
+  const hi = Math.max(0, Number.isFinite(max) ? max : 0);
+  if (hi - lo <= 0) return [0, 1];
+  const raw = (hi - lo) / target;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? 10 * mag;
+  const ticks: number[] = [];
+  for (let v = Math.floor(lo / step) * step; v <= Math.ceil(hi / step) * step + step / 2; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
+  return ticks;
+}
+
+/** 260.0 → "260", 2.50 → "2.5". */
+function trimNumber(n: number, decimals: number): string {
+  return n.toFixed(decimals).replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+}
+
+/** Axis money with no leftover ".0": $260K, $1.5M, $20M, $950. */
+export function moneyAxis(n: number): string {
+  if (!Number.isFinite(n)) return DASH;
+  const a = Math.abs(n);
+  const s = a >= 1e9 ? `$${trimNumber(a / 1e9, 1)}B` : a >= 1e6 ? `$${trimNumber(a / 1e6, 1)}M` : a >= 1e3 ? `$${trimNumber(a / 1e3, 1)}K` : `$${int.format(Math.round(a))}`;
+  return sign(n, s);
+}
+
+/** Axis volume with no leftover ".0": 3,600 ea, 12K lb. */
+export function volumeAxis(n: number, uom: Uom): string {
+  if (!Number.isFinite(n)) return DASH;
+  const a = Math.abs(n);
+  const s = a >= 1e6 ? `${trimNumber(a / 1e6, 1)}M` : a >= 1e4 ? `${trimNumber(a / 1e3, 1)}K` : int.format(Math.round(a));
+  return `${n < 0 ? MINUS : ''}${s} ${uom}`;
+}

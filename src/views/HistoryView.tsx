@@ -1,27 +1,33 @@
 import { useMemo, useState } from 'react';
 import { KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
 import { ChartCard, ChartGrid, HBars, hbarHeight, SignedColumns } from '../components/Charts';
+import { HeatMap } from '../components/HeatMap';
 import { HierTable } from '../components/HierTable';
 import { Term } from '../components/Term';
 import { Pending, Segmented } from '../components/ui';
+import { FUNDING_BEHIND_SCENES } from '../lib/definitions';
+import { buildHeatmap, heatHeight, MONTHS, type HeatMeasure, type HeatRows } from '../lib/heatmap';
 import { fiscalOfDay } from '../data/calendar';
 import { ITEMS, pgByName, PRICE_GROUPS } from '../data/products';
 import { AD_TYPES, DEPTH_BANDS, depthBandOf, EVENTS } from '../data/promos';
 import { useFilters } from '../lib/filterStore';
 import { count, moneyCompact, moneyUnit, pct, pctChange, signedMoney, signedMoneyTile } from '../lib/format';
-import { derive, sumAggs, type Agg } from '../lib/metrics';
+import { derive, eventAgg, sumAggs, type Agg } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
 import { VIEW_INFO } from '../lib/viewInfo';
 import { columnsOf, EmptyState, performanceRows, SettingTags, uomFirst, uomTile, ViewControls, type ViewProps } from './common';
 
 const DEFAULT_PG = pgByName('Coca-Cola 12 pk 12 oz Cans').idx;
-const COLS = ['dates', 'type', 'depth', 'ad', 'avgRetail', 'gross', 'salesLift', 'unitLift', 'incGm', 'netIncGm'];
+// Promo fatigue columns (prototype review, illustrative) right after the promo attributes.
+const COLS = ['dates', 'type', 'depth', 'ad', 'promos52', 'daysSince', 'fatigue', 'avgRetail', 'gross', 'salesLift', 'unitLift', 'incGm', 'netIncGm'];
 
 export default function HistoryView({ openDefinitions }: ViewProps) {
   const { state, update } = useFilters();
   const scope = useMemo(() => getScope(state), [state]);
   const basis = state.basis;
   const [grain, setGrain] = useState<'period' | 'week'>('period');
+  const [heatRows, setHeatRows] = useState<HeatRows>('pg');
+  const [heatMeasure, setHeatMeasure] = useState<HeatMeasure>('lift');
 
   const pg = state.pg >= 0 ? state.pg : state.item >= 0 ? ITEMS[state.item].pg : state.codes.length ? ITEMS[state.codes[0]].pg : -1;
   const nothing = pg < 0 && state.dept < 0 && state.cat < 0 && state.sub < 0 && !state.vb;
@@ -54,6 +60,12 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
     return [...g.entries()].sort((a, b) => a[1].sort - b[1].sort).map(([x, v]) => ({ x, n: v.aggs.length, m: derive(sumAggs(v.aggs), basis) }));
   }, [events, grain, table, basis]);
 
+  // Promotion timing heat map: every event of the selection (not only the table's price group), by month of the year.
+  const heat = useMemo(() => buildHeatmap(scope.events, (e) => table.aggs.get(e) ?? eventAgg(EVENTS[e], scope.ctx), basis, heatRows, heatMeasure), [scope.events, scope.ctx, table, basis, heatRows, heatMeasure]);
+  const heatFmt = (v: number | null) => (heatMeasure === 'lift' ? pctChange(v) : moneyCompact(v));
+  const heatLabel = heatMeasure === 'lift' ? 'Sales Lift %' : 'Avg Net Incremental GM $ per event';
+  const heatRowLabel = heatRows === 'pg' ? 'Price group' : 'Category';
+
   const name = state.item >= 0 ? ITEMS[state.item].name : target >= 0 ? PRICE_GROUPS[target].name : 'the selected items';
   const best = [...byDepth].sort((a, b) => (b.m.netIncGm ?? -Infinity) - (a.m.netIncGm ?? -Infinity))[0];
 
@@ -73,7 +85,7 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
     { label: 'Sales Lift %', info: 'Incremental Sales $ ÷ Baseline Sales $, all events.', value: pctChange(all.salesLift), pending: 4 },
     { label: 'Unit Lift %', info: 'Incremental Units ÷ Baseline Units, all events.', ...uomTile(all.unitLift, true), pending: 4 },
     { label: 'Incremental GM $', info: 'Promo GM $ − Baseline GM $, before cannibalization and funding.', value: signedMoneyTile(all.incGm) },
-    { label: 'Net Incremental GM $', info: 'Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $.', value: signedMoneyTile(all.netIncGm), pending: 7 },
+    { label: 'Net Incremental GM $', info: `${FUNDING_BEHIND_SCENES} Incremental GM $ + Cannibalized GM $ + Vendor Promo Funding $.`, value: signedMoneyTile(all.netIncGm), pending: 7 },
   ];
 
   const lift = (rows: typeof byDepth) => rows.map((r) => ({ label: `${r.label} (${r.n})`, value: r.m.salesLift ?? 0 }));
@@ -98,7 +110,7 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
           tags={<SettingTags block="periodChart" />}
           subtitle={
             <span className="chart-sub-tools">
-              Net Incremental GM $ of the promotions that started in each {grain}; hover for lift and event count.
+              Net Incremental GM $ of the promotions that started in each {grain}; event count in brackets, hover for lift.
               <Segmented<'period' | 'week'>
                 small
                 label="Group results by"
@@ -116,7 +128,7 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
         >
           <SignedColumns
             data={byTime.map((r) => ({
-              x: r.x,
+              x: `${r.x} (${r.n})`,
               value: r.m.netIncGm,
               tip: [
                 { label: 'Net Incremental GM $', value: moneyCompact(r.m.netIncGm) },
@@ -145,6 +157,51 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
         </ChartCard>
       </ChartGrid>
 
+      <ChartGrid cols={1}>
+        <ChartCard
+          title="Promotion timing heat map"
+          titleChip={<span className="chip status-proposed">New request · production data from Cognira (pending)</span>}
+          subtitle={`${heatLabel} of the events that started in each month, all ${scope.events.length} events in the selection`}
+          tags={<SettingTags block="heatmap" />}
+          controls={
+            <>
+              <span className="toggle-group">
+                <span className="toggle-label">Rows</span>
+                <Segmented<HeatRows>
+                  small
+                  label="Heat map rows"
+                  value={heatRows}
+                  onChange={setHeatRows}
+                  options={[
+                    { value: 'pg', label: 'Price group' },
+                    { value: 'cat', label: 'Category' },
+                  ]}
+                />
+              </span>
+              <span className="toggle-group">
+                <span className="toggle-label">Color</span>
+                <Segmented<HeatMeasure>
+                  small
+                  label="Heat map colour"
+                  value={heatMeasure}
+                  onChange={setHeatMeasure}
+                  options={[
+                    { value: 'lift', label: 'Sales Lift %' },
+                    { value: 'netIncGm', label: 'Net Incremental GM $' },
+                  ]}
+                />
+              </span>
+            </>
+          }
+          tableNote={`Rows: ${heatRowLabel.toLowerCase()}, most events first (event count in brackets). Month of the event start. Sales Lift % is a ratio of totals over the events in the cell; Net Incremental GM $ is the average per event. Empty = no event.`}
+          table={{ head: [heatRowLabel, 'Events', ...MONTHS], rows: heat.rows.map((r) => [r.label, r.n, ...r.cells.map((c) => (c.n === 0 ? '' : `${heatFmt(c.value)} (${c.n})`))]) }}
+          height={Math.min(420, heatHeight(heat.rows.length))}
+          contentHeight={heatHeight(heat.rows.length)}
+        >
+          <HeatMap data={heat} format={heatFmt} measureLabel={heatLabel} rowLabel={heatRowLabel} highlight={heatRows === 'pg' ? target : undefined} />
+        </ChartCard>
+      </ChartGrid>
+
       <section className="card table-card" aria-label="Every past promotion">
         <header className="table-head">
           <div>
@@ -152,7 +209,7 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
             <p className="block-tags">
               <SettingTags block="table" />
             </p>
-            <p className="chart-sub">One row per event of the <Term id="priceGroup">price group</Term>, with dates, Promo Type, Promo Depth %, Ad Type / Vehicle and results. Expand a row for its SKU Numbers.</p>
+            <p className="chart-sub">One row per event of the <Term id="priceGroup">price group</Term>, with dates, Promo Type, Promo Depth %, Ad Type / Vehicle, how often it was promoted before and results. Expand a row for its SKU Numbers.</p>
           </div>
         </header>
         <HierTable hierarchy="Price group · event" columns={cols} rows={table.rows} total={table.total} defaultSort={{ key: 'dates', dir: 'desc' }} tableId="hist" exportTitle="Promo History" maxHeight={480} />
