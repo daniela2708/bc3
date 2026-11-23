@@ -1,7 +1,7 @@
 import { ShieldCheck } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { KeyFigures, SectionHeading, ViewSummary, type Tile } from '../components/Blocks';
-import { C, ChartCard, ChartGrid, HBars, hbarHeight, PhaseBars, SignedColumns } from '../components/Charts';
+import { C, ChartCard, ChartGrid, HBars, hbarHeight, PhaseBars } from '../components/Charts';
 import { EventPicker } from '../components/EventPicker';
 import { HierTable, type HierCol, type HierRow } from '../components/HierTable';
 import { ScoreChip, ScoreInline } from '../components/Score';
@@ -17,13 +17,13 @@ import { eventOptions } from '../lib/eventPick';
 import { INTENSITY, INTENSITY_CHIP, intensityBand } from '../lib/fatigue';
 import { effectiveTime } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
-import { count, moneyCompact, moneyUnit, pct, pctChange, pts, signedMoney } from '../lib/format';
+import { count, moneyCompact, moneyUnit, pct, pctChange, signedMoney } from '../lib/format';
 import { averageScore, hotBuyScores, resultsOf } from '../lib/hotBuyScore';
 import { DEFAULT_BASIS, DEFAULT_CANN_LEVEL, derive, eventAgg, type EventCtx } from '../lib/metrics';
-import { SCORE_MARGIN_NOTE, SCORE_WINDOW_NOTE, verdictCountText, verdictCounts, type ScoreResult } from '../lib/scoring';
+import { SCORE_MARGIN_NOTE, SCORE_WINDOW_NOTE, verdictCounts } from '../lib/scoring';
 import { getScope } from '../lib/selectors';
 import { deriveShopper, eventShopper, REPEAT_WINDOW_DAYS, shopperOf, type ShopperMetrics } from '../lib/shopper';
-import { alsoBoughtCategories, brandShare, buyerSources, categoryIntensity, multiItemBaskets, NEW_METRIC_CHIP, NEW_METRIC_INFO, sameAdPromos } from '../lib/shopperDetail';
+import { categoryIntensity } from '../lib/shopperDetail';
 import { categorySummary, hotBuyMonths, nextSubTab, openInEventDetail, PROPOSAL_CHIP, PROPOSALS, subTabLabel, type AdMonth, type Proposal } from '../lib/shopperProposals';
 import { VIEW_INFO } from '../lib/viewInfo';
 import { BlockSettings, EmptyState, eventDates, SettingTags, ViewControls } from './common';
@@ -48,16 +48,6 @@ const vsUsual = (v: number | null) => (
     <Var value={v} kind="pct" /> vs. usual
   </span>
 );
-
-/** "New metric · definition pending" with the explanation in its (i). */
-function NewMetricChip() {
-  return (
-    <span className="score-chip-wrap">
-      <span className="chip status-pending new-metric-chip">{NEW_METRIC_CHIP}</span>
-      <InfoTip text={NEW_METRIC_INFO} label="Where this metric comes from" below />
-    </span>
-  );
-}
 
 function PrivacyNotes({ ctx, full = true }: { ctx: EventCtx; full?: boolean }) {
   return (
@@ -428,9 +418,7 @@ function CategoryPanel({ events, ctx, range }: { events: number[]; ctx: EventCtx
 
 // ---------------------------------------------------------------- B · Event detail
 
-/** Plot heights of B's two chart rows: every card of a row has the same height (layout rule 8). */
-const B_ROW1 = 240;
-const B_ROW2 = 210;
+const B_CHART_HEIGHT = 260;
 
 function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx: EventCtx; selected: number; onSelect: (e: number) => void }) {
   const per = useMemo(() => events.map((e) => ({ e, m: deriveShopper(eventShopper(EVENTS[e], ctx)) })), [events, ctx]);
@@ -441,11 +429,6 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
   const ev = EVENTS[e];
   const agg = useMemo(() => eventShopper(ev, ctx), [ev, ctx]);
   const m = deriveShopper(agg);
-  const share = useMemo(() => brandShare(ev, ctx), [ev, ctx]);
-  const sources = buyerSources(agg);
-  const multi = multiItemBaskets(agg);
-  const cats = alsoBoughtCategories(ev);
-  const promos = sameAdPromos(ev);
   const name = PRICE_GROUPS[ev.pg].name;
   const after = agg.afterN > 0;
   const phases = [
@@ -458,22 +441,6 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
     { label: 'Basket lift %', info: 'Baskets (transactions) that include the promoted item during the event vs. the same buyers’ usual. Also the Basket Lift of the Hot Buy Score.', value: <Var value={m.txnsChange} kind="pct" />, pending: 16 },
     { label: 'Avg Basket Size $', info: BASKET_TIP, value: moneyUnit(m.basket), sub: vsUsual(m.basketChange), pending: 16 },
     { label: 'New-to-Category Buyers %', info: NTC_TIP, value: pct(m.newToCat), pending: 11 },
-    {
-      label: 'Brand share gain',
-      labelNode: (
-        <>
-          <Term id="brandShare">Brand share</Term> gain
-        </>
-      ),
-      info: `${NEW_METRIC_INFO} The promoted brand's share of category sales (Net Customer Sales) during the event minus its share before (the baseline window), in share points.`,
-      chip: <NewMetricChip />,
-      value: pts(share.gain === null ? null : share.gain * 100),
-      sub: (
-        <>
-          {pct(share.before)} → {pct(share.during)} of category sales
-        </>
-      ),
-    },
   ];
   return (
     <>
@@ -482,7 +449,7 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
       </div>
       <KeyFigures tags={<SettingTags block="tiles" />} caption={`${name} · ${ev.id} · ${PROMO_LABEL[ev.type]} · ${eventDates(ev)}`} tiles={tiles} />
       <PrivacyNotes ctx={ctx} />
-      <ChartGrid cols={2}>
+      <ChartGrid cols={1}>
         <ChartCard
           title="Buyers and baskets before, during and after"
           subtitle={`${name}, ${ev.id}`}
@@ -493,7 +460,7 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
           ]}
           table={{ head: ['Window', 'Promo buyers', 'Baskets with the item'], rows: phases.map((p) => [p.x, p.buyers === null ? '—' : Math.round(p.buyers), p.baskets === null ? '—' : Math.round(p.baskets)]) }}
           tableNote="Before = the same buyers' usual over the baseline window, scaled to the promo days; after = the 4 weeks after the promo, scaled to the promo days (— until they have passed). Shading: baseline, promo and after windows."
-          height={B_ROW1}
+          height={B_CHART_HEIGHT}
         >
           <PhaseBars
             data={phases}
@@ -503,76 +470,6 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
             ]}
             format={count}
           />
-        </ChartCard>
-        <ChartCard
-          title="Where buyers came from"
-          titleChip={<NewMetricChip />}
-          subtitle="Share of promo buyers; the three add up to 100 %"
-          tags={<SettingTags block="panels" />}
-          table={{ head: ['Source', 'Share of promo buyers'], rows: sources ? [['New to the category', pct(sources.newToCategory)], ['Already bought the item', pct(sources.existing)], ['Switched from another brand', pct(sources.switched)]] : [] }}
-          tableNote="New to the category: no category purchase in the 52-week look-back. Already bought the item: the same buyers' usual count over the baseline window. Switched brand: the rest, buyers of the category who bought another brand before."
-          height={B_ROW1}
-        >
-          <HBars
-            data={
-              sources
-                ? [
-                    { label: 'New to the category', value: sources.newToCategory },
-                    { label: 'Already bought the item', value: sources.existing },
-                    { label: 'Switched from another brand', value: sources.switched },
-                  ]
-                : []
-            }
-            format={(v) => pct(v)}
-            valueLabel="Share of promo buyers"
-            labelWidth={190}
-          />
-        </ChartCard>
-      </ChartGrid>
-      <ChartGrid cols={3}>
-        <ChartCard
-          title="Multi-item baskets"
-          titleChip={<NewMetricChip />}
-          subtitle="Baskets with 2 or more units of the promoted items, before vs. during"
-          tags={<SettingTags block="panels" />}
-          table={{ head: ['Window', 'Baskets with 2+ units %'], rows: [['Before (usual)', pct(multi.before)], ['During', pct(multi.during)]] }}
-          tableNote="From the average units of the promoted items per basket u (club card aggregates): the extra units of a basket are taken as Poisson(u − 1), so the share with 2 or more is 1 − e^−(u − 1)."
-          height={B_ROW2}
-        >
-          <SignedColumns
-            data={[
-              { x: 'Before (usual)', value: multi.before },
-              { x: 'During', value: multi.during },
-            ]}
-            format={(v) => pct(v, 0)}
-            valueLabel="Baskets with 2+ units"
-            neutral
-            labels
-          />
-        </ChartCard>
-        <ChartCard
-          title="Also bought"
-          titleChip={<NewMetricChip />}
-          subtitle={
-            <>
-              Top 5 that <Term id="overIndex">over-index</Term> in the event's baskets (100 = as usual)
-            </>
-          }
-          table={{ head: ['Category', 'Index'], rows: cats.map((c) => [c.label, c.index]) }}
-          tableNote="Index = share of the event's baskets that include the category ÷ its share of all baskets × 100. Basket affinity is simulated in the prototype; production reads it from the Weis T-log baskets."
-          height={B_ROW2}
-        >
-          <HBars data={cats.map((c) => ({ label: c.label, value: c.index }))} format={(v) => String(Math.round(v))} valueLabel="Index" labelWidth={110} refs={[{ x: 100, label: '100 = usual', anchor: 'end' }]} />
-        </ChartCard>
-        <ChartCard
-          title="Same-ad promotions"
-          titleChip={<NewMetricChip />}
-          subtitle="Also bought: the other promotions of the same ad week most often in the event's baskets"
-          table={{ head: ['Promotion', 'Event', 'Share of the event baskets'], rows: promos.map((p) => [p.label, EVENTS[p.event].id, pct(p.share)]) }}
-          tableNote="Share of the event's baskets that also include the other promotion. Basket affinity is simulated in the prototype; production reads it from the Weis T-log baskets."
-          height={B_ROW2}
-        >
-          <HBars data={promos.map((p) => ({ label: p.label, value: p.share, id: p.event }))} format={(v) => pct(v)} valueLabel="Share of the event baskets" labelWidth={130} />
         </ChartCard>
       </ChartGrid>
       <TableCard
@@ -615,42 +512,74 @@ function SnapshotPanel({ events, ctx, weights, rangeLabel, onOpen }: { events: n
   const list = [...month.events].sort((a, b) => (scores.get(b)?.score ?? -1) - (scores.get(a)?.score ?? -1) || EVENTS[a].start - EVENTS[b].start);
   const results = resultsOf(scores, month.events);
   const avg = averageScore(scores, month.events);
-  const tiles: Tile[] = [
-    { label: 'Hot Buys', info: 'Hot Buys whose ad week starts in the month.', value: count(month.events.length) },
-    {
-      label: 'Verdicts',
-      info: `How many Hot Buys of the month got each verdict: RE-EXECUTE 85 or more, REFINE TACTIC 70 to 84, RECONSIDER SLOT below 70 (Weis Hot Buy Scoring Framework). ${SCORE_WINDOW_NOTE}`,
-      value: <VerdictCounts results={results} />,
-    },
-    {
-      label: 'Hot Buy Score',
-      info: `Average of the month’s Hot Buys, 0–100. ${SCORE_WINDOW_NOTE} ${SCORE_MARGIN_NOTE}`,
-      chip: <ScoreChip info={false} />,
-      value: avg === null ? '—' : String(Math.round(avg)),
-      sub: 'average',
-    },
-  ];
+  const verdicts = verdictCounts(results);
+  const reexecute = verdicts.find(({ verdict }) => verdict.id === 'reexecute')?.n ?? 0;
   return (
     <>
       <div className="panel-controls">
         <Select className="month-picker" label="Ad month" value={month.key} options={months.map((m) => ({ value: m.key, label: `${m.label} (${m.events.length} Hot Buy${m.events.length === 1 ? '' : 's'})` }))} onChange={setPicked} />
       </div>
-      <KeyFigures tags={<SettingTags block="snapshot" />} caption={`${month.label} · ${month.events.length} Hot Buy${month.events.length === 1 ? '' : 's'}`} tiles={tiles} />
+      <section className="card executive-overview" aria-label="Monthly Hot Buy readout">
+        <div className="executive-overview-copy">
+          <span className="executive-kicker">Monthly readout · {month.label}</span>
+          <h3>
+            {reexecute} of {month.events.length} Hot Buys are ready to re-execute
+          </h3>
+          <p>Use the verdict mix to decide what to repeat, refine or reconsider. Cards below are ranked by Hot Buy Score.</p>
+          <ScoreChip />
+        </div>
+        <div className="executive-average" aria-label={`Average Hot Buy Score ${avg === null ? 'not available' : Math.round(avg)} of 100`}>
+          <span>Average score</span>
+          <strong>{avg === null ? '—' : Math.round(avg)}</strong>
+          <small>of 100</small>
+        </div>
+        <div className="executive-verdicts" aria-label="Verdict distribution">
+          {verdicts.map(({ verdict, n }) => {
+            const share = month.events.length > 0 ? n / month.events.length : 0;
+            return (
+              <div key={verdict.id} className={`executive-verdict executive-verdict-${verdict.id}`}>
+                <div className="executive-verdict-head">
+                  <span className={`verdict-chip verdict-${verdict.id}`}>{verdict.label}</span>
+                  <b>{n}</b>
+                </div>
+                <div className="executive-verdict-track" aria-hidden="true">
+                  <span style={{ width: `${share * 100}%` }} />
+                </div>
+                <span>{pct(share, 0)} of the month</span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="executive-method-note">
+          {SCORE_WINDOW_NOTE} {SCORE_MARGIN_NOTE}
+        </p>
+      </section>
       <PrivacyNotes ctx={ctx} full={false} />
       <section aria-label="Executive snapshot">
         <div className="snapshot-head">
-          <h3 className="secondary-title">
-            Every Hot Buy of {month.label}, by Hot Buy Score <SettingTags block="snapshot" />
-          </h3>
+          <div>
+            <h3 className="secondary-title">
+              Ranked Hot Buys <SettingTags block="snapshot" />
+            </h3>
+            <p className="snapshot-head-sub">Highest score first · select a card to review the event detail</p>
+          </div>
           <BlockSettings block="snapshot" />
         </div>
         <div className="shopper-grid snapshot-grid">
-          {list.map((e) => {
+          {list.map((e, rank) => {
             const s = scores.get(e);
             const part = (id: string) => s?.parts.find((p) => p.id === id)?.value ?? null;
             const name = PRICE_GROUPS[EVENTS[e].pg].name;
             return (
-              <button key={e} type="button" className="card snapshot-card" data-event={e} onClick={() => onOpen(e)} aria-label={`${name}, ${EVENTS[e].id}: Hot Buy Score ${s?.score ?? 'none'}${s ? `, ${s.verdict.label}` : ''}. Open in Event detail.`}>
+              <button
+                key={e}
+                type="button"
+                className={`card snapshot-card hot-buy-card${s ? ` hot-buy-card-${s.verdict.id}` : ''}`}
+                data-event={e}
+                onClick={() => onOpen(e)}
+                aria-label={`Rank ${rank + 1}, ${name}, ${EVENTS[e].id}: Hot Buy Score ${s?.score ?? 'none'}${s ? `, ${s.verdict.label}` : ''}. Open in Event detail.`}
+              >
+                <span className="snapshot-rank">#{rank + 1}</span>
                 <header>
                   <h4 title={name}>{name}</h4>
                   <p>
@@ -676,7 +605,7 @@ function SnapshotPanel({ events, ctx, weights, rangeLabel, onOpen }: { events: n
                     <dd>{pct(part('newToCat'))}</dd>
                   </div>
                 </dl>
-                <span className="card-open">Open in B · Event detail →</span>
+                <span className="card-open">Review event detail →</span>
               </button>
             );
           })}
@@ -684,19 +613,6 @@ function SnapshotPanel({ events, ctx, weights, rangeLabel, onOpen }: { events: n
         <p className="table-note">Sales Lift, Unit Lift and New-to-Category are the score inputs (vs. the 4 weeks before, the method's fixed pre-period). Net Incremental GM $ is not part of the score (#19).</p>
       </section>
     </>
-  );
-}
-
-/** "8 Re-execute · 5 Refine · 2 Reconsider" as three verdict chips with their count (text, not colour alone). */
-function VerdictCounts({ results }: { results: ScoreResult[] }) {
-  return (
-    <span className="verdict-counts" aria-label={verdictCountText(results)}>
-      {verdictCounts(results).map(({ verdict, n }) => (
-        <span key={verdict.id} className={`verdict-count${n === 0 ? ' is-zero' : ''}`}>
-          <b>{n}</b> <span className={`verdict-chip verdict-${verdict.id}`}>{verdict.label}</span>
-        </span>
-      ))}
-    </span>
   );
 }
 

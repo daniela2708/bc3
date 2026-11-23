@@ -22,9 +22,7 @@ export type TermId =
   | 'promoRun'
   | 'level2'
   | 'definitionPending'
-  | 'promoIntensity'
-  | 'overIndex'
-  | 'brandShare';
+  | 'promoIntensity';
 
 export interface GlossaryEntry {
   term: string;
@@ -90,14 +88,6 @@ export const GLOSSARY: Record<TermId, GlossaryEntry> = {
   promoIntensity: {
     term: 'Promo intensity',
     text: 'Average share of a category’s items on offer per day of the period. High intensity means shoppers see the category on deal most of the time.',
-  },
-  overIndex: {
-    term: 'Over-index',
-    text: 'How much more often a category shows up in the event’s baskets than in all baskets: 100 = as often as usual, 150 = 1.5 times as often.',
-  },
-  brandShare: {
-    term: 'Brand share',
-    text: 'The promoted brand’s share of category sales. Brand share gain is the change in share points from before the promotion to during it.',
   },
 };
 

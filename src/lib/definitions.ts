@@ -6,7 +6,6 @@
  * workbook tab "UC #3 - Open Questions". Shown in the KPI definitions dialog and in the README (see readme.ts).
  */
 import { FATIGUE_CHIP, FATIGUE_INFO, FATIGUE_RULE, FLOOR_RULE, INTENSITY, INTENSITY_CHIP } from './fatigue';
-import { NEW_METRIC_CHIP, NEW_METRIC_INFO } from './shopperDetail';
 import type { TabId } from './filters';
 import { methodText, SCORE_CHIP, SCORE_METHOD } from './scoring';
 import { LIFT_THRESHOLDS, THRESHOLD_CHIP } from './thresholds';
@@ -502,50 +501,6 @@ export const KPI_DEFINITIONS: KpiDef[] = [
     views: ['shopper'],
     note: `${INTENSITY_CHIP} (calibrated). Promo Shopper Impact, subtab A · Category summary. Every item of the category counts, whatever the product filters.`,
     status: `${REVIEW_STATUS} · business method`,
-  },
-  {
-    id: "brandShareGain",
-    name: "Brand Share Gain",
-    unit: "pts",
-    priority: "Nice to have",
-    definition: "Change in the promoted brand's share of category sales from before the promotion to during it.",
-    formula: "Brand share of category Net Customer Sales during the event − the same share over the baseline window, in share points",
-    views: ['shopper'],
-    note: `${NEW_METRIC_INFO} Promo Shopper Impact, subtab B · Event detail (key figure).`,
-    status: `${NEW_METRIC_CHIP}`,
-  },
-  {
-    id: "buyerSources",
-    name: "Where Buyers Came From",
-    unit: "%",
-    priority: "Nice to have",
-    definition: "Promo buyers split into new to the category, already buyers of the item and switchers from another brand.",
-    formula: "New to the category = New-to-Category Buyers % (52-week look-back); already bought the item = the same buyers' usual count ÷ promo buyers (capped); switched brand = the rest. The three add up to 100 %.",
-    views: ['shopper'],
-    note: `${NEW_METRIC_INFO} Promo Shopper Impact, subtab B · Event detail.`,
-    status: `${NEW_METRIC_CHIP}`,
-  },
-  {
-    id: "multiItem",
-    name: "Multi-Item Baskets",
-    unit: "%",
-    priority: "Nice to have",
-    definition: "Share of baskets with 2 or more units of the promoted items, before vs. during the promotion.",
-    formula: "1 − e^−(u − 1), with u = units of the promoted items ÷ baskets that include them (extra units per basket taken as Poisson); before = the same buyers' usual",
-    views: ['shopper'],
-    note: `${NEW_METRIC_INFO} Promo Shopper Impact, subtab B · Event detail.`,
-    status: `${NEW_METRIC_CHIP}`,
-  },
-  {
-    id: "alsoBought",
-    name: "Also Bought",
-    unit: "index / %",
-    priority: "Nice to have",
-    definition: "The 5 categories that over-index most in the event's baskets, and the other promotions of the same ad bought most often with it.",
-    formula: "Category index = share of the event's baskets with the category ÷ its share of all baskets × 100; same-ad promotions = share of the event's baskets that include the other promotion",
-    views: ['shopper'],
-    note: `${NEW_METRIC_INFO} Promo Shopper Impact, subtab B · Event detail. Basket affinity is simulated in the prototype; production reads it from the Weis T-log baskets.`,
-    status: `${NEW_METRIC_CHIP}`,
   },
   {
     id: "liftBands",

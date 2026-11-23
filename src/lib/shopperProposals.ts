@@ -53,8 +53,8 @@ export const PROPOSALS: ProposalInfo[] = [
     name: 'Event detail',
     proposal: true,
     question: 'What happened to shoppers in one promotion?',
-    description: 'Pick an event: its buyers and baskets before, during and after, where the buyers came from, multi-item baskets, what else they bought and every event in the table below.',
-    look: 'Did this promotion bring new shoppers and bigger baskets, or just discount existing buyers?',
+    description: 'Pick an event: its defined shopper KPIs, buyers and baskets before, during and after, and every event in the table below. Metrics that would require a new KPI definition are intentionally excluded.',
+    look: 'Did this promotion increase buyers and baskets above their usual?',
   },
   {
     id: 'C',
@@ -62,7 +62,7 @@ export const PROPOSALS: ProposalInfo[] = [
     name: 'Executive snapshot',
     proposal: true,
     question: 'How did every Hot Buy of a month do?',
-    description: 'Every Hot Buy of one ad month, one card each ordered by Hot Buy Score with its verdict. Click a card to open the event in B.',
+    description: 'An executive readout for one ad month: the verdict mix, average Hot Buy Score and a ranked card for every Hot Buy. Click a card to open the event in B.',
     look: 'Which Hot Buys should we run again, refine or reconsider?',
   },
 ];

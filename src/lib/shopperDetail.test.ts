@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CAT_ITEMS } from '../data/generate';
-import { ITEMS, PRICE_GROUPS } from '../data/products';
+import { PRICE_GROUPS } from '../data/products';
 import { EVENTS } from '../data/promos';
 import { INTENSITY, intensityBand } from './fatigue';
 import { DEFAULT_STATE, fromQuery, toQuery } from './filters';
-import { baselineWindow, sums, type EventCtx } from './metrics';
-import { eventShopper } from './shopper';
-import { alsoBoughtCategories, brandShare, buyerSources, categoryIntensity, multiItemBaskets, multiUnitShare, sameAdPromos } from './shopperDetail';
+import { categoryIntensity } from './shopperDetail';
 import { nextSubTab, openInEventDetail, parseProposal, PROPOSAL_CHIP, PROPOSALS, subTabLabel } from './shopperProposals';
 
-const ctx: EventCtx = { baselineWeeks: 4, level: 'sub', itemMask: null, storeShare: null };
 const hb = EVENTS.find((e) => e.type === 'HB' && e.start > 400 && e.end + 40 < 1000)!;
 
 describe('Promo Shopper Impact subtabs', () => {
@@ -18,7 +15,7 @@ describe('Promo Shopper Impact subtabs', () => {
     expect(PROPOSALS.map((p) => p.proposal)).toEqual([false, true, true, true]);
     expect(PROPOSALS.slice(1).map((p) => p.look)).toEqual([
       'Which categories gain buyers, and is the lift real vs. last year?',
-      'Did this promotion bring new shoppers and bigger baskets, or just discount existing buyers?',
+      'Did this promotion increase buyers and baskets above their usual?',
       'Which Hot Buys should we run again, refine or reconsider?',
     ]);
     expect(PROPOSAL_CHIP).toBe('Proposals for review');
@@ -58,64 +55,7 @@ describe('Promo Shopper Impact subtabs', () => {
   });
 });
 
-describe('Promo Shopper Impact new metrics', () => {
-  it('brand share gain = brand share of category sales during − before, in share points', () => {
-    const r = brandShare(hb, ctx);
-    const pg = PRICE_GROUPS[hb.pg];
-    const cat = CAT_ITEMS[pg.cat];
-    const brand = cat.filter((i) => ITEMS[i].brand === pg.brand);
-    const bw = baselineWindow(hb, 4);
-    const before = sums(brand, bw.from, bw.to).net / sums(cat, bw.from, bw.to).net;
-    const during = sums(brand, hb.start, hb.end).net / sums(cat, hb.start, hb.end).net;
-    expect(r.before).toBeCloseTo(before, 10);
-    expect(r.during).toBeCloseTo(during, 10);
-    expect(r.gain).toBeCloseTo(during - before, 10);
-    expect(r.before! > 0 && r.before! <= 1 && r.during! > 0 && r.during! <= 1).toBe(true);
-    // A Hot Buy gains share for its brand.
-    expect(r.gain!).toBeGreaterThan(0);
-  });
-
-  it('where buyers came from: the three parts add up to 100 % and never go below 0', () => {
-    for (const e of EVENTS.slice(0, 200)) {
-      const s = buyerSources(eventShopper(e, ctx));
-      if (!s) continue;
-      expect(s.newToCategory + s.existing + s.switched).toBeCloseTo(1, 12);
-      for (const v of [s.newToCategory, s.existing, s.switched]) expect(v).toBeGreaterThanOrEqual(0);
-    }
-    // Hand-made aggregates: 20 % new, 50 % usual buyers, 30 % switched.
-    expect(buyerSources({ buyers: 100, usualBuyers: 50, newBuyers: 20 })).toEqual({ newToCategory: 0.2, existing: 0.5, switched: expect.closeTo(0.3, 12) });
-    // More usual buyers than room left: capped, switched 0.
-    expect(buyerSources({ buyers: 100, usualBuyers: 95, newBuyers: 20 })).toEqual({ newToCategory: 0.2, existing: 0.8, switched: 0 });
-    // Fails safely with no buyers.
-    expect(buyerSources({ buyers: 0, usualBuyers: 10, newBuyers: 0 })).toBeNull();
-  });
-
-  it('multi-item baskets: 1 − e^−(u − 1) from the units per basket, before vs. during', () => {
-    expect(multiUnitShare(100, 100)).toBe(0); // one unit per basket
-    expect(multiUnitShare(200, 100)).toBeCloseTo(1 - Math.exp(-1), 12);
-    expect(multiUnitShare(150, 100)).toBeCloseTo(1 - Math.exp(-0.5), 12);
-    expect(multiUnitShare(50, 0)).toBeNull();
-    const m = multiItemBaskets(eventShopper(hb, ctx));
-    expect(m.before! >= 0 && m.before! < 1 && m.during! > 0 && m.during! < 1).toBe(true);
-    // Promo buyers put more units in each basket than usual.
-    expect(m.during!).toBeGreaterThan(m.before!);
-  });
-
-  it('also bought: 5 other categories by index, highest first; same-ad promotions share the ad week', () => {
-    const cats = alsoBoughtCategories(hb);
-    expect(cats).toHaveLength(5);
-    expect(cats.every((c) => c.cat !== PRICE_GROUPS[hb.pg].cat)).toBe(true);
-    expect([...cats].sort((a, b) => b.index - a.index)).toEqual(cats);
-    expect(alsoBoughtCategories(hb)).toEqual(cats); // deterministic
-    const promos = sameAdPromos(hb);
-    expect(promos.length).toBeLessThanOrEqual(5);
-    for (const p of promos) {
-      expect(p.event).not.toBe(hb.idx);
-      expect(p.share).toBeGreaterThan(0);
-      expect(p.share).toBeLessThan(1);
-    }
-  });
-
+describe('Promo Shopper Impact proposal metrics', () => {
   it('promo intensity per category = item-days on offer ÷ (items × days); overlapping promos count a day once', () => {
     const cat = PRICE_GROUPS[hb.pg].cat;
     const items = CAT_ITEMS[cat];

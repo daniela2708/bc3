@@ -647,7 +647,7 @@ async function main() {
       cur: document.querySelectorAll('.shopper-grid .shopper-panel').length > 0 && !!document.querySelector('.table-card[aria-label="All events"]') && !document.querySelector('.panel-controls'),
       divider: !!document.querySelector('.subtabs .subtab-divider + [role=tab]#shopper-tab-A'),
       a: !!document.querySelector('.table-card[aria-label="Category summary"]') && cards.includes('Promo buyer lift by category') && cards.includes('Promo intensity by category'),
-      b: !!document.querySelector('.panel-controls .event-picker') && cards.includes('Buyers and baskets before, during and after') && cards.includes('Where buyers came from') && cards.includes('Multi-item baskets') && cards.includes('Also bought') && cards.includes('Same-ad promotions') && !!document.querySelector('.table-card[aria-label="All events"]'),
+      b: !!document.querySelector('.panel-controls .event-picker') && cards.length === 1 && cards.includes('Buyers and baskets before, during and after') && !!document.querySelector('.table-card[aria-label="All events"]'),
       c: document.querySelectorAll('.snapshot-grid button.snapshot-card').length > 0 && !!document.querySelector('.panel-controls .month-picker'),
     };
   })()`;
@@ -704,16 +704,13 @@ async function main() {
   await until(`!!document.querySelector('.panel-controls .event-picker')`, 'Event detail panel after reload');
   const sb = await evaluate(subOf);
   const bDetail = await evaluate(`(() => {
-    const tile = [...document.querySelectorAll('.kpi-tile')].find((t) => t.querySelector('.kpi-label').textContent.startsWith('Brand share'));
     const chips = [...document.querySelectorAll('#tab-panel .new-metric-chip')].length;
-    const src = [...document.querySelectorAll('section.chart-card')].find((c) => c.getAttribute('aria-label') === 'Where buyers came from');
-    const tips = [...document.querySelectorAll('#tab-panel .new-metric-chip + .tip .tip-body')].map((t) => t.textContent);
     const rows = [...document.querySelectorAll('#tab-panel .chart-grid')].map((g) => [...g.querySelectorAll(':scope > .chart-card')].map((c) => Math.round(c.getBoundingClientRect().height)));
-    return { rows, brand: tile?.querySelector('.kpi-value').textContent ?? '', chips, tips: [...new Set(tips)], srcBars: src?.querySelectorAll('.recharts-bar-rectangle').length ?? 0, shades: [...document.querySelectorAll('section.chart-card')].find((c) => c.getAttribute('aria-label') === 'Buyers and baskets before, during and after')?.querySelectorAll('.recharts-reference-area').length ?? 0 };
+    return { rows, chips, shades: [...document.querySelectorAll('section.chart-card')].find((c) => c.getAttribute('aria-label') === 'Buyers and baskets before, during and after')?.querySelectorAll('.recharts-reference-area').length ?? 0 };
   })()`);
   check(
-    'Shopper Impact B (sp=B kept after reload): Event dropdown, 5 tiles with Brand share gain in points, charts in rows of 2 and 3 with equal heights, shaded windows, the four new metrics with the "New metric · definition pending" chip and its (i)',
-    sb.active === 'B · Event detail' && sb.b && sb.tiles.length === 5 && bDetail.rows.map((r) => r.length).join() === '2,3' && bDetail.rows.every((r) => r.every((h) => h === r[0])) && sb.look === 'What to look at: Did this promotion bring new shoppers and bigger baskets, or just discount existing buyers?' && sb.approval && /^([+−]\d+\.\d|0\.0) pts$/.test(bDetail.brand) && bDetail.chips >= 5 && bDetail.shades === 3 && bDetail.srcBars === 3 && bDetail.tips.length === 1 && bDetail.tips[0].startsWith('Not in the KPI sheet: it comes from the views the team uses today in the Hot Buy recap, calculated here with Weis data'),
+    'Shopper Impact B (sp=B kept after reload): Event dropdown, 4 defined KPI tiles, one before/during/after chart with shaded windows, no new-metric visuals, and the events table',
+    sb.active === 'B · Event detail' && sb.b && sb.tiles.length === 4 && bDetail.rows.map((r) => r.length).join() === '1' && sb.look === 'What to look at: Did this promotion increase buyers and baskets above their usual?' && sb.approval && bDetail.chips === 0 && bDetail.shades === 3,
     JSON.stringify({ ...bDetail, tiles: sb.tiles }),
   );
   await shootPage('shopper-b-event-detail.png');
@@ -728,7 +725,7 @@ async function main() {
   await until(`!!document.querySelector('[role=tablist][aria-label="Promo Shopper Impact layouts"]')`, 'subtabs with an invalid sp');
   const sz = await evaluate(subOf);
   check('Shopper Impact: an invalid sp (sp=Z) falls back to the current view', sz.active === 'Current · Event panels' && sz.cur, sz.active);
-  // C: verdict strip, cards ordered by score, Weights in the snapshot header; a card click opens the event in B.
+  // C: decision-first monthly readout, cards ordered by score, Weights in the ranking header; a card click opens the event in B.
   await send('Page.navigate', { url: `${base}/?tab=shopper&sp=C` });
   await until(`document.querySelectorAll('.snapshot-grid button.snapshot-card').length > 0`, 'Executive snapshot cards');
   const lc = await evaluate(subOf);
@@ -738,9 +735,12 @@ async function main() {
     verdicts: [...document.querySelectorAll('.snapshot-card .score-badge .verdict-chip')].map((v) => v.textContent),
     fields: [...document.querySelectorAll('.snapshot-card')].slice(0, 1).map((c) => [...c.querySelectorAll('dt')].map((d) => d.textContent).join('|')).join(),
     price: document.querySelector('.snapshot-card .card-price')?.textContent ?? '',
-    counts: [...document.querySelectorAll('.kpi-tile')].find((t) => t.querySelector('.kpi-label').textContent.startsWith('Verdicts'))?.querySelector('.verdict-counts')?.getAttribute('aria-label') ?? '',
-    countChips: [...document.querySelectorAll('.kpi-tile .verdict-count .verdict-chip')].map((c) => c.textContent).join('|'),
-    avg: [...document.querySelectorAll('.kpi-tile')].find((t) => t.querySelector('.kpi-label').textContent.startsWith('Hot Buy Score'))?.querySelector('.kpi-value')?.textContent ?? '',
+    counts: [...document.querySelectorAll('.executive-verdict-head b')].map((b) => Number(b.textContent)),
+    countChips: [...document.querySelectorAll('.executive-verdict .verdict-chip')].map((c) => c.textContent).join('|'),
+    avg: document.querySelector('.executive-average strong')?.textContent ?? '',
+    headline: (document.querySelector('.executive-overview-copy h3')?.textContent ?? '').replace(/\\s+/g, ' ').trim(),
+    ranks: [...document.querySelectorAll('.snapshot-card .snapshot-rank')].map((r) => r.textContent),
+    overview: !!document.querySelector('.executive-overview[aria-label="Monthly Hot Buy readout"]'),
     weights: ${pressed('Hot Buy Score weights')},
     inHeader: !!document.querySelector('.snapshot-head .block-settings [role=group][aria-label="Hot Buy Score weights"]'),
     inBar: !!document.querySelector('.calc-settings [role=group][aria-label="Hot Buy Score weights"]'),
@@ -748,8 +748,8 @@ async function main() {
   }))()`;
   const snap = await evaluate(snapshotOf);
   check(
-    'Shopper Impact C: count by verdict and average score on top; cards ordered by score with price, verdict text, Sales Lift, Unit Lift, Net Incremental GM $ and New-to-Category; Weights in the snapshot header',
-    snap.scores.length > 0 && snap.scores.every((v, i) => i === 0 || snap.scores[i - 1] >= v) && snap.verdicts.length === snap.scores.length && snap.verdicts.every((v, i) => VERDICT[v]?.(snap.scores[i])) && /^\d+ Re-execute · \d+ Refine · \d+ Reconsider$/.test(snap.counts) && snap.countChips === 'RE-EXECUTE|REFINE TACTIC|RECONSIDER SLOT' && /^\d{1,3}$/.test(snap.avg) && snap.fields === 'Sales Lift|Unit Lift|Net Incremental GM $|New-to-Category' && /^\$\d+\.\d\d( \/ lb)?$/.test(snap.price) && snap.weights === 'Current' && snap.inHeader && !snap.inBar && snap.tags.every((t) => t === 'Current weights'),
+    'Shopper Impact C: decision-first monthly readout with headline, average score and verdict distribution; ranked cards show score, verdict, price and the four supporting fields; Weights stay in the ranking header',
+    snap.overview && snap.scores.length > 0 && snap.scores.every((v, i) => i === 0 || snap.scores[i - 1] >= v) && snap.verdicts.length === snap.scores.length && snap.verdicts.every((v, i) => VERDICT[v]?.(snap.scores[i])) && snap.counts.length === 3 && snap.counts.reduce((a, b) => a + b, 0) === snap.scores.length && snap.countChips === 'RE-EXECUTE|REFINE TACTIC|RECONSIDER SLOT' && /^\d{1,3}$/.test(snap.avg) && /^\d+ of \d+ Hot Buys are ready to re-execute$/.test(snap.headline.trim()) && snap.ranks.every((r, i) => r === '#' + (i + 1)) && snap.fields === 'Sales Lift|Unit Lift|Net Incremental GM $|New-to-Category' && /^\$\d+\.\d\d( \/ lb)?$/.test(snap.price) && snap.weights === 'Current' && snap.inHeader && !snap.inBar && snap.tags.every((t) => t === 'Current weights'),
     JSON.stringify(snap),
   );
   await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Hot Buy Score weights"] button')].find((b) => b.textContent === 'Proposed').click(), 1`);

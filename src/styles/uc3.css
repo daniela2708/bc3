@@ -689,21 +689,6 @@ td .lift-band.band-low {
 .panel-controls .month-picker select {
   min-width: 240px;
 }
-.new-metric-chip {
-  white-space: nowrap;
-}
-.snapshot-strip {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sp-1) var(--sp-4);
-  padding: var(--sp-2) var(--sp-3);
-  margin: 0 0 var(--sp-2);
-}
-.snapshot-strip b {
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-}
 button.snapshot-card {
   display: block;
   width: 100%;
@@ -765,7 +750,121 @@ button.snapshot-card:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-1);
+  gap: var(--sp-2);
+  margin: var(--sp-4) 0 var(--sp-2);
+}
+.snapshot-head .secondary-title {
+  margin-bottom: 2px;
+}
+.snapshot-head-sub {
+  margin: 0;
+  color: var(--n5);
+  font-size: 12.5px;
+}
+
+/* Proposal C: a decision-first monthly readout, using the existing score and verdicts only. */
+.executive-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: var(--sp-3) var(--sp-4);
+  padding: 22px 24px;
+  border-top: 4px solid var(--red);
+  background: linear-gradient(135deg, #fff 0%, #fff 70%, #faf7f5 100%);
+}
+.executive-overview-copy h3 {
+  max-width: 720px;
+  margin: 3px 0 6px;
+  font-size: clamp(21px, 2vw, 28px);
+  line-height: 1.15;
+}
+.executive-overview-copy p {
+  max-width: 720px;
+  margin: 0 0 10px;
+  color: var(--n5);
+  font-size: 13px;
+}
+.executive-kicker {
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.executive-average {
+  display: grid;
+  place-content: center;
+  min-height: 116px;
+  padding: 12px;
+  border: 1px solid var(--n3);
+  border-radius: 8px;
+  background: #fff;
+  text-align: center;
+}
+.executive-average span,
+.executive-average small {
+  color: var(--n5);
+  font-size: 11px;
+  font-weight: 700;
+}
+.executive-average strong {
+  color: var(--dark);
+  font-size: 40px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.executive-verdicts {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
+}
+.executive-verdict {
+  padding: 12px;
+  border: 1px solid var(--n3);
+  border-radius: 7px;
+  background: #fff;
+}
+.executive-verdict-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.executive-verdict-head b {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.executive-verdict-track {
+  height: 6px;
+  margin: 9px 0 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--n2);
+}
+.executive-verdict-track span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+}
+.executive-verdict-reexecute .executive-verdict-track span {
+  background: var(--pos);
+}
+.executive-verdict-refine .executive-verdict-track span {
+  background: #c08a10;
+}
+.executive-verdict-reconsider .executive-verdict-track span {
+  background: var(--neg);
+}
+.executive-verdict > span {
+  color: var(--n5);
+  font-size: 11.5px;
+}
+.executive-method-note {
+  grid-column: 1 / -1;
+  margin: -3px 0 0;
+  color: var(--n5);
+  font-size: 11.5px;
 }
 
 /* Hot Buy Score method in the KPI definitions dialog. */
@@ -822,22 +921,43 @@ button.snapshot-card:focus-visible {
   gap: 6px 12px;
   font-size: 13px;
 }
-.verdict-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.verdict-count b {
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-}
-.verdict-count.is-zero {
-  opacity: 0.55;
-}
 /* Cards: one column of blocks with the action pinned to the bottom, so cards of a row line up. */
 .snapshot-card {
   display: flex;
   flex-direction: column;
+}
+.hot-buy-card {
+  position: relative;
+  overflow: hidden;
+  border-top-width: 4px;
+}
+.hot-buy-card-reexecute {
+  border-top-color: var(--pos);
+}
+.hot-buy-card-refine {
+  border-top-color: #c08a10;
+}
+.hot-buy-card-reconsider {
+  border-top-color: var(--neg);
+}
+.snapshot-rank {
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 99px;
+  background: var(--n2);
+  color: var(--n5);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.hot-buy-card header {
+  padding-right: 42px;
 }
 .snapshot-card > .btn-link,
 .snapshot-card > .card-open {
@@ -866,4 +986,24 @@ button.snapshot-card:focus-visible {
 }
 button.snapshot-card dt {
   min-height: 0;
+}
+
+@media (max-width: 760px) {
+  .executive-overview {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+  .executive-average {
+    grid-template-columns: auto auto auto;
+    gap: 6px;
+    min-height: 0;
+    place-content: center;
+    align-items: baseline;
+  }
+  .executive-average strong {
+    font-size: 30px;
+  }
+  .executive-verdicts {
+    grid-template-columns: 1fr;
+  }
 }
