@@ -13,7 +13,6 @@ describe('calculation settings bar (layout rule 5)', () => {
     expect(barSettings('trend')).toEqual(['baseline', 'basis', 'cann']);
     expect(barSettings('post')).toEqual(['baseline']);
     expect(barSettings('shopper')).toEqual(['baseline']);
-    expect(barSettings('funding')).toEqual([]);
   });
   it('a setting that changes one block lives in that block: Sales basis in the Post-Promo sales chart', () => {
     expect(blockSettings('post', 'salesChart')).toEqual(['basis']);
@@ -50,7 +49,6 @@ describe('active-value tags (layout rule 6)', () => {
     expect(keys('hotbuy', 'unitsChart')).toEqual([]);
     expect(keys('post', 'bridge')).toEqual([]);
     expect(keys('shopper', 'salesChart')).toEqual([]);
-    for (const b of ['tiles', 'table', 'salesChart'] as const) expect(keys('funding', b)).toEqual([]);
   });
   it('shows the default values plainly', () => {
     expect(tagsFor('hotbuy', 'tiles', S).map((t) => [t.text, t.changed])).toEqual([

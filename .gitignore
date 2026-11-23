@@ -31,3 +31,6 @@ tmp/
 
 # e2e screenshots (SCREENSHOTS=./screens npm run test:e2e)
 screens/
+
+# Local assistant notes (the working rules live in the README, "Layout rules")
+CLAUDE.md

@@ -23,6 +23,12 @@ export function liftBand(v: number | null | undefined, t = LIFT_THRESHOLDS): Lif
   return 'low';
 }
 
+/** Text of the legend's (i): what the bands mean, with the thresholds above. */
+export function liftBandsInfo(t = LIFT_THRESHOLDS): string {
+  const p = (v: number) => `${Math.round(v * 100)} %`;
+  return `Colour of Sales Lift % and Unit Lift % in each run: ${LIFT_BAND_LABEL.good} (green) at ${p(t.good)} or more, ${LIFT_BAND_LABEL.watch} (amber) from ${p(t.watch)} to under ${p(t.good)}, ${LIFT_BAND_LABEL.low} (red) under ${p(t.watch)}. The value is always shown next to the colour. Illustrative thresholds, to be defined by the business.`;
+}
+
 /** Legend lines, e.g. "High ≥ 30 %". */
 export function liftLegend(t = LIFT_THRESHOLDS): { band: LiftBand; text: string }[] {
   const p = (v: number) => `${Math.round(v * 100)} %`;

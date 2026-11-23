@@ -13,11 +13,11 @@ import { SALES_COLUMNS, UNITS_COLUMNS } from '../lib/series';
 import { getScope } from '../lib/selectors';
 import { deriveShopper, eventShopper, REPEAT_WINDOW_DAYS, shopperOf } from '../lib/shopper';
 import { VIEW_INFO } from '../lib/viewInfo';
-import { basisWord, EmptyState, eventDates, SettingTags, uomFirst, uomPct, uomTile, ViewControls, type ViewProps } from './common';
+import { basisWord, EmptyState, eventDates, SettingTags, uomFirst, uomPct, uomTile, ViewControls } from './common';
 import { PromoWindowCard } from './PromoWindowCard';
 
 /** Post-Promo Trend (workbook view, Nice to have, level 2): what happens to the item after each promo ends. */
-export default function PostPromoView({ openDefinitions }: ViewProps) {
+export default function PostPromoView() {
   const { state } = useFilters();
   const scope = useMemo(() => getScope(state), [state]);
   const basis = state.basis;
@@ -117,10 +117,7 @@ export default function PostPromoView({ openDefinitions }: ViewProps) {
       <ViewControls />
       <KeyFigures tags={<SettingTags block="tiles" />} caption={`${scope.range.name} · ${scope.events.length} events · ${POST_PROMO_WINDOW_DAYS / 7}-week post-promo window`} tiles={tiles} />
       <ViewSummary>
-        {scope.events.length} promotions starting {scope.range.label}: units in the 4 weeks after the promo were <b>{pctChange(uomFirst(all.dip))}</b> vs. baseline, and <b>{pct(shopperAll.repeatRate)}</b> of promo buyers bought again at regular price.{' '}
-        <button type="button" className="btn-link" onClick={() => openDefinitions('dip')}>
-          Definitions
-        </button>
+        {scope.events.length} promotions starting {scope.range.label}: units in the 4 weeks after the promo were <b>{pctChange(uomFirst(all.dip))}</b> vs. baseline, and <b>{pct(shopperAll.repeatRate)}</b> of promo buyers bought again at regular price.
       </ViewSummary>
 
       {selEvent && (

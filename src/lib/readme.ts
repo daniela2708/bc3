@@ -29,7 +29,7 @@ export function settingsTable(): string {
     const uses = AFFECTS[tab.id];
     const keys = (['baseline', 'basis', 'cann'] as SettingKey[]).filter((k) => uses[k]);
     if (tab.id === 'hotbuy' || tab.id === 'other') lines.push(`| ${tab.label} | Rows | Table header | Table only (no tag) |`);
-    if (keys.length === 0) lines.push(`| ${tab.label} | — | — | No calculation setting (notice tab) |`);
+    if (keys.length === 0) lines.push(`| ${tab.label} | — | — | No calculation setting |`);
     for (const k of keys) {
       const u = uses[k]!;
       const where = u.blocks.length > 1 ? 'Calculation settings bar' : `${BLOCK_LABEL[u.blocks[0]]} header`;

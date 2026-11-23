@@ -300,6 +300,13 @@
 .hovercard-title {
   font-weight: 800;
 }
+.hovercard-list {
+  margin: 0;
+  padding-left: 16px;
+}
+.hovercard-list li + li {
+  margin-top: 3px;
+}
 .hovercard-title span,
 .hovercard-note {
   font-weight: 600;

@@ -3,7 +3,7 @@ import { AD_WEEK, AD_WEEK_RULE, AS_OF_DAY, adWeekEnd, adWeekOfDay, adWeekStart, 
 import { baselineWeeksFor, effectiveBaseline, PROPOSED_BASELINE_BY_TYPE, viewBaselineDefault } from './baseline';
 import { EVENTS } from '../data/promos';
 import { ITEMS } from '../data/products';
-import { BASE_TIME, DEFAULT_STATE, fromQuery, FUNDING_OFF, NOT_IN_VIEW, offReason, resolveTime, TABS, timeOffReason, toQuery, usesFilter, type FilterState } from './filters';
+import { BASE_TIME, DEFAULT_STATE, fromQuery, NOT_IN_VIEW, offReason, periodControlLabel, rangeHint, resolveTime, ROLLING_OPTS, rollingLabel, TABS, toQuery, usesFilter, type FilterState } from './filters';
 import { getScope, itemMaskOf, storeShareOf } from './selectors';
 
 const state = (patch: Partial<FilterState>): FilterState => ({ ...structuredClone(DEFAULT_STATE), ...patch });
@@ -32,6 +32,21 @@ describe('time resolution', () => {
   it('rolling spans count complete ad weeks', () => {
     const r = resolveTime({ ...BASE_TIME, mode: 'rolling', rolling: 13 });
     expect(r.end - r.start + 1).toBe(13 * 7);
+  });
+  it('Period control: "Last N weeks" options and "Promotions starting …" text; never "Span"', () => {
+    expect(ROLLING_OPTS.map(rollingLabel)).toEqual(['Last 6 weeks', 'Last 13 weeks', 'Last 26 weeks', 'Last 52 weeks']);
+    expect(periodControlLabel('rolling')).toBe('Period');
+    expect(periodControlLabel('todate')).toBe('Period');
+    expect(periodControlLabel('fiscal')).toBe('Grain');
+    for (const m of ['todate', 'rolling', 'fiscal', 'custom', 'all'] as const) expect(periodControlLabel(m)).not.toMatch(/span/i);
+    const rolling = resolveTime({ ...BASE_TIME, mode: 'rolling', rolling: 13 });
+    expect(rolling.name).toBe('Last 13 weeks');
+    expect(rangeHint('rolling', rolling)).toBe('Promotions starting 08/13/26–11/11/26 (last complete ad week)');
+    const custom = resolveTime({ ...BASE_TIME, mode: 'custom', from: dayFromYMD(2026, 1, 1), to: dayFromYMD(2026, 3, 31) });
+    expect(rangeHint('custom', custom)).toBe('Promotions starting 01/01/26–03/31/26');
+    const day = resolveTime({ ...BASE_TIME, mode: 'todate', toDate: 'day' });
+    expect(rangeHint('todate', day)).toBe('Promotions starting 11/15/26');
+    for (const m of ['todate', 'fiscal', 'all'] as const) expect(rangeHint(m, resolveTime({ ...BASE_TIME, mode: m }))).toMatch(/^Promotions starting \d\d\/\d\d\/\d\d(–\d\d\/\d\d\/\d\d)?$/);
   });
   it('custom ranges are clamped and ordered', () => {
     const r = resolveTime({ ...BASE_TIME, mode: 'custom', from: AS_OF_DAY + 500, to: -50 });
@@ -66,10 +81,11 @@ describe('URL state', () => {
     expect(s.cols.a).toEqual([]);
     expect(fromQuery('x'.repeat(3000), EVENTS.length)).toEqual(DEFAULT_STATE);
   });
-  it('tab=funding opens the Promo Funding notice tab; funding filters are still ignored', () => {
-    expect(TABS.map((t) => t.id)).toEqual(['hotbuy', 'other', 'post', 'funding', 'history', 'shopper', 'trend']);
-    expect(fromQuery('tab=funding', EVENTS.length)).toEqual({ ...DEFAULT_STATE, tab: 'funding' });
-    expect(fromQuery('tab=funding&fu=bill&funding=scan', EVENTS.length)).toEqual({ ...DEFAULT_STATE, tab: 'funding' });
+  it('six tabs without Promo Funding (#2); tab=funding opens the default tab and funding filters are ignored', () => {
+    expect(TABS.map((t) => t.id)).toEqual(['hotbuy', 'other', 'post', 'history', 'shopper', 'trend']);
+    expect(TABS.map((t) => t.label)).toEqual(['Hot Buy Performance', 'Other Promo Performance', 'Post-Promo Trend', 'Promo History', 'Promo Shopper Impact', 'Promo Run Trend']);
+    expect(fromQuery('tab=funding', EVENTS.length)).toEqual(DEFAULT_STATE);
+    expect(fromQuery('tab=funding&fu=bill&funding=scan', EVENTS.length)).toEqual(DEFAULT_STATE);
     const s = fromQuery('tab=other&fu=bill&fundingType=other', EVENTS.length);
     expect(s).toEqual({ ...DEFAULT_STATE, tab: 'other' });
     expect('funding' in s).toBe(false);
@@ -85,24 +101,21 @@ describe('URL state', () => {
     expect(fromQuery('lv=category', EVENTS.length).level).toBe('category');
     expect(fromQuery(toQuery(state({ level: 'category' })), EVENTS.length).level).toBe('category');
   });
-  it('accepts tab=funding only exactly; funding stays rejected everywhere else in the URL', () => {
-    expect(fromQuery('tab=funding', EVENTS.length).tab).toBe('funding');
-    for (const q of ['tab=Funding', 'tab=funding2', 'tab=%20funding', 'tab=funding;x', 'lv=funding', 'sb=funding', 'bw=funding']) {
+  it('rejects tab=funding and its variants (default tab); funding stays rejected everywhere else in the URL', () => {
+    expect(fromQuery('tab=funding', EVENTS.length).tab).toBe('hotbuy');
+    for (const q of ['tab=funding', 'tab=Funding', 'tab=funding2', 'tab=%20funding', 'tab=funding;x', 'lv=funding', 'sb=funding', 'bw=funding']) {
       const s = fromQuery(q, EVENTS.length);
       if (q.startsWith('tab=')) expect(s.tab).toBe('hotbuy');
       expect(toQuery(s)).not.toMatch(/(^|&)(lv|sb|bw)=funding/);
       expect(toQuery(s)).not.toMatch(/(^|&)(ft|fu)=/);
     }
-    expect(toQuery(fromQuery('tab=funding&ft=scan', EVENTS.length))).toBe('tab=funding');
+    expect(toQuery(fromQuery('tab=funding&ft=scan', EVENTS.length))).toBe('tab=hotbuy');
+    // A valid tab still opens after an invalid one is rejected.
+    expect(fromQuery('tab=history', EVENTS.length).tab).toBe('history');
   });
-  it('greys out every filter on the Promo Funding tab with the #2 reason', () => {
-    for (const k of ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'event', 'adType', 'depthBand', 'holiday', 'location'] as const) {
-      expect(usesFilter('funding', k)).toBe(false);
-      expect(offReason('funding', k)).toBe(FUNDING_OFF);
-    }
-    expect(timeOffReason('funding')).toBe(FUNDING_OFF);
-    expect(timeOffReason('hotbuy')).toBeUndefined();
+  it('greys out a filter the workbook does not list for the view', () => {
     expect(offReason('shopper', 'vb')).toBe(NOT_IN_VIEW);
+    expect(offReason('hotbuy', 'vb')).toBeUndefined();
   });
   it('never puts a pasted UPC list in the URL', () => {
     expect(toQuery(state({ codes: [1, 2, 3] }))).not.toMatch(/codes|upc/);
@@ -113,7 +126,7 @@ describe('baseline default per view (#4)', () => {
   it('Hot Buy Performance 4 weeks, Other Promo Performance 13, the other views by promo type', () => {
     expect(viewBaselineDefault('hotbuy')).toBe(4);
     expect(viewBaselineDefault('other')).toBe(13);
-    for (const tab of ['post', 'funding', 'history', 'shopper', 'trend'] as const) expect(viewBaselineDefault(tab)).toBe('byType');
+    for (const tab of ['post', 'history', 'shopper', 'trend'] as const) expect(viewBaselineDefault(tab)).toBe('byType');
     expect(PROPOSED_BASELINE_BY_TYPE).toEqual({ HB: 4, TPR: 13, BOGO: 13, PL: 13, OTH: 13 });
   });
   it('the scope uses the view default until the user picks a window, and the pick wins in every view', () => {

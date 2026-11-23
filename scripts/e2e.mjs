@@ -1,4 +1,4 @@
-// End-to-end check of the production build (adapted from UC2): access gate, the seven views (tabs), typed dates and the
+// End-to-end check of the production build (adapted from UC2): access gate, the six views (tabs), typed dates and the
 // pasted UPC list.
 //
 //   npm run test:e2e                          builds a throwaway copy with a one-time password, serves it, runs the checks
@@ -27,7 +27,6 @@ const TABS = [
   ['hotbuy', 'Hot Buy Performance'],
   ['other', 'Other Promo Performance'],
   ['post', 'Post-Promo Trend'],
-  ['funding', 'Promo Funding'],
   ['history', 'Promo History'],
   ['shopper', 'Promo Shopper Impact'],
   ['trend', 'Promo Run Trend'],
@@ -153,27 +152,8 @@ async function main() {
     const info = await evaluate(`({ tiles: document.querySelectorAll('.kpi-tile').length, error: !!document.querySelector('.app-error'), pending: document.querySelectorAll('.pending-chip').length, rows: document.querySelectorAll('table.hier tbody tr').length, charts: document.querySelectorAll('.recharts-surface').length })`);
     const termCounts = await evaluate(`(() => { const c = {}; for (const t of document.querySelectorAll('#tab-panel .term, .calc-settings .term')) c[t.dataset.term] = (c[t.dataset.term] ?? 0) + 1; return c; })()`);
     check(`${title}: each glossary term is underlined at most once`, Object.values(termCounts).every((n) => n === 1), JSON.stringify(termCounts));
-    if (tab === 'funding') {
-      const f = await evaluate(`(() => {
-        const panel = document.querySelector('#tab-panel');
-        const text = panel.textContent.replace(/#\\d+/g, '');
-        const filters = [...document.querySelectorAll('.filter-card .field')];
-        return {
-          chip: document.querySelector('#section-title').textContent.includes('Not in this dashboard (#2)'),
-          notice: panel.textContent.includes('Vendor funding analytics live in the DNP tool, so this view is not part of the Promo Effectiveness dashboard (open question #2).'),
-          kpis: panel.querySelectorAll('.funding-kpis li').length,
-          numbers: /\\d/.test(text) || !!panel.querySelector('.kpi-tile, table, .recharts-surface'),
-          greyed: filters.length > 0 && filters.every((x) => x.classList.contains('is-disabled') && x.title === 'Not used: this view is not part of the dashboard (#2).'),
-        };
-      })()`);
-      check('Promo Funding is a notice tab with no numbers and every filter greyed out', f.chip && f.notice && f.kpis === 6 && !f.numbers && f.greyed, JSON.stringify(f));
-      if (process.env.SCREENSHOTS) {
-        await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-        const shot = await send('Page.captureScreenshot', { format: 'png' });
-        writeFileSync(join(process.env.SCREENSHOTS, `${tab}.png`), Buffer.from(shot.result.data, 'base64'));
-      }
-      continue;
-    }
+    const inlineDefs = await evaluate(`[...document.querySelectorAll('#tab-panel button.btn-link')].map((b) => b.textContent.trim()).filter((t) => /Definitions|definition|Criteria and weights|Thresholds|more/.test(t))`);
+    check(`${title}: no inline link to the KPI definitions`, inlineDefs.length === 0, JSON.stringify(inlineDefs));
     const [minTiles, maxTiles] = TILE_RANGE[tab] ?? [5, 8];
     check(`${title} renders`, !info.error && info.tiles >= minTiles && info.tiles <= maxTiles && info.pending > 0 && info.rows > 0, `${info.tiles} tiles · ${info.rows} table rows · ${info.charts} charts · ${info.pending} pending marks`);
     // Layout rules 1 and 2: title, then tiles; charts (or panels) before tables; Level 2 sections last; no story / validate on top.
@@ -408,13 +388,32 @@ async function main() {
   await send('Page.navigate', { url: `${base}/?tab=other` });
   await until(`!!document.querySelector('.baseline-note')`, 'Other Promo baseline control');
   check('Other Promo Performance: 13-week baseline by default', (await evaluate(pressed('Baseline window in weeks'))) === '13 wk');
-  // 6. Tabs = the workbook views in its order; Promo Funding is a notice tab (#2); Post-Promo Trend is its own level-2 tab (#8).
+  // 6. Tabs = the workbook views in its order without Promo Funding (#2); Post-Promo Trend is its own level-2 tab (#8).
   await send('Page.navigate', { url: `${base}/?tab=funding&fu=bill` });
-  await until(`document.querySelector('#section-title')?.textContent.includes('Promo Funding')`, 'Promo Funding notice tab');
+  await until(`document.querySelector('#section-title')?.textContent.includes('Hot Buy Performance')`, 'default tab for tab=funding');
   check(
-    'tab=funding opens the Promo Funding notice tab; the seven tabs follow the workbook order',
-    await evaluate(`[...document.querySelectorAll('[role=tab]')].map((t) => t.textContent.trim()).join('|') === 'Hot Buy Performance|Other Promo Performance|Post-Promo Trend|Promo Funding|Promo History|Promo Shopper Impact|Promo Run Trend' && !location.search.includes('fu=')`),
+    'tab=funding opens the default tab (Hot Buy Performance); the six tabs follow the workbook order without Promo Funding',
+    await evaluate(`[...document.querySelectorAll('[role=tab]')].map((t) => t.textContent.trim()).join('|') === 'Hot Buy Performance|Other Promo Performance|Post-Promo Trend|Promo History|Promo Shopper Impact|Promo Run Trend' && !location.search.includes('fu=') && !location.search.includes('tab=funding') && !document.body.textContent.includes('Not in this dashboard (#2)')`),
   );
+  // Time filter: Rolling mode reads "Period · Last 13 weeks" and says which promotions it includes; no "Span" anywhere.
+  const time = await evaluate(`(() => {
+    const labels = [...document.querySelectorAll('.filter-card .field-label')].map((l) => l.textContent.trim());
+    const sel = [...document.querySelectorAll('.filter-card .field')].find((f) => f.querySelector('.field-label')?.textContent.trim() === 'Period');
+    const select = sel?.querySelector('select');
+    return { labels, period: select ? select.options[select.selectedIndex].text : '', options: select ? [...select.options].map((o) => o.text).join('|') : '', hint: document.querySelector('.range-hint').textContent };
+  })()`);
+  check(
+    'Time filter: Rolling "Period" shows "Last 13 weeks" and "Promotions starting … (last complete ad week)"; never "Span"',
+    time.labels.includes('Period') && !time.labels.some((l) => /span/i.test(l)) && time.period === 'Last 13 weeks' && time.options === 'Last 6 weeks|Last 13 weeks|Last 26 weeks|Last 52 weeks' && /^Promotions starting \d\d\/\d\d\/\d\d–\d\d\/\d\d\/\d\d \(last complete ad week\)$/.test(time.hint),
+    JSON.stringify(time),
+  );
+  for (const [q, label] of [['tm=todate&td=ytd', 'Period'], ['tm=fiscal&fg=quarter&fy=2026&q=2', 'Grain']]) {
+    await send('Page.navigate', { url: `${base}/?tab=hotbuy&${q}` });
+    await until(`!!document.querySelector('.range-hint')`, 'range hint');
+    await sleep(200);
+    const t = await evaluate(`({ labels: [...document.querySelectorAll('.filter-card .field-label')].map((l) => l.textContent.trim()), hint: document.querySelector('.range-hint').textContent })`);
+    check(`Time filter (${q}): "${label}" label, "Promotions starting …", never "Span"`, t.labels.includes(label) && !t.labels.some((l) => /span/i.test(l)) && /^Promotions starting \d\d\/\d\d\/\d\d/.test(t.hint), JSON.stringify(t));
+  }
   await send('Page.navigate', { url: `${base}/?tab=post` });
   await until(`document.querySelector('#section-title')?.textContent.includes('Post-Promo Trend')`, 'Post-Promo Trend tab');
   check(
@@ -432,8 +431,12 @@ async function main() {
   await evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'KPI definitions').click(), 1`);
   await until(`!!document.querySelector('.defs-views-list')`, 'views section in the KPI definitions dialog');
   check(
-    'KPI definitions dialog lists each view with priority, user story and what to validate',
-    await evaluate(`(() => { const items = [...document.querySelectorAll('.defs-views-list li')]; return items.length === 7 && items.every((li) => li.textContent.includes('User story') && li.textContent.includes('To validate') && /Must Have|Should Have|Nice to have/.test(li.textContent) && /View \\d of 7/.test(li.textContent)); })()`),
+    'KPI definitions dialog lists each of the six views with priority, user story and what to validate',
+    await evaluate(`(() => { const items = [...document.querySelectorAll('.defs-views-list li')].filter((li) => li.id !== 'view-funding'); return items.length === 6 && items.every((li) => li.textContent.includes('User story') && li.textContent.includes('To validate') && /Must Have|Should Have|Nice to have/.test(li.textContent) && /View \\d of 6/.test(li.textContent)); })()`),
+  );
+  check(
+    'KPI definitions dialog keeps Promo Funding with the DNP tool note (#2)',
+    await evaluate(`(document.querySelector('#view-funding')?.textContent ?? '').includes('Not part of this dashboard: vendor funding analytics live in the DNP tool (#2). Vendor Promo Funding $ is still an input to Net Gross Margin.')`),
   );
   check(
     'KPI definitions: the workbook name links to SharePoint in a new tab',
@@ -487,12 +490,15 @@ async function main() {
       cells: cells.length,
       cellLabel: cells[0]?.getAttribute('aria-label') ?? '',
       empty: heat.querySelectorAll('.heat-cell.is-empty').length > 0,
-      fatigueCols: ['Promos in last 52 weeks', 'Days since previous promo'].every((h) => heads.includes(h)) && heads.some((h) => h.startsWith('Promo fatigue') && h.includes('Definition pending · threshold to align with Cognira promo fatigue')),
-      fatigueTip: [...document.querySelectorAll('table.hier thead .th-extra .tip-body')].some((t) => t.textContent.startsWith('Cognira has promo fatigue and intensity calculations; this flag is illustrative and is not part of the Hot Buy Score.')),
+      fatigueCols: ['Promos in last 52 weeks', 'Days since previous promo'].every((h) => heads.includes(h)) && heads.some((h) => h.startsWith('Promo fatigue') && h.includes('Definition pending · thresholds to align with Cognira promo fatigue and intensity')),
+      fatigueTip: [...document.querySelectorAll('table.hier thead .th-extra .tip-body')].some((t) => t.textContent.startsWith('Illustrative: flags items promoted often whose lift is low or falling. Cognira has promo fatigue and intensity calculations; thresholds to be aligned. Not part of the Hot Buy Score.')),
+      flags: [...document.querySelectorAll('table.hier tbody .flag-cell')].map((f) => f.getAttribute('aria-label')),
+      oldFlag: document.body.textContent.includes('Promoted often</span>') || [...document.querySelectorAll('.flag-chip')].some((f) => f.textContent === 'Promoted often'),
     };
   })()`);
   check('Promo History: timing heat map after the charts and before the table, with chip, legend, labelled and empty cells', hist.order && hist.chip && hist.legend && hist.cells > 0 && /: Sales Lift % [+−-]?\d/.test(hist.cellLabel) && hist.empty, JSON.stringify(hist));
   check('Promo History: Promos in last 52 weeks, Days since previous promo and the Promo fatigue column with its chip and (i)', hist.fatigueCols && hist.fatigueTip, JSON.stringify(hist));
+  check('Promo History: the old "Promoted often" flag is gone', !hist.oldFlag);
   const heatCard = `[...document.querySelectorAll('section.chart-card')].find((c) => c.getAttribute('aria-label') === 'Promotion timing heat map')`;
   await shoot(heatCard, 'history-heatmap.png');
   await evaluate(`[...(${heatCard}).querySelectorAll('button')].find((b) => b.textContent === 'Category').click(), 1`);
@@ -503,6 +509,21 @@ async function main() {
   await sleep(200);
   const heatTable = await evaluate(`[...(${heatCard}).querySelectorAll('th')].map((t) => t.textContent).join('|')`);
   check('Heat map local controls switch rows to Category and colour to Net Incremental GM $; table view lists the 12 months', heat2.rowHead === 'Category' && heat2.legend === 'Avg Net Incremental GM $ per event' && heatTable === 'Category|Events|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec', JSON.stringify({ heat2, heatTable }));
+  // Possible promo fatigue: M&M's Sharing Size (price group 5) has two flagged events in the demo data (frequent and low or falling lift).
+  await send('Page.navigate', { url: `${base}/?tab=history&pg=5` });
+  await until(`document.querySelectorAll('table.hier tbody .flag-cell').length > 0`, 'flagged events');
+  const fatigue = await evaluate(`[...document.querySelectorAll('table.hier tbody .flag-cell')].map((f) => ({ text: f.textContent, label: f.getAttribute('aria-label') }))`);
+  await hoverAt(`document.querySelector('table.hier tbody .flag-cell')`);
+  await until(`!!document.querySelector('.hovercard .hovercard-list li')`, 'fatigue tooltip');
+  const fatigueTip = await evaluate(`[...document.querySelectorAll('.hovercard .hovercard-list li')].map((l) => l.textContent)`);
+  check(
+    'Promo History: "Possible promo fatigue" flags; the tooltip lists the frequency and lift rules met with the event values',
+    fatigue.length === 2 &&
+      fatigue.every((f) => f.text === 'Possible promo fatigue' && f.label.startsWith('Possible promo fatigue. Promoted often: ') && /(Low lift: Unit Lift % -?\d+ %|Falling lift: Unit Lift % -?\d+ % vs\. \d+ % in the previous run)/.test(f.label)) &&
+      fatigueTip.some((t) => t.startsWith('Promoted often: ')) &&
+      fatigueTip.some((t) => /^(Low|Falling) lift: Unit Lift % /.test(t)),
+    JSON.stringify({ fatigue, fatigueTip }),
+  );
 
   await send('Page.navigate', { url: `${base}/?tab=trend` });
   await until(`!!document.querySelector('.runs-table')`, 'runs side by side');
@@ -510,11 +531,11 @@ async function main() {
     const card = [...document.querySelectorAll('.table-card')].find((c) => c.getAttribute('aria-label') === 'Runs side by side');
     const rows = [...card.querySelectorAll('tbody th')].map((t) => t.textContent);
     const lift = [...card.querySelectorAll('tbody tr')].find((r) => r.querySelector('th').textContent.startsWith('Sales Lift %'));
-    return { first: rows[0], counts: [...card.querySelector('tbody tr').querySelectorAll('td')].every((td) => /^\\d+$/.test(td.textContent)), bands: [...lift.querySelectorAll('td .lift-band')].map((b) => b.className.replace('lift-band ', '') + ':' + b.textContent).join(' '), legend: card.querySelector('.lift-legend')?.textContent ?? '', definitions: [...card.querySelectorAll('.table-head button')].some((b) => b.textContent.trim() === 'Definitions') };
+    return { first: rows[0], counts: [...card.querySelector('tbody tr').querySelectorAll('td')].every((td) => /^\\d+$/.test(td.textContent)), bands: [...lift.querySelectorAll('td .lift-band')].map((b) => b.className.replace('lift-band ', '') + ':' + b.textContent).join(' '), legend: card.querySelector('.lift-legend')?.textContent ?? '', definitions: [...card.querySelectorAll('.table-head button')].some((b) => /Definitions|Thresholds|more/.test(b.textContent.trim())), legendTip: card.querySelector('.lift-legend .tip-body')?.textContent ?? '' };
   })()`);
   check(
     'Promo Run Trend: Event count row, lift colours by illustrative thresholds with legend and value shown, no Definitions link',
-    trend.first.startsWith('Event count') && trend.counts && /band-(good|watch|low):[+−-]?\d/.test(trend.bands) && trend.legend.includes('Illustrative thresholds') && trend.legend.includes('High ≥ 30 %') && trend.legend.includes('Medium 10 %–30 %') && trend.legend.includes('Low < 10 %') && !trend.definitions,
+    trend.first.startsWith('Event count') && trend.counts && /band-(good|watch|low):[+−-]?\d/.test(trend.bands) && trend.legend.includes('Illustrative thresholds') && trend.legend.includes('High ≥ 30 %') && trend.legend.includes('Medium 10 %–30 %') && trend.legend.includes('Low < 10 %') && !trend.definitions && trend.legendTip.startsWith('Colour of Sales Lift % and Unit Lift % in each run: High (green) at 30 % or more'),
     JSON.stringify(trend),
   );
 

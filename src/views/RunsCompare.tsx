@@ -5,7 +5,8 @@ import { fiscalOfDay } from '../data/calendar';
 import { PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
 import { count, moneyCompact, pct, pctChange } from '../lib/format';
-import { LIFT_BAND_LABEL, liftBand, liftLegend, THRESHOLD_CHIP } from '../lib/thresholds';
+import { LIFT_BAND_LABEL, liftBand, liftBandsInfo, liftLegend, THRESHOLD_CHIP } from '../lib/thresholds';
+import { InfoTip } from '../components/ui';
 import type { Metrics } from '../lib/metrics';
 import { eventDates, unitsText, uomPct } from './common';
 
@@ -48,8 +49,8 @@ export function LiftValue({ v, children }: { v: number | null; children: ReactNo
   );
 }
 
-/** Legend of the lift bands with the "Illustrative thresholds" chip. */
-export function LiftLegend({ onMore }: { onMore?: () => void }) {
+/** Legend of the lift bands with the "Illustrative thresholds" chip; the (i) explains the bands. */
+export function LiftLegend() {
   return (
     <p className="lift-legend" aria-label="Lift colour thresholds">
       <span className="chip status-proposed">{THRESHOLD_CHIP}</span>
@@ -59,12 +60,9 @@ export function LiftLegend({ onMore }: { onMore?: () => void }) {
           {l.text}
         </span>
       ))}
-      <span className="lift-legend-note">Sales Lift % and Unit Lift %</span>
-      {onMore && (
-        <button type="button" className="btn-link" onClick={onMore}>
-          Thresholds
-        </button>
-      )}
+      <span className="lift-legend-note">
+        Sales Lift % and Unit Lift % <InfoTip text={liftBandsInfo()} label="Lift colour thresholds: what they mean" />
+      </span>
     </p>
   );
 }

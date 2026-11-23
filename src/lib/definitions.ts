@@ -5,7 +5,7 @@
  * KPI and the open questions with the assumption the prototype uses. Question numbers and statuses follow the
  * workbook tab "UC #3 - Open Questions". Shown in the KPI definitions dialog and in the README (see readme.ts).
  */
-import { FATIGUE_INFO, FATIGUE_RULE } from './fatigue';
+import { FATIGUE_CHIP, FATIGUE_INFO, FATIGUE_RULE } from './fatigue';
 import type { TabId } from './filters';
 import { criteriaText, SCORE_CHIP, SCORE_METHOD } from './scoring';
 import { LIFT_THRESHOLDS, THRESHOLD_CHIP } from './thresholds';
@@ -448,13 +448,13 @@ export const KPI_DEFINITIONS: KpiDef[] = [
   },
   {
     id: "fatigue",
-    name: "Promoted Often (promo fatigue flag)",
+    name: "Possible Promo Fatigue (flag)",
     unit: "flag",
     priority: "Nice to have",
-    definition: "Flags events whose price group is promoted so often that shoppers may wait for the deal.",
-    formula: `${FATIGUE_RULE} Example threshold, configurable in src/lib/fatigue.ts.`,
+    definition: "Flags events whose price group is promoted often and whose lift is low or falling, a sign that shoppers may wait for the deal.",
+    formula: `${FATIGUE_RULE} Example thresholds, configurable in src/lib/fatigue.ts.`,
     views: ['history'],
-    note: `Definition pending · threshold to align with Cognira promo fatigue. ${FATIGUE_INFO}`,
+    note: `${FATIGUE_CHIP}. ${FATIGUE_INFO} Unit Lift % uses the baseline window and sales basis of the view; the flag's tooltip lists the rules each event met.`,
     status: `${REVIEW_STATUS} · illustrative`,
   },
   {

@@ -3,7 +3,7 @@ import { KPI_DEFINITIONS, kpiStatus, OPEN_QUESTIONS, WORKBOOK_NAME, WORKBOOK_URL
 import { SCORE_CRITERIA } from '../lib/scoring';
 import { sanitizeSearch, SEARCH_MAX, TABS } from '../lib/filters';
 import { GLOSSARY, TERM_IDS } from '../lib/glossary';
-import { VIEW_INFO } from '../lib/viewInfo';
+import { OUT_OF_SCOPE_VIEWS, VIEW_INFO } from '../lib/viewInfo';
 
 const TAB_LABEL = Object.fromEntries(TABS.map((t) => [t.id, t.label]));
 
@@ -134,6 +134,22 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
                 </li>
               );
             })}
+            {OUT_OF_SCOPE_VIEWS.map((v) => (
+              <li key={v.id} id={`view-${v.id}`}>
+                <p className="defs-view-head">
+                  <b>{v.label}</b>
+                  <span className="chip status-pending">{v.priority} · Not in this dashboard (#2)</span>
+                </p>
+                <p>
+                  <span className="section-tag dashed">Note</span>
+                  {v.note}
+                </p>
+                <p>
+                  <span className="section-tag">User story</span>
+                  {v.story}
+                </p>
+              </li>
+            ))}
           </ul>
           <h3 className="defs-q-title">Glossary</h3>
           <dl className="defs-glossary">

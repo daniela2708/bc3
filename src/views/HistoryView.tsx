@@ -9,19 +9,19 @@ import { FUNDING_BEHIND_SCENES } from '../lib/definitions';
 import { buildHeatmap, heatHeight, MONTHS, type HeatMeasure, type HeatRows } from '../lib/heatmap';
 import { fiscalOfDay } from '../data/calendar';
 import { ITEMS, pgByName, PRICE_GROUPS } from '../data/products';
-import { AD_TYPES, DEPTH_BANDS, depthBandOf, EVENTS } from '../data/promos';
+import { AD_TYPES, DEPTH_BANDS, depthBandOf, EVENTS, type PromoEvent } from '../data/promos';
 import { useFilters } from '../lib/filterStore';
 import { count, moneyCompact, moneyUnit, pct, pctChange, signedMoney, signedMoneyTile } from '../lib/format';
 import { derive, eventAgg, sumAggs, type Agg } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
 import { VIEW_INFO } from '../lib/viewInfo';
-import { columnsOf, EmptyState, performanceRows, SettingTags, uomFirst, uomTile, ViewControls, type ViewProps } from './common';
+import { columnsOf, EmptyState, fatigueColumn, performanceRows, SettingTags, uomFirst, uomTile, ViewControls } from './common';
 
 const DEFAULT_PG = pgByName('Coca-Cola 12 pk 12 oz Cans').idx;
 // Promo fatigue columns (prototype review, illustrative) right after the promo attributes.
 const COLS = ['dates', 'type', 'depth', 'ad', 'promos52', 'daysSince', 'fatigue', 'avgRetail', 'gross', 'salesLift', 'unitLift', 'incGm', 'netIncGm'];
 
-export default function HistoryView({ openDefinitions }: ViewProps) {
+export default function HistoryView() {
   const { state, update } = useFilters();
   const scope = useMemo(() => getScope(state), [state]);
   const basis = state.basis;
@@ -33,7 +33,15 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
   const nothing = pg < 0 && state.dept < 0 && state.cat < 0 && state.sub < 0 && !state.vb;
   const target = pg >= 0 ? pg : nothing ? DEFAULT_PG : -1;
   const events = useMemo(() => (target >= 0 ? scope.events.filter((e) => EVENTS[e].pg === target) : scope.events), [scope.events, target]);
-  const cols = useMemo(() => columnsOf(COLS, ['gross']), []);
+  // Unit Lift % of any event (also the previous run, which may fall outside the period), with this view's settings.
+  const liftOf = useMemo(() => {
+    const cache = new Map<number, number | null>();
+    return (e: PromoEvent) => {
+      if (!cache.has(e.idx)) cache.set(e.idx, uomFirst(derive(eventAgg(e, scope.ctx), basis).unitLift));
+      return cache.get(e.idx) ?? null;
+    };
+  }, [scope.ctx, basis]);
+  const cols = useMemo(() => columnsOf(COLS, ['gross'], { fatigue: fatigueColumn(liftOf) }), [liftOf]);
   const table = useMemo(
     () => performanceRows({ events, ctx: scope.ctx, basis, rollup: 'event', cols, selected: state.sel, onSelect: (e) => update((s) => ({ ...s, sel: e })) }),
     [events, scope.ctx, basis, cols, state.sel, update],
@@ -215,10 +223,7 @@ export default function HistoryView({ openDefinitions }: ViewProps) {
         <HierTable hierarchy="Price group · event" columns={cols} rows={table.rows} total={table.total} defaultSort={{ key: 'dates', dir: 'desc' }} tableId="hist" exportTitle="Promo History" maxHeight={480} />
       </section>
       <p className="table-note">
-        Use Fiscal Calendar › Holiday period in the Time filter to line up holiday promotions year over year.{' '}
-        <button type="button" className="btn-link" onClick={() => openDefinitions('depth')}>
-          Depth and ad type definitions
-        </button>
+        Use Fiscal Calendar › Holiday period in the Time filter to line up holiday promotions year over year.
       </p>
     </>
   );

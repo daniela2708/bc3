@@ -53,16 +53,6 @@ export const VIEW_INFO: Record<TabId, ViewInfo> = {
       'As a Category Manager, I want to compare how the same promotion performs each time it runs (e.g., a Hot Buy run in Q1, Q2 and Q3, and vs. prior years) at the price group level down to the item level, so that I can see whether it is trending up or down and adjust future runs.',
     validate: 'Baseline (#4), sales basis and GM % denominator (#5), margin scope and funding (#7), cost (#15). Last Year Gross Sales and YoY growth reuse the UC1 definition.',
   },
-  funding: {
-    objective: 'Not part of this dashboard: vendor funding analytics live in the DNP tool (#2).',
-    priority: 'Should Have',
-    priorityNote: 'not in this dashboard, #2',
-    question: 'How much of each promotion do vendors fund?',
-    story:
-      'As a Category manager I want to be able to track promo spend by vendor and category down to the item level so that I can efficiently track how much of my promotions are vendor funded.',
-    validate:
-      'Not part of this dashboard: vendor funding analytics live in the DNP tool (#2). The tab is a notice with no numbers. Vendor Promo Funding $ is still an input to Net GM $ and Net Incremental GM $ (#7); where Promo Investment $ belongs is pending.',
-  },
   history: {
     objective: 'Every past promotion for an item or price group, and how results change with discount depth and ad type.',
     priority: 'Should Have',
@@ -81,3 +71,24 @@ export const VIEW_INFO: Record<TabId, ViewInfo> = {
       'Symphony AI cannot be a data source, only a reference for comparison (#12); shopper metrics are calculated from the Weis T-log and Club Card tables. Household vs. card level per metric (#16). New-to-category logic from a third-party system (#11). About 6 to 8 core metrics, which ones pending (#9). Rewards and loyalty campaigns are out of scope.',
   },
 };
+
+/** A workbook view that is not a tab of this dashboard, listed in the KPI definitions dialog with the reason. */
+export interface OutOfScopeView {
+  id: string;
+  label: string;
+  priority: Priority;
+  story: string;
+  note: string;
+}
+
+/** Promo Funding: the seventh view of the workbook, not part of this dashboard (#2). */
+export const OUT_OF_SCOPE_VIEWS: OutOfScopeView[] = [
+  {
+    id: 'funding',
+    label: 'Promo Funding',
+    priority: 'Should Have',
+    story:
+      'As a Category manager I want to be able to track promo spend by vendor and category down to the item level so that I can efficiently track how much of my promotions are vendor funded.',
+    note: 'Not part of this dashboard: vendor funding analytics live in the DNP tool (#2). Vendor Promo Funding $ is still an input to Net Gross Margin.',
+  },
+];

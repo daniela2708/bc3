@@ -36,7 +36,6 @@ export const AFFECTS: Record<TabId, Partial<Record<SettingKey, SettingUse>>> = {
     // One block only (layout rule 5): this control lives in the sales chart header.
     basis: { blocks: ['salesChart'], text: 'the sales vs. baseline chart only.' },
   },
-  funding: {},
   history: {
     baseline: { blocks: ['tiles', 'periodChart', 'depthCharts', 'adCharts', 'heatmap', 'table'], text: 'key figures (Sales Lift %, Unit Lift %, Incremental GM $, Net Incremental GM $), the results by period or week, the charts by Promo Depth Band and by Ad Type / Vehicle, the timing heat map and the lift and margin columns of the table.' },
     basis: { blocks: ['tiles', 'periodChart', 'depthCharts', 'adCharts', 'heatmap', 'table'], text: 'key figures (Avg Promo Retail $, Sales Lift %, Incremental GM $, Net Incremental GM $), the results by period or week, the charts by Promo Depth Band and by Ad Type / Vehicle, the timing heat map and the sales, lift and margin columns of the table.' },

@@ -19,7 +19,7 @@ import { SALES_COLUMNS } from '../lib/series';
 import { ALL_EVENTS, bridgeEvent, bridgeSteps, chartEvent, eventOptions, selectedInTable } from '../lib/eventPick';
 import { getScope } from '../lib/selectors';
 import { VIEW_INFO } from '../lib/viewInfo';
-import { basisWord, columnsOf, EmptyState, eventDates, performanceRows, RowsControl, salesPair, SettingTags, unitsTile, uomFirst, uomPct, ViewControls, withEventColumn, type MetricCol, type ViewProps } from './common';
+import { basisWord, columnsOf, EmptyState, eventDates, performanceRows, RowsControl, salesPair, SettingTags, unitsTile, uomFirst, uomPct, ViewControls, withEventColumn, type MetricCol } from './common';
 import { PromoWindowCard } from './PromoWindowCard';
 import { RunsCompare } from './RunsCompare';
 
@@ -32,7 +32,7 @@ const OTHER_HIDDEN = ['dates', 'net', 'netGm', 'incSales', 'cannRate', 'netIncSa
 /** Hot Buy Score column (illustrative); its cells are filled per event after the rows are built (withEventColumn). */
 const SCORE_COL: MetricCol = { key: 'score', label: 'Hot Buy Score', group: 'Score', title: `Illustrative. ${SCORE_METHOD}`, cell: () => null, sort: () => null };
 
-export function PerformanceView({ openDefinitions, variant }: ViewProps & { variant: 'hotbuy' | 'other' }) {
+export function PerformanceView({ variant }: { variant: 'hotbuy' | 'other' }) {
   const { state, update } = useFilters();
   const scope = useMemo(() => getScope(state), [state]);
   const hb = variant === 'hotbuy';
@@ -184,10 +184,7 @@ export function PerformanceView({ openDefinitions, variant }: ViewProps & { vari
         note={
           hb ? (
             <>
-              <b>Hot Buy Score:</b> illustrative criteria and weights until the business defines the method; hover a score in the table for its breakdown.{' '}
-              <button type="button" className="btn-link" onClick={() => openDefinitions('score')}>
-                Criteria and weights
-              </button>
+              <b>Hot Buy Score:</b> illustrative criteria and weights until the business defines the method; hover a score in the table for its breakdown.
             </>
           ) : undefined
         }

@@ -11,7 +11,9 @@ import {
   fiscalOptionAvailable,
   GRAIN_LABEL,
   offReason,
-  timeOffReason,
+  periodControlLabel,
+  rangeHint,
+  rollingLabel,
   promoTypesFor,
   resolveTime,
   ROLLING_OPTS,
@@ -119,14 +121,13 @@ export function FilterCard() {
   const range = resolveTime(t, tab);
   const setTime = (patch: Parameters<typeof actions.time>[0]) => update(actions.time(patch));
   const holidayOk = usesFilter(tab, 'holiday');
-  const timeOff = timeOffReason(tab);
 
   const periodOptions = (() => {
     switch (t.mode) {
       case 'todate':
         return (Object.keys(TO_DATE_LABEL) as ToDateOpt[]).map((k) => ({ value: k, label: TO_DATE_LABEL[k] }));
       case 'rolling':
-        return ROLLING_OPTS.map((n) => ({ value: String(n), label: `${n}-week rolling` }));
+        return ROLLING_OPTS.map((n) => ({ value: String(n), label: rollingLabel(n) }));
       case 'fiscal':
         return (Object.keys(GRAIN_LABEL) as FiscalGrain[]).map((k) => ({
           value: k,
@@ -163,9 +164,8 @@ export function FilterCard() {
             below
           />
         </span>
-        <Field label="View by" disabledReason={timeOff}>
+        <Field label="View by">
           <Segmented<TimeMode>
-            disabled={!!timeOff}
             label="Time selection type"
             value={t.mode}
             onChange={(mode) => setTime({ mode })}
@@ -178,9 +178,9 @@ export function FilterCard() {
             ]}
           />
         </Field>
-        {(t.mode === 'todate' || t.mode === 'rolling' || t.mode === 'fiscal') && <Select label={t.mode === 'fiscal' ? 'Grain' : 'Span'} value={periodValue} options={periodOptions} onChange={onPeriod} disabledReason={timeOff} />}
+        {(t.mode === 'todate' || t.mode === 'rolling' || t.mode === 'fiscal') && <Select label={periodControlLabel(t.mode)} value={periodValue} options={periodOptions} onChange={onPeriod} />}
         {t.mode === 'fiscal' && (t.grain === 'year' || t.grain === 'quarter' || t.grain === 'period' || t.grain === 'holiday') && (
-          <Select label="Year" value={String(t.fy)} options={FISCAL_YEARS.map((y) => ({ value: String(y), label: `FY${y}` }))} onChange={(v) => setTime({ fy: Number(v) })} disabledReason={timeOff} />
+          <Select label="Year" value={String(t.fy)} options={FISCAL_YEARS.map((y) => ({ value: String(y), label: `FY${y}` }))} onChange={(v) => setTime({ fy: Number(v) })} />
         )}
         {t.mode === 'fiscal' && t.grain === 'quarter' && (
           <Select
@@ -188,7 +188,7 @@ export function FilterCard() {
             value={String(t.quarter)}
             options={[1, 2, 3, 4].map((q) => ({ value: String(q), label: `Q${q} (P${q * 3 - 2}–P${q * 3})`, disabled: !fiscalOptionAvailable('quarter', t.fy, q) }))}
             onChange={(v) => setTime({ quarter: Number(v) })}
-            disabledReason={timeOff}
+           
           />
         )}
         {t.mode === 'fiscal' && t.grain === 'period' && (
@@ -197,29 +197,27 @@ export function FilterCard() {
             value={String(t.period)}
             options={Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: `P${i + 1}`, disabled: !fiscalOptionAvailable('period', t.fy, i + 1) }))}
             onChange={(v) => setTime({ period: Number(v) })}
-            disabledReason={timeOff}
+           
           />
         )}
-        {t.mode === 'fiscal' && t.grain === 'adweek' && <DateInput label={`Ad week (${AD_WEEK_START_NAME})`} value={t.adWeek} onChange={(d) => setTime({ adWeek: snapToAdWeekStart(d) })} disabledReason={timeOff} />}
-        {t.mode === 'fiscal' && t.grain === 'week' && <DateInput label="Week beginning (Sunday)" value={t.weekStart} onChange={(d) => setTime({ weekStart: snapToSunday(d) })} disabledReason={timeOff} />}
+        {t.mode === 'fiscal' && t.grain === 'adweek' && <DateInput label={`Ad week (${AD_WEEK_START_NAME})`} value={t.adWeek} onChange={(d) => setTime({ adWeek: snapToAdWeekStart(d) })} />}
+        {t.mode === 'fiscal' && t.grain === 'week' && <DateInput label="Week beginning (Sunday)" value={t.weekStart} onChange={(d) => setTime({ weekStart: snapToSunday(d) })} />}
         {t.mode === 'fiscal' && t.grain === 'holiday' && (
           <Select
             label="Holiday period"
             value={t.holiday}
             options={HOLIDAYS.map((h) => ({ value: h.id, label: `${h.label}${holidayAvailable(h.id, t.fy) ? '' : ' · not yet'}`, disabled: !holidayAvailable(h.id, t.fy) }))}
             onChange={(v) => setTime({ holiday: v as typeof t.holiday })}
-            disabledReason={timeOff}
+           
           />
         )}
         {t.mode === 'custom' && (
           <>
-            <DateInput label="From" value={t.from} onChange={(d) => setTime({ from: d })} disabledReason={timeOff} />
-            <DateInput label="To" value={t.to} onChange={(d) => setTime({ to: d })} disabledReason={timeOff} />
+            <DateInput label="From" value={t.from} onChange={(d) => setTime({ from: d })} />
+            <DateInput label="To" value={t.to} onChange={(d) => setTime({ to: d })} />
           </>
         )}
-        <span className="range-hint">
-          {range.name} · {range.label}
-        </span>
+        <span className="range-hint">{rangeHint(t.mode, range)}</span>
         <span className="filter-spacer" />
         <button type="button" className="btn-outline" onClick={() => update(actions.reset())}>
           <RotateCcw size={14} aria-hidden="true" />

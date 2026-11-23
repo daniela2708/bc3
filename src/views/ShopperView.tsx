@@ -22,7 +22,7 @@ import { getScope } from '../lib/selectors';
 import { deriveShopper, eventShopper, REPEAT_WINDOW_DAYS, shopperOf, type ShopperMetrics } from '../lib/shopper';
 import { categorySummary, DEFAULT_PROPOSAL, hotBuyMonths, PROPOSAL_CHIP, PROPOSALS, type AdMonth, type Proposal } from '../lib/shopperProposals';
 import { VIEW_INFO } from '../lib/viewInfo';
-import { EmptyState, eventDates, SettingTags, ViewControls, type ViewProps } from './common';
+import { EmptyState, eventDates, SettingTags, ViewControls } from './common';
 
 const SUM_LABEL = 'Sum across events (not unique households)';
 const SUM_TIP = 'Each event counts its own buyers. A household that bought in two events counts twice, so this total is not a count of unique households. Unique households across events would need the club card data itself, which the dashboard does not hold (aggregates only).';
@@ -123,7 +123,7 @@ function phases(before: number | null, during: number | null, after: number | nu
  * (A Category summary, B Event detail, C Executive snapshot), picked with a local control (default A). All use club
  * card aggregates only.
  */
-export default function ShopperView({ openDefinitions }: ViewProps) {
+export default function ShopperView() {
   const { state, update } = useFilters();
   const scope = useMemo(() => getScope(state), [state]);
   const [proposal, setProposal] = useState<Proposal>(DEFAULT_PROPOSAL);
@@ -238,14 +238,7 @@ export default function ShopperView({ openDefinitions }: ViewProps) {
                 Category summary <Pending q={16} />
               </>
             }
-            sub={
-              <>
-                One row per category: club card aggregates of its events (ratio of totals).{' '}
-                <button type="button" className="btn-link" onClick={() => openDefinitions('buyerLift')}>
-                  Buyer lift definition
-                </button>
-              </>
-            }
+            sub="One row per category: club card aggregates of its events (ratio of totals)."
           >
             <HierTable
               hierarchy="Category"

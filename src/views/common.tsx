@@ -8,7 +8,8 @@ import { formatDay, shortDay } from '../data/calendar';
 import { CATS, DEPTS, ITEMS, itemCode, PRICE_GROUPS, SUBS } from '../data/products';
 import { AD_LABEL, EVENTS, EVENTS_BY_PG, PROMO_LABEL, type PromoEvent } from '../data/promos';
 import { FUNDING_BEHIND_SCENES, RANDOM_WEIGHT_NOTE } from '../lib/definitions';
-import { daysSincePreviousPromo, FATIGUE_CHIP, FATIGUE_INFO, FATIGUE_RULE, promosInLast52Weeks, promotedOften } from '../lib/fatigue';
+import { daysSincePreviousPromo, FATIGUE_CHIP, FATIGUE_INFO, FATIGUE_LABEL, FATIGUE_RULE, fatigueCheck, fatigueReasons, promosInLast52Weeks } from '../lib/fatigue';
+import { HoverCard } from '../components/HoverCard';
 import type { Rollup } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
 import { count, DASH, money, moneyCompact, moneyTile, numberCompact, pct, pctChange, volume, volumeCompact } from '../lib/format';
@@ -16,10 +17,6 @@ import { BASELINE_PENDING_TEXT, BASELINE_WEEKS, PROPOSED_BASELINE_BY_TYPE, viewB
 import { safeDiv } from '../lib/kpis';
 import { affectsText, barSettings, blockSettings, SETTING_LABEL, tagsFor, type BlockId, type SettingKey } from '../lib/settings';
 import { CANN_LEVELS, derive, eventAgg, sumAggs, type Agg, type Basis, type ByUom, type CannLevel, type EventCtx, type Metrics, type U } from '../lib/metrics';
-
-export interface ViewProps {
-  openDefinitions: (id?: string) => void;
-}
 
 export const basisWord = (b: Basis) => (b === 'net' ? 'Net Customer Sales' : 'Gross Sales');
 
@@ -173,7 +170,16 @@ export const METRIC_COLS: Record<string, MetricCol> = {
     cell: (_m, e) => (e ? (daysSincePreviousPromo(e, pgEvents(e)) === null ? DASH : count(daysSincePreviousPromo(e, pgEvents(e)))) : ''),
     sort: (_m, e) => (e ? daysSincePreviousPromo(e, pgEvents(e)) : null),
   },
-  fatigue: {
+};
+
+/**
+ * "Possible promo fatigue" column (Promo History, prototype review, illustrative): per event only; group and total rows
+ * stay empty. `liftOf` gives an event's Unit Lift % with the view's baseline and sales basis, so the previous run of the
+ * same price group and promo type is measured the same way. Hover or focus on the flag lists the rules it met.
+ */
+export function fatigueColumn(liftOf: (e: PromoEvent) => number | null): MetricCol {
+  const check = (e: PromoEvent) => fatigueCheck(e, pgEvents(e), liftOf);
+  return {
     key: 'fatigue',
     label: 'Promo fatigue',
     group: 'Promo',
@@ -182,13 +188,38 @@ export const METRIC_COLS: Record<string, MetricCol> = {
     headExtra: (
       <>
         <span className="chip status-pending th-chip">{FATIGUE_CHIP}</span>
-        <InfoTip text={`${FATIGUE_INFO} ${FATIGUE_RULE}`} label="Promoted often: what it means" below />
+        <InfoTip text={`${FATIGUE_INFO} ${FATIGUE_RULE}`} label="Possible promo fatigue: what it means" below />
       </>
     ),
-    cell: (_m, e) => (e && promotedOften(e, pgEvents(e)) ? <span className="flag-chip">Promoted often</span> : ''),
-    sort: (_m, e) => (e ? (promotedOften(e, pgEvents(e)) ? 1 : 0) : null),
-  },
-};
+    cell: (_m, e) => {
+      if (!e) return '';
+      const c = check(e);
+      if (!c.flagged) return '';
+      const reasons = fatigueReasons(c, shortDay);
+      return (
+        <HoverCard className="flag-cell" label={`${FATIGUE_LABEL}. ${reasons.join(' ')}`} content={<FatigueReasons reasons={reasons} />}>
+          <span className="flag-chip">{FATIGUE_LABEL}</span>
+        </HoverCard>
+      );
+    },
+    sort: (_m, e) => (e ? (check(e).flagged ? 1 : 0) : null),
+  };
+}
+
+function FatigueReasons({ reasons }: { reasons: string[] }) {
+  return (
+    <>
+      <p>
+        <b>{FATIGUE_LABEL}</b> (illustrative): rules met by this event
+      </p>
+      <ul className="hovercard-list">
+        {reasons.map((r) => (
+          <li key={r}>{r}</li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 function uomPctUnits(v: ByUom): ReactNode {
   if (v.ea !== null && v.lb !== null)
@@ -220,8 +251,11 @@ export function withEventColumn<T extends { rows: HierRow[]; total: HierRow }>(t
 }
 const cellsFor = (r: HierRow, key: string, c: { cell: ReactNode; sort: number | null }): HierRow => ({ ...r, cells: { ...r.cells, [key]: c.cell }, sort: { ...r.sort, [key]: c.sort } });
 
-export function columnsOf(keys: string[], hidden: string[] = []): MetricCol[] {
-  return keys.map((k) => ({ ...METRIC_COLS[k], defaultHidden: METRIC_COLS[k].defaultHidden || hidden.includes(k) }));
+export function columnsOf(keys: string[], hidden: string[] = [], extra: Record<string, MetricCol> = {}): MetricCol[] {
+  return keys.map((k) => {
+    const c = extra[k] ?? METRIC_COLS[k];
+    return { ...c, defaultHidden: c.defaultHidden || hidden.includes(k) };
+  });
 }
 
 // ---------------------------------------------------------------- Rows
@@ -337,7 +371,7 @@ function BaselineControl() {
       <span className="toggle-label">
         <Term id="baseline">Baseline</Term> window{' '}
         <InfoTip
-          text={`${affectsText(state.tab, 'baseline')} Average of the weeks right before the event, scaled to the promo days. Proposed defaults (#4): ${PROPOSED_BASELINE_BY_TYPE.HB} weeks for Hot Buys, ${PROPOSED_BASELINE_BY_TYPE.TPR} weeks for TPRs, BOGOs and price locks. Prior promo weeks inside the window are still included; whether to exclude them is pending.`}
+          text={`${affectsText(state.tab, 'baseline')} Average of the weeks right before the event, scaled to the promo days. Proposed defaults (#4): ${PROPOSED_BASELINE_BY_TYPE.HB} weeks for Hot Buys, ${PROPOSED_BASELINE_BY_TYPE.TPR} weeks for TPRs, BOGOs and price locks. Prior promo weeks inside the window are still included; whether to exclude them is pending. It can go back before the selected period; it never changes which promotions you see.`}
           label="Baseline window: what it affects"
         />
       </span>

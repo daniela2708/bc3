@@ -21,6 +21,7 @@ import {
   LY_OFFSET_DAYS,
   periodSpan,
   quarterSpan,
+  shortDay,
   snapToSunday,
   snapToAdWeekStart,
   adWeekStart,
@@ -37,16 +38,15 @@ import { CANN_LEVELS, DEFAULT_BASIS, DEFAULT_CANN_LEVEL, type Basis, type CannLe
 
 // ---------------------------------------------------------------- Views
 
-export type TabId = 'hotbuy' | 'other' | 'post' | 'funding' | 'history' | 'shopper' | 'trend';
+export type TabId = 'hotbuy' | 'other' | 'post' | 'history' | 'shopper' | 'trend';
 /**
- * The tabs: the views of the requirements workbook, in its order. Promo Funding is a notice tab with no numbers: the
- * view is not part of this dashboard (#2: vendor funding analytics live in the DNP tool).
+ * The tabs: the views of the requirements workbook, in its order, without Promo Funding: that view is not part of this
+ * dashboard (#2: vendor funding analytics live in the DNP tool), so tab=funding is not a valid tab and opens the default.
  */
 export const TABS: { id: TabId; label: string }[] = [
   { id: 'hotbuy', label: 'Hot Buy Performance' },
   { id: 'other', label: 'Other Promo Performance' },
   { id: 'post', label: 'Post-Promo Trend' },
-  { id: 'funding', label: 'Promo Funding' },
   { id: 'history', label: 'Promo History' },
   { id: 'shopper', label: 'Promo Shopper Impact' },
   { id: 'trend', label: 'Promo Run Trend' },
@@ -71,25 +71,18 @@ const VIEW_FILTERS: Record<TabId, FilterKey[]> = {
   hotbuy: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'event', 'location'],
   other: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'event'],
   post: ['dept', 'cat', 'sub', 'item', 'vb', 'promoType', 'event'],
-  // Not part of the dashboard (#2): every filter is greyed out.
-  funding: [],
   trend: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'event'],
   history: ['dept', 'cat', 'sub', 'pg', 'item', 'vb', 'promoType', 'adType', 'depthBand', 'holiday'],
   shopper: ['dept', 'cat', 'sub', 'pg', 'item', 'promoType', 'event'],
 };
 export const NOT_IN_VIEW = 'Not a filter for this view in the requirements workbook.';
-export const FUNDING_OFF = 'Not used: this view is not part of the dashboard (#2).';
 
 export function usesFilter(tab: TabId, key: FilterKey): boolean {
   return VIEW_FILTERS[tab].includes(key);
 }
 export function offReason(tab: TabId, key: FilterKey): string | undefined {
   if (usesFilter(tab, key)) return undefined;
-  return tab === 'funding' ? FUNDING_OFF : NOT_IN_VIEW;
-}
-/** Reason the time filter is off (only the Promo Funding notice tab), or undefined. */
-export function timeOffReason(tab: TabId): string | undefined {
-  return tab === 'funding' ? FUNDING_OFF : undefined;
+  return NOT_IN_VIEW;
 }
 
 // ---------------------------------------------------------------- Time
@@ -207,7 +200,7 @@ export function resolveTime(t: TimeSel, tab?: TabId): ResolvedRange {
       // Rolling spans count complete ad weeks back from the last complete ad week.
       start = adWeekStart(LAST_COMPLETE_AD_WEEK - t.rolling + 1);
       end = adWeekEnd(LAST_COMPLETE_AD_WEEK);
-      name = `Rolling ${t.rolling} weeks`;
+      name = `Last ${t.rolling} weeks`;
       break;
     }
     case 'fiscal': {
@@ -265,6 +258,20 @@ export function resolveTime(t: TimeSel, tab?: TabId): ResolvedRange {
     lyStart: start - LY_OFFSET_DAYS,
     lyEnd: end - LY_OFFSET_DAYS,
   };
+}
+
+/** Label of the time filter's second control: "Grain" in Fiscal Calendar, "Period" in To Date and Rolling. */
+export function periodControlLabel(mode: TimeMode): string {
+  return mode === 'fiscal' ? 'Grain' : 'Period';
+}
+
+/** Option text of the Rolling period, e.g. "Last 13 weeks". */
+export const rollingLabel = (n: RollingOpt) => `Last ${n} weeks`;
+
+/** The text next to the time filter: which promotions the range includes, e.g. "Promotions starting 08/13/26–11/11/26 (last complete ad week)". */
+export function rangeHint(mode: TimeMode, r: Pick<ResolvedRange, 'start' | 'end'>): string {
+  const dates = r.start === r.end ? shortDay(r.start) : `${shortDay(r.start)}–${shortDay(r.end)}`;
+  return `Promotions starting ${dates}${mode === 'rolling' ? ' (last complete ad week)' : ''}`;
 }
 
 export function fiscalOptionAvailable(grain: 'quarter' | 'period', fy: number, n: number): boolean {

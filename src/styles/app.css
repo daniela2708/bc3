@@ -2010,30 +2010,11 @@ table.hier tr.total-row td:first-child {
 table.hier tbody tr:not(.total-row):hover td:first-child {
   background: #faf9f5;
 }
-/* Promo Funding notice tab */
-.funding-card {
-  margin-top: 14px;
-  padding: 14px 16px;
-}
 /* A greyed-out filter's Paste UPCs link looks disabled too. */
 .paste-btn:disabled {
   color: var(--n4);
   text-decoration: none;
   cursor: not-allowed;
-}
-.funding-kpis {
-  list-style: none;
-  margin: 10px 0 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-  font-size: 14px;
-}
-.funding-kpis li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
 }
 
 /* "How it works" popover (cannibalization level) */

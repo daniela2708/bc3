@@ -12,12 +12,12 @@ import { count, moneyCompact, moneyTile, pct, pctChange, signedMoney, signedMone
 import { derive, eventAgg, sumAggs } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
 import { VIEW_INFO } from '../lib/viewInfo';
-import { EmptyState, SettingTags, unitsTile, uomFirst, uomPct, ViewControls, type ViewProps } from './common';
+import { EmptyState, SettingTags, unitsTile, uomFirst, uomPct, ViewControls } from './common';
 import { LiftLegend, RunsCompare, runLabel, trendRunRows } from './RunsCompare';
 
 const DEFAULT_PG = pgByName('Cheerios Family Size').idx;
 
-export default function RunTrendView({ openDefinitions }: ViewProps) {
+export default function RunTrendView() {
   const { state } = useFilters();
   const scope = useMemo(() => getScope(state), [state]);
   const basis = state.basis;
@@ -148,7 +148,7 @@ export default function RunTrendView({ openDefinitions }: ViewProps) {
               <SettingTags block="table" />
             </p>
             <p className="chart-sub">One column per run, oldest first. The Post-Promo Trend tab shows units before, during and after each promo.</p>
-            <LiftLegend onMore={() => openDefinitions('liftBands')} />
+            <LiftLegend />
           </div>
         </header>
         <RunsCompare runs={runs} metrics={metrics} rows={runRows} selected={sel} onSelect={setSelRun} title="Promo Run Trend" />

@@ -9,7 +9,6 @@ import { lazyWithReload } from './lib/lazyWithReload';
 import { PerformanceView } from './views/PerformanceView';
 
 const PostPromoView = lazyWithReload(() => import('./views/PostPromoView'));
-const FundingView = lazyWithReload(() => import('./views/FundingView'));
 const RunTrendView = lazyWithReload(() => import('./views/RunTrendView'));
 const HistoryView = lazyWithReload(() => import('./views/HistoryView'));
 const ShopperView = lazyWithReload(() => import('./views/ShopperView'));
@@ -70,19 +69,17 @@ function Shell() {
   const view = (() => {
     switch (state.tab) {
       case 'other':
-        return <PerformanceView variant="other" openDefinitions={openDefinitions} />;
+        return <PerformanceView variant="other" />;
       case 'post':
-        return <PostPromoView openDefinitions={openDefinitions} />;
-      case 'funding':
-        return <FundingView />;
+        return <PostPromoView />;
       case 'trend':
-        return <RunTrendView openDefinitions={openDefinitions} />;
+        return <RunTrendView />;
       case 'history':
-        return <HistoryView openDefinitions={openDefinitions} />;
+        return <HistoryView />;
       case 'shopper':
-        return <ShopperView openDefinitions={openDefinitions} />;
+        return <ShopperView />;
       default:
-        return <PerformanceView variant="hotbuy" openDefinitions={openDefinitions} />;
+        return <PerformanceView variant="hotbuy" />;
     }
   })();
 
