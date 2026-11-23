@@ -615,25 +615,118 @@ td .lift-band.band-low {
   color: var(--dark);
 }
 
-/* Shopper Impact layout proposals. */
-.proposal-bar {
+/* Promo Shopper Impact: subtabs (layout proposals for review). Navigation, not a filter. */
+.subtabs-head {
+  margin: var(--sp-2) 0 var(--sp-2);
+}
+.subtabs-bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 16px;
-  padding: 12px 16px;
-  margin: 12px 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-1) var(--sp-3);
+  border-bottom: 1px solid var(--n3);
 }
-.proposal-desc {
-  flex-basis: 100%;
-  margin: 0;
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.subtab {
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: none;
+  padding: 10px 18px;
+  margin-bottom: -1px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--n5);
+  cursor: pointer;
+  box-shadow: inset 0 -3px 0 transparent;
+}
+.subtab:hover {
+  color: var(--dark);
+  background: var(--n1);
+}
+.subtab.is-active {
+  color: var(--dark);
+  font-weight: 800;
+  background: var(--white);
+  border-color: var(--n3);
+  box-shadow: inset 0 -3px 0 var(--red);
+}
+.subtab:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
+}
+.subtabs-aside {
+  padding-bottom: 8px;
+}
+.subtab-desc {
+  margin: var(--sp-1) 0 0;
+  font-size: 13px;
+  color: var(--dark);
+}
+.subtab-look {
+  margin: 2px 0 0;
   font-size: 12.5px;
   color: var(--n5);
 }
-.proposal-bar .month-picker {
+.panel-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  margin: 0 0 var(--sp-2);
+}
+.panel-controls .month-picker {
   flex-direction: row;
   align-items: center;
   gap: 8px;
+}
+.panel-controls .month-picker select {
+  min-width: 240px;
+}
+.new-metric-chip {
+  white-space: nowrap;
+}
+.snapshot-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+  margin: 0 0 var(--sp-2);
+}
+.snapshot-strip b {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+button.snapshot-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+button.snapshot-card:hover {
+  border-color: var(--n4);
+}
+button.snapshot-card:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
+}
+.snapshot-card .card-price {
+  font-weight: 700;
+  color: var(--dark);
+}
+.snapshot-card .card-open {
+  font-size: 11.5px;
+  color: var(--info);
+  font-weight: 700;
 }
 .snapshot-grid {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -664,9 +757,6 @@ td .lift-band.band-low {
 }
 .defs-criteria li {
   margin: 2px 0;
-}
-.proposal-bar .month-picker select {
-  min-width: 240px;
 }
 
 /* Executive snapshot header: title and tags, then the block's own control (Weights). */
@@ -701,4 +791,13 @@ td .lift-band.band-low {
   border-color: var(--n3);
   background: var(--n1);
   color: var(--dark);
+}
+
+.defs-subtabs {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+}
+.defs-subtabs li {
+  margin: 4px 0;
 }

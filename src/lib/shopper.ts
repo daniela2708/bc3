@@ -23,6 +23,9 @@ export interface ShopperAgg {
   /** Transactions that include the promo item, during the event and over the same number of usual days. */
   txns: number;
   usualTxns: number;
+  /** Units of the promoted items in those transactions, during the event and over the same number of usual days. */
+  promoUnits: number;
+  usualPromoUnits: number;
   basketDollars: number;
   usualBasketDollars: number;
   basketUnits: number;
@@ -54,7 +57,7 @@ export interface ShopperAgg {
 }
 
 export function emptyShopper(): ShopperAgg {
-  return { n: 0, buyers: 0, usualBuyers: 0, txns: 0, usualTxns: 0, basketDollars: 0, usualBasketDollars: 0, basketUnits: 0, usualBasketUnits: 0, spend: 0, usualSpend: 0, newBuyers: 0, newBuyers4w: 0, catTrips: 0, usualCatTrips: 0, storeTxns: 0, repeat: 0, repeatBase: 0, prevBuyers: 0, lyBuyers: 0, lyTyBuyers: 0, afterN: 0, afterBuyers: 0, afterTxns: 0, afterBasketDollars: 0 };
+  return { n: 0, buyers: 0, usualBuyers: 0, txns: 0, usualTxns: 0, promoUnits: 0, usualPromoUnits: 0, basketDollars: 0, usualBasketDollars: 0, basketUnits: 0, usualBasketUnits: 0, spend: 0, usualSpend: 0, newBuyers: 0, newBuyers4w: 0, catTrips: 0, usualCatTrips: 0, storeTxns: 0, repeat: 0, repeatBase: 0, prevBuyers: 0, lyBuyers: 0, lyTyBuyers: 0, afterN: 0, afterBuyers: 0, afterTxns: 0, afterBasketDollars: 0 };
 }
 
 export function addShopper(a: ShopperAgg, b: ShopperAgg): ShopperAgg {
@@ -120,6 +123,8 @@ export function eventShopper(e: PromoEvent, ctx: EventCtx): ShopperAgg {
     usualBuyers,
     txns,
     usualTxns,
+    promoUnits: units,
+    usualPromoUnits: usualUnits,
     basketDollars: txns * basket,
     usualBasketDollars: usualTxns * usualBasket,
     basketUnits: txns * upb,

@@ -4,6 +4,7 @@ import { RULE_TEXT, SCORE_METRICS, VERDICTS } from '../lib/scoring';
 import { sanitizeSearch, SEARCH_MAX, TABS } from '../lib/filters';
 import { GLOSSARY, TERM_IDS } from '../lib/glossary';
 import { OUT_OF_SCOPE_VIEWS, VIEW_INFO } from '../lib/viewInfo';
+import { PROPOSAL_CHIP, PROPOSALS } from '../lib/shopperProposals';
 
 const TAB_LABEL = Object.fromEntries(TABS.map((t) => [t.id, t.label]));
 
@@ -153,6 +154,18 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
                     <span className="section-tag dashed">To validate</span>
                     {v.validate}
                   </p>
+                  {t.id === 'shopper' && (
+                    <ul className="defs-subtabs" aria-label="Promo Shopper Impact subtabs">
+                      {PROPOSALS.map((pr) => (
+                        <li key={pr.id} id={`view-shopper-${pr.id}`}>
+                          <b>
+                            Subtab {pr.label} · {pr.name}
+                          </b>{' '}
+                          <span className="chip status-proposed">{PROPOSAL_CHIP}</span> {pr.question} {pr.description} <i>What to look at: {pr.look}</i>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               );
             })}

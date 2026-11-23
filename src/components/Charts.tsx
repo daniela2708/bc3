@@ -463,7 +463,10 @@ export function HBars({
   arrows = false,
   labelWidth = 120,
   compareColor,
+  refs = [],
 }: {
+  /** Vertical reference lines (e.g. watch / flag thresholds), labelled at the top. */
+  refs?: { x: number; label: string; color?: string; anchor?: 'start' | 'end' }[];
   arrows?: boolean;
   /** When set, the comparison is a second full-size series in this color instead of a thin gray reference bar. */
   compareColor?: string;
@@ -478,10 +481,26 @@ export function HBars({
   labelWidth?: number;
 }) {
   return (
-    <BarChart width={width} height={height} data={data} layout="vertical" margin={{ top: 4, right: 72, bottom: 4, left: 4 }} barCategoryGap={compareLabel ? 8 : 10} barGap={3}>
-      <XAxis type="number" hide domain={diverging ? divDomain(data) : [0, 'auto']} />
+    <BarChart width={width} height={height} data={data} layout="vertical" margin={{ top: refs.length ? 20 : 4, right: 72, bottom: 4, left: 4 }} barCategoryGap={compareLabel ? 8 : 10} barGap={3}>
+      <XAxis type="number" hide domain={diverging ? divDomain(data) : [0, (max: number) => Math.max(max, ...refs.map((r) => r.x * 1.15))]} />
       <YAxis type="category" dataKey="label" {...axisProps} width={labelWidth} interval={0} tick={{ fill: '#211e1e', fontSize: 12 }} />
       {diverging && <ReferenceLine x={0} stroke={C.axis} strokeWidth={1} />}
+      {refs.map((r) => (
+        <ReferenceLine
+          key={r.label}
+          x={r.x}
+          stroke={r.color ?? C.axis}
+          strokeDasharray="4 3"
+          strokeWidth={1.5}
+          ifOverflow="extendDomain"
+          label={(p: { viewBox?: { x: number; y: number } }) => (
+            // Above the plot, beside the line: "end" sits to its left, "start" to its right, so close lines never overlap.
+            <text x={(p.viewBox?.x ?? 0) + (r.anchor === 'end' ? -4 : 4)} y={(p.viewBox?.y ?? 0) - 6} textAnchor={r.anchor ?? 'start'} fill={r.color ?? C.axis} fontSize={11} fontWeight={700}>
+              {r.label}
+            </text>
+          )}
+        />
+      ))}
       <Tooltip
         cursor={{ fill: 'rgba(33,30,30,0.05)' }}
         content={({ active, payload }) => {
@@ -923,6 +942,46 @@ export function SignedColumns({
           <Cell key={i} fill={neutral ? C.s1 : (d.value ?? 0) >= 0 ? C.pos : C.neg} />
         ))}
       </Bar>
+    </BarChart>
+  );
+}
+
+/**
+ * Two series (e.g. buyers and baskets) across the Before / During / After windows, as grouped columns with each window
+ * shaded like the promo window charts (Baseline neutral, Promo a soft accent tint, After lighter). Null values are gaps.
+ */
+export function PhaseBars({
+  data,
+  series,
+  format,
+  width,
+  height,
+}: {
+  data: { x: string; phase: keyof typeof WINDOW_SHADE; [k: string]: number | null | string }[];
+  series: { key: string; label: string; color: string }[];
+  format: (v: number) => string;
+  width?: number;
+  height?: number;
+}) {
+  return (
+    <BarChart width={width} height={height} data={data} margin={{ top: 20, right: 8, bottom: 0, left: 4 }} barCategoryGap="24%" barGap={4}>
+      {data.map((d) => (
+        <ReferenceArea key={d.x} x1={d.x} x2={d.x} fill={WINDOW_SHADE[d.phase].fill} fillOpacity={WINDOW_SHADE[d.phase].opacity} stroke="none" ifOverflow="extendDomain" />
+      ))}
+      <CartesianGrid vertical={false} stroke={C.grid} />
+      <XAxis dataKey="x" {...axisProps} interval={0} />
+      <YAxis {...axisProps} width={58} tickFormatter={format} />
+      <Tooltip
+        cursor={{ fill: 'rgba(33,30,30,0.05)' }}
+        content={({ active, payload, label }) => {
+          if (!active || !payload?.length) return null;
+          const d = payload[0].payload as Record<string, number | null>;
+          return <TipBox title={String(label)} rows={series.map((sr) => ({ label: sr.label, value: d[sr.key] === null ? '—' : format(d[sr.key] as number), color: sr.color }))} />;
+        }}
+      />
+      {series.map((sr) => (
+        <Bar key={sr.key} dataKey={sr.key} name={sr.label} fill={sr.color} isAnimationActive={false} radius={[3, 3, 0, 0]} maxBarSize={32} />
+      ))}
     </BarChart>
   );
 }

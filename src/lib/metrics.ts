@@ -179,14 +179,15 @@ export interface EventCtx {
   storeShare: Float64Array | null;
 }
 
-interface Sums {
+export interface Sums {
   units: number;
   gross: number;
   net: number;
   cost: number;
   invest: number;
 }
-function sums(items: number[], from: number, to: number): Sums {
+/** Chain totals of a set of items over a day range (inclusive). */
+export function sums(items: number[], from: number, to: number): Sums {
   const m = getModel();
   const s: Sums = { units: 0, gross: 0, net: 0, cost: 0, invest: 0 };
   for (const i of items) {

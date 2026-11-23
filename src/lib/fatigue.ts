@@ -153,3 +153,17 @@ export function fatigueReasons(c: FatigueCheck, type: PromoType): string[] {
   }
   return out;
 }
+
+/** Promo intensity per category (share of its items on offer in the period): watch / flag at or above (calibrated). */
+export const INTENSITY = { watch: 0.15, flag: 0.25 };
+export const INTENSITY_CHIP = 'Thresholds from the Promo Hygiene Review';
+
+export type IntensityBand = 'flag' | 'watch' | 'ok';
+
+/** The band of a promo intensity; null with no value. */
+export function intensityBand(v: number | null): IntensityBand | null {
+  if (v === null || !Number.isFinite(v)) return null;
+  if (v >= INTENSITY.flag) return 'flag';
+  if (v >= INTENSITY.watch) return 'watch';
+  return 'ok';
+}

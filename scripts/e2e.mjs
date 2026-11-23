@@ -31,8 +31,8 @@ const TABS = [
   ['shopper', 'Promo Shopper Impact'],
   ['trend', 'Promo Run Trend'],
 ];
-/** Key figures per view: 5–8, except Post-Promo Trend, whose workbook view lists two (Post-Promo Dip %, Repeat Purchase Rate %). */
-const TILE_RANGE = { post: [2, 2] };
+/** Key figures per view: 5–8, except Post-Promo Trend (two in the workbook view) and Promo Shopper Impact, whose default subtab A shows four. */
+const TILE_RANGE = { post: [2, 2], shopper: [4, 4] };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const children = [];
@@ -432,7 +432,7 @@ async function main() {
   await until(`!!document.querySelector('.defs-views-list')`, 'views section in the KPI definitions dialog');
   check(
     'KPI definitions dialog lists each of the six views with priority, user story and what to validate',
-    await evaluate(`(() => { const items = [...document.querySelectorAll('.defs-views-list li')].filter((li) => li.id !== 'view-funding'); return items.length === 6 && items.every((li) => li.textContent.includes('User story') && li.textContent.includes('To validate') && /Must Have|Should Have|Nice to have/.test(li.textContent) && /View \\d of 6/.test(li.textContent)); })()`),
+    await evaluate(`(() => { const items = [...document.querySelectorAll('.defs-views-list > li')].filter((li) => li.id !== 'view-funding'); return items.length === 6 && items.every((li) => li.textContent.includes('User story') && li.textContent.includes('To validate') && /Must Have|Should Have|Nice to have/.test(li.textContent) && /View \\d of 6/.test(li.textContent)); })()`),
   );
   check(
     'KPI definitions dialog keeps Promo Funding with the DNP tool note (#2)',
@@ -621,18 +621,34 @@ async function main() {
     JSON.stringify(trend),
   );
 
-  // Shopper Impact: the "Layout proposal" control switches between A, B and C (default A).
+  // Shopper Impact: three subtabs at the top (tablist), one complete proposal each; the active one is in the URL (sp).
   await send('Page.navigate', { url: `${base}/?tab=shopper` });
-  await until(`!!document.querySelector('.proposal-bar')`, 'Shopper Impact proposals');
-  const layoutOf = `(() => ({
-    pressed: ${pressed('Layout proposal')},
-    chip: document.querySelector('.proposal-bar .proposal-chip')?.textContent ?? '',
-    approval: document.body.textContent.includes('Aggregates only. Individual-level detail requires approval (#16).'),
-    a: !!document.querySelector('.table-card[aria-label="Category summary"]') && [...document.querySelectorAll('section.chart-card')].some((c) => c.getAttribute('aria-label') === 'Promo buyer lift by category'),
-    b: [...document.querySelectorAll('section.chart-card')].some((c) => c.getAttribute('aria-label') === 'Promo buyers before, during and after') && !!document.querySelector('.proposal-bar .event-picker') && !!document.querySelector('.table-card[aria-label="All events"]'),
-    c: document.querySelectorAll('.snapshot-grid .snapshot-card').length > 0 && !!document.querySelector('.snapshot-card .score-badge b') && !!document.querySelector('.proposal-bar .month-picker'),
-    tiles: document.querySelectorAll('.kpi-tile').length,
-  }))()`;
+  await until(`!!document.querySelector('[role=tablist][aria-label="Layout proposals"]')`, 'Shopper Impact subtabs');
+  const subOf = `(() => {
+    const tabs = [...document.querySelectorAll('[role=tablist][aria-label="Layout proposals"] [role=tab]')];
+    const active = tabs.find((t) => t.getAttribute('aria-selected') === 'true');
+    const panel = document.querySelector('.subtab-panel[role=tabpanel]');
+    const cards = [...document.querySelectorAll('#tab-panel section.chart-card')].map((c) => c.getAttribute('aria-label'));
+    return {
+      tabs: tabs.map((t) => t.textContent).join('|'),
+      selected: tabs.map((t) => t.getAttribute('aria-selected')).join(','),
+      tabindex: tabs.map((t) => t.tabIndex).join(','),
+      active: active?.textContent ?? '',
+      focused: document.activeElement?.getAttribute('role') === 'tab' ? document.activeElement.textContent : '',
+      panelOk: !!panel && panel.id === active?.getAttribute('aria-controls') && panel.getAttribute('aria-labelledby') === active?.id,
+      chip: document.querySelector('.subtabs-aside .proposal-chip')?.textContent ?? '',
+      desc: document.querySelector('.subtab-desc')?.textContent ?? '',
+      look: document.querySelector('.subtab-look')?.textContent ?? '',
+      url: location.search,
+      oldBar: !!document.querySelector('.proposal-bar') || !!document.querySelector('[aria-label="Layout proposal"]'),
+      approval: document.body.textContent.includes('Aggregates only. Individual-level detail requires approval (#16).'),
+      cards,
+      tiles: [...document.querySelectorAll('.kpi-tile .kpi-label')].map((l) => l.textContent),
+      a: !!document.querySelector('.table-card[aria-label="Category summary"]') && cards.includes('Promo buyer lift by category') && cards.includes('Promo intensity by category'),
+      b: !!document.querySelector('.panel-controls .event-picker') && cards.includes('Buyers and baskets before, during and after') && cards.includes('Where buyers came from') && cards.includes('Multi-item baskets') && cards.includes('Also bought: categories') && !!document.querySelector('.table-card[aria-label="All events"]'),
+      c: document.querySelectorAll('.snapshot-grid button.snapshot-card').length > 0 && !!document.querySelector('.panel-controls .month-picker'),
+    };
+  })()`;
   // Whole page: the viewport grows to the page height, so the sticky header and the tab bar stay in place.
   const shootPage = async (file) => {
     if (!process.env.SCREENSHOTS) return;
@@ -644,23 +660,76 @@ async function main() {
     writeFileSync(join(process.env.SCREENSHOTS, file), Buffer.from(shot.result.data, 'base64'));
     await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   };
-  const pick = async (label) => {
-    await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Layout proposal"] button')].find((b) => b.textContent.startsWith(${JSON.stringify(label)})).click(), 1`);
-    await sleep(500);
-    return evaluate(layoutOf);
+  const subKey = async (k, code, vk) => {
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: k, code, windowsVirtualKeyCode: vk });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk });
+    await sleep(400);
+    return evaluate(subOf);
   };
-  const la = await evaluate(layoutOf);
-  check('Shopper Impact: proposal A (Category summary) by default, with the "Proposal for review" chip and the #16 line', la.pressed === 'A · Category summary' && la.a && !la.b && !la.c && la.chip === 'Proposal for review' && la.approval, JSON.stringify(la));
-  await shootPage('shopper-proposal-a.png');
-  const lb = await pick('B');
-  check('Shopper Impact: the control switches to proposal B (Event detail)', lb.pressed === 'B · Event detail' && lb.b && !lb.a && !lb.c && lb.approval && lb.tiles >= 5, JSON.stringify(lb));
-  await shootPage('shopper-proposal-b.png');
-  const lc = await pick('C');
-  check('Shopper Impact: the control switches to proposal C (Executive snapshot) with the Hot Buy Score per card', lc.pressed === 'C · Executive snapshot' && lc.c && !lc.a && !lc.b && lc.approval, JSON.stringify(lc));
+  const sa = await evaluate(subOf);
+  check(
+    'Shopper Impact: subtabs "A · Category summary | B · Event detail | C · Executive snapshot" (tablist), A by default, "Proposals for review" chip, description and "What to look at"; the old Layout proposal control is gone',
+    sa.tabs === 'A · Category summary|B · Event detail|C · Executive snapshot' && sa.selected === 'true,false,false' && sa.tabindex === '0,-1,-1' && sa.panelOk && sa.chip === 'Proposals for review' && sa.look === 'What to look at: Which categories gain buyers, and is the lift real vs. last year?' && sa.desc.length > 20 && !sa.oldBar,
+    JSON.stringify(sa),
+  );
+  check(
+    'Shopper Impact A: 4 tiles (events, buyers, basket, new-to-category), buyer lift and promo intensity charts, category table, #16 line',
+    sa.a && !sa.b && !sa.c && sa.approval && sa.tiles.length === 4 && sa.tiles[0].startsWith('Promo events'),
+    JSON.stringify({ tiles: sa.tiles, cards: sa.cards }),
+  );
+  const intensity = await evaluate(`(() => { const c = [...document.querySelectorAll('section.chart-card')].find((x) => x.getAttribute('aria-label') === 'Promo intensity by category'); const lift = [...document.querySelectorAll('section.chart-card')].find((x) => x.getAttribute('aria-label') === 'Promo buyer lift by category'); return { chip: c.querySelector('.chart-title-chip')?.textContent ?? '', refs: [...c.querySelectorAll('.recharts-reference-line text')].map((t) => t.textContent.replace(/\u202f/g, ' ')), term: !!c.querySelector('.term'), liftVals: [...lift.querySelectorAll('.recharts-bar:first-of-type .recharts-label-list text, .recharts-layer.recharts-bar-rectangles ~ .recharts-label-list text')].length }; })()`);
+  check('Shopper Impact A: promo intensity with watch 15 % and flag 25 % lines and the Promo Hygiene Review chip', intensity.chip === 'Thresholds from the Promo Hygiene Review' && intensity.refs.includes('Watch 15 %') && intensity.refs.includes('Flag 25 %') && intensity.term, JSON.stringify(intensity));
+  await shootPage('shopper-a-category-summary.png');
+  // Keyboard: focus the active subtab, ArrowRight → B (focus follows), End → C, Home → A, ArrowLeft wraps to C.
+  await evaluate(`document.querySelector('[role=tab][aria-selected=true]').focus(), 1`);
+  const kb = await subKey('ArrowRight', 'ArrowRight', 39);
+  check('Shopper Impact: ArrowRight selects B, moves the focus, swaps the panel and writes sp=B to the URL', kb.active === 'B · Event detail' && kb.focused === 'B · Event detail' && kb.selected === 'false,true,false' && kb.tabindex === '-1,0,-1' && kb.panelOk && kb.b && !kb.a && /(^|[?&])sp=B(&|$)/.test(kb.url), JSON.stringify({ ...kb, cards: undefined }));
+  const kEnd = await subKey('End', 'End', 35);
+  const kHome = await subKey('Home', 'Home', 36);
+  const kLeft = await subKey('ArrowLeft', 'ArrowLeft', 37);
+  check('Shopper Impact: End → C, Home → A, ArrowLeft from A wraps to C', kEnd.active === 'C · Executive snapshot' && kEnd.c && kHome.active === 'A · Category summary' && kHome.a && kLeft.active === 'C · Executive snapshot' && kLeft.focused === 'C · Executive snapshot', [kEnd.active, kHome.active, kLeft.active].join(' | '));
+  // B by URL; reload keeps it; an invalid sp falls back to A.
+  await send('Page.navigate', { url: `${base}/?tab=shopper&sp=B` });
+  await until(`!!document.querySelector('.panel-controls .event-picker')`, 'Event detail panel');
+  await send('Page.reload', {});
+  await until(`!!document.querySelector('.panel-controls .event-picker')`, 'Event detail panel after reload');
+  const sb = await evaluate(subOf);
+  const bDetail = await evaluate(`(() => {
+    const tile = [...document.querySelectorAll('.kpi-tile')].find((t) => t.querySelector('.kpi-label').textContent.startsWith('Brand share'));
+    const chips = [...document.querySelectorAll('#tab-panel .new-metric-chip')].length;
+    const src = [...document.querySelectorAll('section.chart-card')].find((c) => c.getAttribute('aria-label') === 'Where buyers came from');
+    const tips = [...document.querySelectorAll('#tab-panel .new-metric-chip + .tip .tip-body')].map((t) => t.textContent);
+    return { brand: tile?.querySelector('.kpi-value').textContent ?? '', chips, tips: [...new Set(tips)], srcBars: src?.querySelectorAll('.recharts-bar-rectangle').length ?? 0, shades: [...document.querySelectorAll('section.chart-card')].find((c) => c.getAttribute('aria-label') === 'Buyers and baskets before, during and after')?.querySelectorAll('.recharts-reference-area').length ?? 0 };
+  })()`);
+  check(
+    'Shopper Impact B (sp=B kept after reload): Event dropdown, 5 tiles with Brand share gain in points, shaded windows, the four new metrics with the "New metric · definition pending" chip and its (i)',
+    sb.active === 'B · Event detail' && sb.b && sb.tiles.length === 5 && sb.look === 'What to look at: Did this promotion bring new shoppers and bigger baskets, or just discount existing buyers?' && sb.approval && /^([+−]\d+\.\d|0\.0) pts$/.test(bDetail.brand) && bDetail.chips >= 5 && bDetail.shades === 3 && bDetail.srcBars === 3 && bDetail.tips.length === 1 && bDetail.tips[0].startsWith('Not in the KPI sheet: it comes from the views the team uses today in the Hot Buy recap, calculated here with Weis data'),
+    JSON.stringify({ ...bDetail, tiles: sb.tiles }),
+  );
+  await shootPage('shopper-b-event-detail.png');
+  // A table row click picks the event.
+  const pickerValue = `(() => { const p = document.querySelector('.panel-controls .event-picker'); const i = p.querySelector('input'); if (i) return i.value; const sel = p.querySelector('select'); return sel ? sel.options[sel.selectedIndex].text : ''; })()`;
+  const before = await evaluate(pickerValue);
+  await evaluate(`(() => { const rows = [...document.querySelectorAll('.table-card[aria-label="All events"] tbody tr:not(.total-row)')]; rows.find((r) => r.getAttribute('aria-selected') === 'false')?.click(); return 1; })()`);
+  await sleep(400);
+  const after = await evaluate(pickerValue);
+  check('Shopper Impact B: clicking a row of the events table changes the event', before !== after && /(^|[?&])sel=\d+/.test(await evaluate('location.search')), `${before} → ${after}`);
+  await send('Page.navigate', { url: `${base}/?tab=shopper&sp=Z` });
+  await until(`!!document.querySelector('[role=tablist][aria-label="Layout proposals"]')`, 'subtabs with an invalid sp');
+  const sz = await evaluate(subOf);
+  check('Shopper Impact: an invalid sp (sp=Z) falls back to A', sz.active === 'A · Category summary' && sz.a, sz.active);
+  // C: verdict strip, cards ordered by score, Weights in the snapshot header; a card click opens the event in B.
+  await send('Page.navigate', { url: `${base}/?tab=shopper&sp=C` });
+  await until(`document.querySelectorAll('.snapshot-grid button.snapshot-card').length > 0`, 'Executive snapshot cards');
+  const lc = await evaluate(subOf);
+  check('Shopper Impact C: Ad month selector, cards and the #16 line', lc.active === 'C · Executive snapshot' && lc.c && lc.approval && lc.look === 'What to look at: Which Hot Buys should we run again, refine or reconsider?', JSON.stringify({ ...lc, cards: undefined }));
   const snapshotOf = `(() => ({
     scores: [...document.querySelectorAll('.snapshot-card .score-badge b')].map((b) => Number(b.textContent)),
     verdicts: [...document.querySelectorAll('.snapshot-card .score-badge .verdict-chip')].map((v) => v.textContent),
-    counts: [...document.querySelectorAll('.kpi-tile')].find((t) => t.querySelector('.kpi-label').textContent.startsWith('Hot Buy Score'))?.querySelector('.verdict-counts')?.textContent ?? '',
+    fields: [...document.querySelectorAll('.snapshot-card')].slice(0, 1).map((c) => [...c.querySelectorAll('dt')].map((d) => d.textContent).join('|')).join(),
+    price: document.querySelector('.snapshot-card .card-price')?.textContent ?? '',
+    counts: [...document.querySelectorAll('.kpi-tile')].find((t) => t.querySelector('.kpi-label').textContent.startsWith('Verdicts'))?.querySelector('.verdict-counts')?.textContent ?? '',
+    avg: [...document.querySelectorAll('.kpi-tile')].find((t) => t.querySelector('.kpi-label').textContent.startsWith('Hot Buy Score'))?.querySelector('.kpi-value')?.textContent ?? '',
     weights: ${pressed('Hot Buy Score weights')},
     inHeader: !!document.querySelector('.snapshot-head .block-settings [role=group][aria-label="Hot Buy Score weights"]'),
     inBar: !!document.querySelector('.calc-settings [role=group][aria-label="Hot Buy Score weights"]'),
@@ -668,19 +737,21 @@ async function main() {
   }))()`;
   const snap = await evaluate(snapshotOf);
   check(
-    'Shopper Impact C: cards ordered by score with a verdict chip, count by verdict, Weights in the snapshot header (not in the bar)',
-    snap.scores.length > 0 && snap.scores.every((v, i) => i === 0 || snap.scores[i - 1] >= v) && snap.verdicts.length === snap.scores.length && snap.verdicts.every((v, i) => VERDICT[v]?.(snap.scores[i])) && /^\d+ Re-execute · \d+ Refine · \d+ Reconsider$/.test(snap.counts) && snap.weights === 'Current' && snap.inHeader && !snap.inBar && snap.tags.every((t) => t === 'Current weights'),
+    'Shopper Impact C: count by verdict and average score on top; cards ordered by score with price, verdict text, Sales Lift, Unit Lift, Net Incremental GM $ and New-to-Category; Weights in the snapshot header',
+    snap.scores.length > 0 && snap.scores.every((v, i) => i === 0 || snap.scores[i - 1] >= v) && snap.verdicts.length === snap.scores.length && snap.verdicts.every((v, i) => VERDICT[v]?.(snap.scores[i])) && /^\d+ Re-execute · \d+ Refine · \d+ Reconsider$/.test(snap.counts) && /^\d{1,3}$/.test(snap.avg) && snap.fields === 'Sales Lift|Unit Lift|Net Incremental GM $|New-to-Category' && /^\$\d+\.\d\d( \/ lb)?$/.test(snap.price) && snap.weights === 'Current' && snap.inHeader && !snap.inBar && snap.tags.every((t) => t === 'Current weights'),
     JSON.stringify(snap),
   );
   await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Hot Buy Score weights"] button')].find((b) => b.textContent === 'Proposed').click(), 1`);
   await sleep(400);
   const snapP = await evaluate(snapshotOf);
-  check('Shopper Impact C: Proposed weights highlight the snapshot tags', snapP.weights === 'Proposed' && snapP.tags.length > 0 && snapP.tags.every((t) => t === '*Proposed weights (default Current)'), JSON.stringify(snapP.tags));
+  check('Shopper Impact C: Proposed weights highlight the snapshot tags and keep the cards ordered by score', snapP.weights === 'Proposed' && snapP.tags.length > 0 && snapP.tags.every((t) => t === '*Proposed weights (default Current)') && snapP.scores.every((v, i) => i === 0 || snapP.scores[i - 1] >= v), JSON.stringify(snapP.tags));
   await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Hot Buy Score weights"] button')].find((b) => b.textContent === 'Current').click(), 1`);
   await sleep(300);
-  await shootPage('shopper-proposal-c.png');
-  const la2 = await pick('A');
-  check('Shopper Impact: back to proposal A', la2.a && !la2.c, JSON.stringify(la2));
+  await shootPage('shopper-c-executive-snapshot.png');
+  const cardTarget = await evaluate(`(() => { const c = document.querySelectorAll('.snapshot-grid button.snapshot-card')[1] ?? document.querySelector('.snapshot-grid button.snapshot-card'); c.click(); return { e: c.dataset.event, name: c.querySelector('h4').textContent }; })()`);
+  await until(`!!document.querySelector('.panel-controls .event-picker')`, 'Event detail after a card click');
+  const opened = await evaluate(`({ active: document.querySelector('[role=tab][aria-selected=true]').textContent, url: location.search, picker: ${pickerValue} })`);
+  check('Shopper Impact C: a click on a card opens that event in B (sp=B, sel)', opened.active === 'B · Event detail' && new RegExp('(^|[?&])sp=B(&|$)').test(opened.url) && new RegExp('(^|[?&])sel=' + cardTarget.e + '(&|$)').test(opened.url) && opened.picker.includes(cardTarget.name), JSON.stringify({ cardTarget, opened }));
 
   check('No console errors or exceptions', errors.length === 0, errors.slice(0, 3).join(' | '));
   if (process.env.E2E_DEBUG) console.log(debug.join('\n'));
