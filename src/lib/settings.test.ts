@@ -6,9 +6,9 @@ const S = { baseline: DEFAULT_STATE.baseline, basis: DEFAULT_STATE.basis, level:
 const keys = (tab: Parameters<typeof tagsFor>[0], block: BlockId, s = S) => tagsFor(tab, block, s).map((t) => t.key);
 
 describe('Hot Buy Score weights (layout rules 5 and 6)', () => {
-  it('Weights changes only the score blocks: bar in Hot Buy Performance, executive snapshot header in Shopper Impact', () => {
+  it('Weights changes only the score blocks in Hot Buy Performance', () => {
     expect(AFFECTS.hotbuy.weights!.blocks).toEqual(['tiles', 'table']);
-    expect(blockSettings('shopper', 'snapshot')).toEqual(['weights']);
+    expect(AFFECTS.shopper.weights).toBeUndefined();
     expect(barSettings('shopper')).not.toContain('weights');
     for (const tab of ['other', 'post', 'history', 'trend'] as const) expect(AFFECTS[tab].weights).toBeUndefined();
     expect(keys('hotbuy', 'salesChart')).not.toContain('weights');
@@ -55,7 +55,6 @@ describe('active-value tags (layout rule 6)', () => {
     expect(keys('trend', 'liftChart')).toEqual(['baseline', 'basis']);
     expect(keys('trend', 'netIncChart')).toEqual(['baseline', 'basis', 'cann']);
     expect(keys('shopper', 'panels')).toEqual(['baseline']);
-    expect(keys('shopper', 'snapshot')).toEqual(['baseline', 'weights']);
   });
   it('blocks that no setting changes show no tag', () => {
     expect(keys('hotbuy', 'unitsChart')).toEqual([]);

@@ -40,11 +40,11 @@ import { DEFAULT_WEIGHTS, type WeightSet } from './scoring';
 // ---------------------------------------------------------------- Views
 
 /**
- * Promo Shopper Impact subtabs: the current view first (default) and the layout proposals A, B and C for review.
+ * Promo Shopper Impact subtabs: the current view first (default), then layout proposals A and B for review.
  * URL `sp`, allowlist; anything else is the current view.
  */
-export type SubTab = 'current' | 'A' | 'B' | 'C';
-export const SUBTAB_IDS: readonly SubTab[] = ['current', 'A', 'B', 'C'];
+export type SubTab = 'current' | 'A' | 'B';
+export const SUBTAB_IDS: readonly SubTab[] = ['current', 'A', 'B'];
 export const DEFAULT_SUBTAB: SubTab = 'current';
 
 export type TabId = 'hotbuy' | 'other' | 'post' | 'history' | 'shopper' | 'trend';

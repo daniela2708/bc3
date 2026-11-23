@@ -5,16 +5,16 @@ import { buildHeatmap, heatColor, MONTHS } from './heatmap';
 import { eventAgg, type EventCtx } from './metrics';
 import { getScope } from './selectors';
 import { deriveShopper, eventShopper } from './shopper';
-import { categorySummary, DEFAULT_PROPOSAL, hotBuyMonths, parseProposal, PROPOSALS } from './shopperProposals';
+import { categorySummary, DEFAULT_PROPOSAL, parseProposal, PROPOSALS } from './shopperProposals';
 
 const ctx: EventCtx = { baselineWeeks: 'byType', level: 'sub', itemMask: null, storeShare: null };
 
 describe('Promo Shopper Impact layout proposals', () => {
-  it('the current view by default, then three proposals; anything else falls back to the current view', () => {
-    expect(PROPOSALS.map((p) => `${p.id} ${p.name}`)).toEqual(['current Event panels', 'A Category summary', 'B Event detail', 'C Executive snapshot']);
+  it('the current view by default, then proposals A and B; anything else falls back to the current view', () => {
+    expect(PROPOSALS.map((p) => `${p.id} ${p.name}`)).toEqual(['current Event panels', 'A Category summary', 'B Event detail']);
     expect(DEFAULT_PROPOSAL).toBe('current');
     expect(parseProposal('B')).toBe('B');
-    expect(parseProposal('C')).toBe('C');
+    expect(parseProposal('C')).toBe('current');
     expect(parseProposal('D')).toBe('current');
     expect(parseProposal(undefined)).toBe('current');
     expect(parseProposal('<script>')).toBe('current');
@@ -42,17 +42,6 @@ describe('Promo Shopper Impact layout proposals', () => {
     expect(first.buyersVsLy).toBeNull();
   });
 
-  it('C: Hot Buys only, grouped by the month their ad week starts, latest first', () => {
-    const scope = getScope({ ...DEFAULT_STATE, tab: 'shopper' });
-    const months = hotBuyMonths(scope.events);
-    expect(months.length).toBeGreaterThan(0);
-    for (const m of months) {
-      expect(m.label).toMatch(/^[A-Z][a-z]+ \d{4}$/);
-      for (const e of m.events) expect(EVENTS[e].type).toBe('HB');
-    }
-    const sorts = months.map((m) => Number(m.key.slice(3)) * 100 + Number(m.key.slice(0, 2)));
-    expect([...sorts].sort((a, b) => b - a)).toEqual(sorts);
-  });
 });
 
 describe('Promotion timing heat map', () => {

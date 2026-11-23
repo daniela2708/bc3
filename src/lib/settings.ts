@@ -10,7 +10,7 @@ import { CANN_LEVELS, DEFAULT_BASIS, DEFAULT_CANN_LEVEL } from './metrics';
 import { DEFAULT_WEIGHTS, WEIGHT_SETS } from './scoring';
 
 export type SettingKey = 'baseline' | 'basis' | 'cann' | 'weights';
-export type BlockId = 'tiles' | 'salesChart' | 'unitsChart' | 'bridge' | 'table' | 'runs' | 'liftChart' | 'netIncChart' | 'periodChart' | 'depthCharts' | 'adCharts' | 'heatmap' | 'panels' | 'snapshot';
+export type BlockId = 'tiles' | 'salesChart' | 'unitsChart' | 'bridge' | 'table' | 'runs' | 'liftChart' | 'netIncChart' | 'periodChart' | 'depthCharts' | 'adCharts' | 'heatmap' | 'panels';
 
 export const SETTING_LABEL: Record<SettingKey, string> = { baseline: 'Baseline window', basis: 'Sales basis', cann: 'Cannibalization level', weights: 'Weights' };
 
@@ -44,9 +44,7 @@ export const AFFECTS: Record<TabId, Partial<Record<SettingKey, SettingUse>>> = {
     cann: { blocks: ['tiles', 'periodChart', 'depthCharts', 'adCharts', 'heatmap', 'table'], text: 'the Net Incremental GM $ key figure, the Net Incremental GM $ of the results by period or week, of the charts by depth band and ad type and of the timing heat map, and the Net Incremental GM $ column of the table.' },
   },
   shopper: {
-    baseline: { blocks: ['tiles', 'panels', 'table', 'snapshot'], text: 'the "usual" behaviour of the same buyers (spend change and every vs. usual comparison) in the key figures, the event panels, the table and the executive snapshot. Not the Hot Buy Score, which uses the method\'s fixed 4-week pre-period.' },
-    // One block only (layout rule 5): this control lives in the executive snapshot header (proposal C).
-    weights: { blocks: ['snapshot'], text: 'the Hot Buy Score of the executive snapshot (proposal C): its key figure and every card. Nothing else.' },
+    baseline: { blocks: ['tiles', 'panels', 'table'], text: 'the "usual" behaviour of the same buyers (spend change and every vs. usual comparison) in the key figures, event panels and table.' },
   },
   trend: {
     baseline: { blocks: ['tiles', 'liftChart', 'netIncChart', 'table'], text: 'key figures (Sales / Unit Lift %, Net Incremental GM $), the lift and Net Incremental GM $ charts and the lift, incremental, net and Post-Promo Dip % rows of the runs table.' },
@@ -70,7 +68,6 @@ export const BLOCK_LABEL: Record<BlockId, string> = {
   adCharts: 'Charts by Ad Type / Vehicle',
   heatmap: 'Promotion timing heat map',
   panels: 'Layout proposal (charts and cards)',
-  snapshot: 'Executive snapshot (proposal C)',
 };
 
 const ORDER: SettingKey[] = ['baseline', 'basis', 'cann', 'weights'];

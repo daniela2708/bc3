@@ -1,12 +1,10 @@
 /**
- * Promo Shopper Impact: three layout proposals for review (prototype review), shown as subtabs at the top of the view.
- * All three use club card and T-log aggregates only (totals and averages per event or per category, never a customer
- * or card).
+ * Promo Shopper Impact: the current view plus two layout proposals for review, shown as subtabs at the top of the view.
+ * All use club card aggregates only (totals and averages per event or category, never a customer or card).
  */
-import { formatMonth, monthOfDay } from '../data/calendar';
 import { CATS, PRICE_GROUPS } from '../data/products';
 import { EVENTS } from '../data/promos';
-import { DEFAULT_SUBTAB, SUBTAB_IDS, type FilterState, type SubTab } from './filters';
+import { DEFAULT_SUBTAB, SUBTAB_IDS, type SubTab } from './filters';
 import type { EventCtx } from './metrics';
 import { shopperOf, type ShopperMetrics } from './shopper';
 
@@ -18,7 +16,7 @@ export interface ProposalInfo {
   id: Proposal;
   label: string;
   name: string;
-  /** False for the current view; A, B and C are layout proposals for review. */
+  /** False for the current view; A and B are layout proposals for review. */
   proposal: boolean;
   /** The question the subtab answers. */
   question: string;
@@ -27,7 +25,7 @@ export interface ProposalInfo {
   look: string;
 }
 
-/** The subtabs in order: the current view, then the three proposals. */
+/** The subtabs in order: the current view, then the two proposals. */
 export const PROPOSALS: ProposalInfo[] = [
   {
     id: 'current',
@@ -56,15 +54,6 @@ export const PROPOSALS: ProposalInfo[] = [
     description: 'Pick an event: its defined shopper KPIs, buyers and baskets before, during and after, and every event in the table below. Metrics that would require a new KPI definition are intentionally excluded.',
     look: 'Did this promotion increase buyers and baskets above their usual?',
   },
-  {
-    id: 'C',
-    label: 'C',
-    name: 'Executive snapshot',
-    proposal: true,
-    question: 'How did every Hot Buy of a month do?',
-    description: 'An executive readout for one ad month: the verdict mix, average Hot Buy Score and a ranked card for every Hot Buy. Click a card to open the event in B.',
-    look: 'Which Hot Buys should we run again, refine or reconsider?',
-  },
 ];
 
 /** The subtab for a stored or typed value; anything else falls back to the default (the current view). */
@@ -86,11 +75,6 @@ export function nextSubTab(current: Proposal, key: string): Proposal | null {
 /** Tab text: "Current · Event panels", "A · Category summary", … */
 export const subTabLabel = (p: ProposalInfo) => `${p.label} · ${p.name}`;
 
-/** C → B: clicking a card opens that event in the Event detail subtab. */
-export function openInEventDetail(s: FilterState, event: number): FilterState {
-  return { ...s, sp: 'B', sel: event };
-}
-
 export interface CategoryRow {
   cat: number;
   label: string;
@@ -106,27 +90,4 @@ export function categorySummary(events: number[], ctx: EventCtx): CategoryRow[] 
     byCat.set(c, [...(byCat.get(c) ?? []), e]);
   }
   return [...byCat.entries()].map(([cat, list]) => ({ cat, label: CATS[cat].name, events: list, m: shopperOf(list, ctx) })).sort((a, b) => b.m.buyers - a.m.buyers || a.label.localeCompare(b.label));
-}
-
-export interface AdMonth {
-  /** "MM/YYYY" of the events' start (ad week start). */
-  key: string;
-  label: string;
-  events: number[];
-}
-
-const MONTH_NAME = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-/** Proposal C: the Hot Buys of the selection grouped by the month their ad week starts, latest month first. */
-export function hotBuyMonths(events: number[]): AdMonth[] {
-  const map = new Map<string, AdMonth & { sort: number }>();
-  for (const e of events) {
-    const ev = EVENTS[e];
-    if (ev.type !== 'HB') continue;
-    const key = formatMonth(ev.start);
-    const cur = map.get(key) ?? { key, label: `${MONTH_NAME[monthOfDay(ev.start) - 1]} ${key.slice(3)}`, events: [], sort: Number(key.slice(3)) * 100 + monthOfDay(ev.start) };
-    cur.events.push(e);
-    map.set(key, cur);
-  }
-  return [...map.values()].sort((a, b) => b.sort - a.sort).map(({ key, label, events: list }) => ({ key, label, events: list.sort((a, b) => EVENTS[a].start - EVENTS[b].start || a - b) }));
 }

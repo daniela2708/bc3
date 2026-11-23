@@ -621,7 +621,7 @@ async function main() {
     JSON.stringify(trend),
   );
 
-  // Shopper Impact: three subtabs at the top (tablist), one complete proposal each; the active one is in the URL (sp).
+  // Shopper Impact: current plus proposals A and B at the top; the active one is in the URL (sp).
   await send('Page.navigate', { url: `${base}/?tab=shopper` });
   await until(`!!document.querySelector('[role=tablist][aria-label="Promo Shopper Impact layouts"]')`, 'Shopper Impact subtabs');
   const subOf = `(() => {
@@ -648,7 +648,6 @@ async function main() {
       divider: !!document.querySelector('.subtabs .subtab-divider + [role=tab]#shopper-tab-A'),
       a: !!document.querySelector('.table-card[aria-label="Category summary"]') && cards.includes('Promo buyer lift by category') && cards.includes('Promo intensity by category'),
       b: !!document.querySelector('.panel-controls .event-picker') && cards.length === 1 && cards.includes('Buyers and baskets before, during and after') && !!document.querySelector('.table-card[aria-label="All events"]'),
-      c: document.querySelectorAll('.snapshot-grid button.snapshot-card').length > 0 && !!document.querySelector('.panel-controls .month-picker'),
     };
   })()`;
   // Whole page: the viewport grows to the page height, so the sticky header and the tab bar stay in place.
@@ -670,20 +669,20 @@ async function main() {
   };
   const s0 = await evaluate(subOf);
   check(
-    'Shopper Impact: subtabs "Current · Event panels | A · Category summary | B · Event detail | C · Executive snapshot" (tablist), Current by default, separator before the proposals, "A–C · Proposals for review" chip, description and "What to look at"',
-    s0.tabs === 'Current · Event panels|A · Category summary|B · Event detail|C · Executive snapshot' && s0.selected === 'true,false,false,false' && s0.tabindex === '0,-1,-1,-1' && s0.panelOk && s0.divider && s0.chip === 'A–C · Proposals for review' && s0.look === 'What to look at: Which promotions moved buyers, baskets and spend above their usual?' && s0.desc.length > 20 && !s0.oldBar,
+    'Shopper Impact: subtabs "Current · Event panels | A · Category summary | B · Event detail" (tablist), Current by default, separator before the proposals, "A–B · Proposals for review" chip, description and "What to look at"',
+    s0.tabs === 'Current · Event panels|A · Category summary|B · Event detail' && s0.selected === 'true,false,false' && s0.tabindex === '0,-1,-1' && s0.panelOk && s0.divider && s0.chip === 'A–B · Proposals for review' && s0.look === 'What to look at: Which promotions moved buyers, baskets and spend above their usual?' && s0.desc.length > 20 && !s0.oldBar,
     JSON.stringify({ ...s0, cards: undefined }),
   );
-  check('Shopper Impact Current: the view as it was (8 tiles, one panel per event, All events table) and the #16 line', s0.cur && !s0.a && !s0.b && !s0.c && s0.approval && s0.tiles.length === 8 && s0.tiles[0].startsWith('Promo Buyer Count'), JSON.stringify(s0.tiles));
+  check('Shopper Impact Current: the view as it was (8 tiles, one panel per event, All events table) and the #16 line', s0.cur && !s0.a && !s0.b && s0.approval && s0.tiles.length === 8 && s0.tiles[0].startsWith('Promo Buyer Count'), JSON.stringify(s0.tiles));
   await shootPage('shopper-current-event-panels.png');
-  // Keyboard: focus the active subtab, ArrowRight → A (focus follows, sp=A), End → C, Home → Current, ArrowLeft wraps to C.
+  // Keyboard: focus the active subtab, ArrowRight → A (focus follows, sp=A), End → B, Home → Current, ArrowLeft wraps to B.
   await evaluate(`document.querySelector('[role=tab][aria-selected=true]').focus(), 1`);
   const kb = await subKey('ArrowRight', 'ArrowRight', 39);
-  check('Shopper Impact: ArrowRight selects A, moves the focus, swaps the panel and writes sp=A to the URL', kb.active === 'A · Category summary' && kb.focused === 'A · Category summary' && kb.selected === 'false,true,false,false' && kb.tabindex === '-1,0,-1,-1' && kb.panelOk && kb.a && !kb.cur && /(^|[?&])sp=A(&|$)/.test(kb.url), JSON.stringify({ ...kb, cards: undefined }));
+  check('Shopper Impact: ArrowRight selects A, moves the focus, swaps the panel and writes sp=A to the URL', kb.active === 'A · Category summary' && kb.focused === 'A · Category summary' && kb.selected === 'false,true,false' && kb.tabindex === '-1,0,-1' && kb.panelOk && kb.a && !kb.cur && /(^|[?&])sp=A(&|$)/.test(kb.url), JSON.stringify({ ...kb, cards: undefined }));
   const kEnd = await subKey('End', 'End', 35);
   const kHome = await subKey('Home', 'Home', 36);
   const kLeft = await subKey('ArrowLeft', 'ArrowLeft', 37);
-  check('Shopper Impact: End → C, Home → Current (no sp in the URL), ArrowLeft from Current wraps to C', kEnd.active === 'C · Executive snapshot' && kEnd.c && kHome.active === 'Current · Event panels' && kHome.cur && !/(^|[?&])sp=/.test(kHome.url) && kLeft.active === 'C · Executive snapshot' && kLeft.focused === 'C · Executive snapshot', [kEnd.active, kHome.active, kHome.url, kLeft.active].join(' | '));
+  check('Shopper Impact: End → B, Home → Current (no sp in the URL), ArrowLeft from Current wraps to B', kEnd.active === 'B · Event detail' && kEnd.b && kHome.active === 'Current · Event panels' && kHome.cur && !/(^|[?&])sp=/.test(kHome.url) && kLeft.active === 'B · Event detail' && kLeft.focused === 'B · Event detail', [kEnd.active, kHome.active, kHome.url, kLeft.active].join(' | '));
   // A by URL.
   await send('Page.navigate', { url: `${base}/?tab=shopper&sp=A` });
   await until(`!!document.querySelector('.table-card[aria-label="Category summary"]')`, 'Category summary panel');
@@ -691,7 +690,7 @@ async function main() {
   const sa = await evaluate(subOf);
   check(
     'Shopper Impact A: 4 tiles (events, buyers, basket, new-to-category), buyer lift and promo intensity charts, category table, #16 line',
-    sa.active === 'A · Category summary' && sa.a && !sa.b && !sa.c && sa.approval && sa.tiles.length === 4 && sa.tiles[0].startsWith('Promo events') && sa.look === 'What to look at: Which categories gain buyers, and is the lift real vs. last year?',
+    sa.active === 'A · Category summary' && sa.a && !sa.b && sa.approval && sa.tiles.length === 4 && sa.tiles[0].startsWith('Promo events') && sa.look === 'What to look at: Which categories gain buyers, and is the lift real vs. last year?',
     JSON.stringify({ tiles: sa.tiles, cards: sa.cards }),
   );
   const intensity = await evaluate(`(() => { const c = [...document.querySelectorAll('section.chart-card')].find((x) => x.getAttribute('aria-label') === 'Promo intensity by category'); return { chip: c.querySelector('.chart-title-chip')?.textContent ?? '', refs: [...c.querySelectorAll('.recharts-reference-line text')].map((t) => t.textContent.replace(/\\u202f/g, ' ')), term: !!c.querySelector('.term'), heights: [...document.querySelectorAll('#tab-panel .chart-grid .chart-card')].map((x) => Math.round(x.getBoundingClientRect().height)) }; })()`);
@@ -721,48 +720,10 @@ async function main() {
   await sleep(400);
   const after = await evaluate(pickerValue);
   check('Shopper Impact B: clicking a row of the events table changes the event', before !== after && /(^|[?&])sel=\d+/.test(await evaluate('location.search')), `${before} → ${after}`);
-  await send('Page.navigate', { url: `${base}/?tab=shopper&sp=Z` });
-  await until(`!!document.querySelector('[role=tablist][aria-label="Promo Shopper Impact layouts"]')`, 'subtabs with an invalid sp');
-  const sz = await evaluate(subOf);
-  check('Shopper Impact: an invalid sp (sp=Z) falls back to the current view', sz.active === 'Current · Event panels' && sz.cur, sz.active);
-  // C: decision-first monthly readout, cards ordered by score, Weights in the ranking header; a card click opens the event in B.
   await send('Page.navigate', { url: `${base}/?tab=shopper&sp=C` });
-  await until(`document.querySelectorAll('.snapshot-grid button.snapshot-card').length > 0`, 'Executive snapshot cards');
-  const lc = await evaluate(subOf);
-  check('Shopper Impact C: Ad month selector, cards and the #16 line', lc.active === 'C · Executive snapshot' && lc.c && lc.approval && lc.look === 'What to look at: Which Hot Buys should we run again, refine or reconsider?', JSON.stringify({ ...lc, cards: undefined }));
-  const snapshotOf = `(() => ({
-    scores: [...document.querySelectorAll('.snapshot-card .score-badge b')].map((b) => Number(b.textContent)),
-    verdicts: [...document.querySelectorAll('.snapshot-card .score-badge .verdict-chip')].map((v) => v.textContent),
-    fields: [...document.querySelectorAll('.snapshot-card')].slice(0, 1).map((c) => [...c.querySelectorAll('dt')].map((d) => d.textContent).join('|')).join(),
-    price: document.querySelector('.snapshot-card .card-price')?.textContent ?? '',
-    counts: [...document.querySelectorAll('.executive-verdict-head b')].map((b) => Number(b.textContent)),
-    countChips: [...document.querySelectorAll('.executive-verdict .verdict-chip')].map((c) => c.textContent).join('|'),
-    avg: document.querySelector('.executive-average strong')?.textContent ?? '',
-    headline: (document.querySelector('.executive-overview-copy h3')?.textContent ?? '').replace(/\\s+/g, ' ').trim(),
-    ranks: [...document.querySelectorAll('.snapshot-card .snapshot-rank')].map((r) => r.textContent),
-    overview: !!document.querySelector('.executive-overview[aria-label="Monthly Hot Buy readout"]'),
-    weights: ${pressed('Hot Buy Score weights')},
-    inHeader: !!document.querySelector('.snapshot-head .block-settings [role=group][aria-label="Hot Buy Score weights"]'),
-    inBar: !!document.querySelector('.calc-settings [role=group][aria-label="Hot Buy Score weights"]'),
-    tags: [...document.querySelectorAll('.setting-tag[data-setting="weights"]')].map((t) => (t.classList.contains('is-changed') ? '*' : '') + t.firstChild.textContent),
-  }))()`;
-  const snap = await evaluate(snapshotOf);
-  check(
-    'Shopper Impact C: decision-first monthly readout with headline, average score and verdict distribution; ranked cards show score, verdict, price and the four supporting fields; Weights stay in the ranking header',
-    snap.overview && snap.scores.length > 0 && snap.scores.every((v, i) => i === 0 || snap.scores[i - 1] >= v) && snap.verdicts.length === snap.scores.length && snap.verdicts.every((v, i) => VERDICT[v]?.(snap.scores[i])) && snap.counts.length === 3 && snap.counts.reduce((a, b) => a + b, 0) === snap.scores.length && snap.countChips === 'RE-EXECUTE|REFINE TACTIC|RECONSIDER SLOT' && /^\d{1,3}$/.test(snap.avg) && /^\d+ of \d+ Hot Buys are ready to re-execute$/.test(snap.headline.trim()) && snap.ranks.every((r, i) => r === '#' + (i + 1)) && snap.fields === 'Sales Lift|Unit Lift|Net Incremental GM $|New-to-Category' && /^\$\d+\.\d\d( \/ lb)?$/.test(snap.price) && snap.weights === 'Current' && snap.inHeader && !snap.inBar && snap.tags.every((t) => t === 'Current weights'),
-    JSON.stringify(snap),
-  );
-  await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Hot Buy Score weights"] button')].find((b) => b.textContent === 'Proposed').click(), 1`);
-  await sleep(400);
-  const snapP = await evaluate(snapshotOf);
-  check('Shopper Impact C: Proposed weights highlight the snapshot tags and keep the cards ordered by score', snapP.weights === 'Proposed' && snapP.tags.length > 0 && snapP.tags.every((t) => t === '*Proposed weights (default Current)') && snapP.scores.every((v, i) => i === 0 || snapP.scores[i - 1] >= v), JSON.stringify(snapP.tags));
-  await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Hot Buy Score weights"] button')].find((b) => b.textContent === 'Current').click(), 1`);
-  await sleep(300);
-  await shootPage('shopper-c-executive-snapshot.png');
-  const cardTarget = await evaluate(`(() => { const c = document.querySelectorAll('.snapshot-grid button.snapshot-card')[1] ?? document.querySelector('.snapshot-grid button.snapshot-card'); c.click(); return { e: c.dataset.event, name: c.querySelector('h4').textContent }; })()`);
-  await until(`!!document.querySelector('.panel-controls .event-picker')`, 'Event detail after a card click');
-  const opened = await evaluate(`({ active: document.querySelector('[role=tab][aria-selected=true]').textContent, url: location.search, picker: ${pickerValue} })`);
-  check('Shopper Impact C: a click on a card opens that event in B (sp=B, sel)', opened.active === 'B · Event detail' && new RegExp('(^|[?&])sp=B(&|$)').test(opened.url) && new RegExp('(^|[?&])sel=' + cardTarget.e + '(&|$)').test(opened.url) && opened.picker.includes(cardTarget.name), JSON.stringify({ cardTarget, opened }));
+  await until(`!!document.querySelector('[role=tablist][aria-label="Promo Shopper Impact layouts"]')`, 'subtabs with the removed sp=C');
+  const sz = await evaluate(subOf);
+  check('Shopper Impact: removed sp=C falls back to the current view and C is absent from the tab bar', sz.active === 'Current · Event panels' && sz.cur && !sz.tabs.includes('Executive snapshot'), sz.active);
 
   check('No console errors or exceptions', errors.length === 0, errors.slice(0, 3).join(' | '));
   if (process.env.E2E_DEBUG) console.log(debug.join('\n'));

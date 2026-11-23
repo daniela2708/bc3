@@ -97,33 +97,3 @@ export function ScoreCell({ s }: { s: ScoreResult | undefined }) {
     </HoverCard>
   );
 }
-
-/** A compact score badge for cards (Shopper Impact proposal C), with the verdict and the same breakdown on hover. */
-export function ScoreBadge({ s }: { s: ScoreResult | undefined }) {
-  if (!s) return <span className="score-badge is-empty">Score —</span>;
-  return (
-    <HoverCard className="score-badge" label={scoreText(s)} content={<Breakdown s={s} />}>
-      <span className="score-badge-label">Hot Buy Score</span>
-      <b>{s.score}</b>
-      <span className="track" aria-hidden="true">
-        <span className="fill" style={{ width: `${Math.max(0, Math.min(100, s.score)).toFixed(1)}%` }} />
-      </span>
-      <VerdictChip v={s.verdict} />
-    </HoverCard>
-  );
-}
-
-/** The score and its verdict without the hover breakdown, for cards that are buttons themselves (no nested control). */
-export function ScoreInline({ s }: { s: ScoreResult | undefined }) {
-  if (!s) return <span className="score-badge is-empty">Score —</span>;
-  return (
-    <span className="score-badge">
-      <span className="score-badge-label">Hot Buy Score</span>
-      <b>{s.score}</b>
-      <span className="track" aria-hidden="true">
-        <span className="fill" style={{ width: `${Math.max(0, Math.min(100, s.score)).toFixed(1)}%` }} />
-      </span>
-      <VerdictChip v={s.verdict} />
-    </span>
-  );
-}

@@ -4,12 +4,9 @@ import { KeyFigures, SectionHeading, ViewSummary, type Tile } from '../component
 import { C, ChartCard, ChartGrid, HBars, hbarHeight, PhaseBars } from '../components/Charts';
 import { EventPicker } from '../components/EventPicker';
 import { HierTable, type HierCol, type HierRow } from '../components/HierTable';
-import { ScoreChip, ScoreInline } from '../components/Score';
-import { Select } from '../components/Select';
 import { SubTabPanel, SubTabs } from '../components/SubTabs';
 import { Term } from '../components/Term';
 import { InfoTip, Pending, Var } from '../components/ui';
-import { AS_OF_DAY, formatMonth } from '../data/calendar';
 import { PRICE_GROUPS } from '../data/products';
 import { EVENTS, PROMO_LABEL } from '../data/promos';
 import { baselineText } from '../lib/baseline';
@@ -17,16 +14,14 @@ import { eventOptions } from '../lib/eventPick';
 import { INTENSITY, INTENSITY_CHIP, intensityBand } from '../lib/fatigue';
 import { effectiveTime } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
-import { count, moneyCompact, moneyUnit, pct, pctChange, signedMoney } from '../lib/format';
-import { averageScore, hotBuyScores, resultsOf } from '../lib/hotBuyScore';
-import { DEFAULT_BASIS, DEFAULT_CANN_LEVEL, derive, eventAgg, type EventCtx } from '../lib/metrics';
-import { SCORE_MARGIN_NOTE, SCORE_WINDOW_NOTE, verdictCounts } from '../lib/scoring';
+import { count, moneyUnit, pct, pctChange } from '../lib/format';
+import type { EventCtx } from '../lib/metrics';
 import { getScope } from '../lib/selectors';
 import { deriveShopper, eventShopper, REPEAT_WINDOW_DAYS, shopperOf, type ShopperMetrics } from '../lib/shopper';
 import { categoryIntensity } from '../lib/shopperDetail';
-import { categorySummary, hotBuyMonths, nextSubTab, openInEventDetail, PROPOSAL_CHIP, PROPOSALS, subTabLabel, type AdMonth, type Proposal } from '../lib/shopperProposals';
+import { categorySummary, nextSubTab, PROPOSAL_CHIP, PROPOSALS, subTabLabel, type Proposal } from '../lib/shopperProposals';
 import { VIEW_INFO } from '../lib/viewInfo';
-import { BlockSettings, EmptyState, eventDates, SettingTags, ViewControls } from './common';
+import { EmptyState, eventDates, SettingTags, ViewControls } from './common';
 
 const SUM_LABEL = 'Sum across events (not unique households)';
 const SUM_TIP = 'Each event counts its own buyers. A household that bought in two events counts twice, so this total is not a count of unique households. Unique households across events would need the club card data itself, which the dashboard does not hold (aggregates only).';
@@ -113,9 +108,8 @@ function TableCard({ label, title, sub, tags = true, children }: { label: string
 const ID = 'shopper';
 
 /**
- * Promo Shopper Impact: subtabs at the top of the view (URL `sp`): the current view (default) and three layout proposals
- * for review, A Category summary, B Event detail and C Executive snapshot. Only the active panel renders. Club card
- * and T-log aggregates only.
+ * Promo Shopper Impact: subtabs at the top of the view (URL `sp`): the current view (default) and two layout proposals
+ * for review, A Category summary and B Event detail. Only the active panel renders. Club card aggregates only.
  */
 export default function ShopperView() {
   const { state, update } = useFilters();
@@ -134,7 +128,7 @@ export default function ShopperView() {
           next={nextSubTab}
           label="Promo Shopper Impact layouts"
           idPrefix={ID}
-          aside={<span className="chip status-proposed proposal-chip">A–C · {PROPOSAL_CHIP}</span>}
+          aside={<span className="chip status-proposed proposal-chip">A–B · {PROPOSAL_CHIP}</span>}
         />
         <p className="subtab-desc">
           {info.proposal && <span className="subtab-kind">Proposal for review · </span>}
@@ -153,19 +147,8 @@ export default function ShopperView() {
           <CurrentPanel events={scope.events} ctx={scope.ctx} range={scope.range} />
         ) : sp === 'A' ? (
           <CategoryPanel events={scope.events} ctx={scope.ctx} range={scope.range} />
-        ) : sp === 'B' ? (
-          <EventPanel events={scope.events} ctx={scope.ctx} selected={state.sel} onSelect={(e) => update((s) => ({ ...s, sel: e }))} />
         ) : (
-          <SnapshotPanel
-            events={scope.events}
-            ctx={scope.ctx}
-            weights={state.weights}
-            rangeLabel={scope.range.label}
-            onOpen={(e) => {
-              update((s) => openInEventDetail(s, e));
-              window.scrollTo({ top: 0 });
-            }}
-          />
+          <EventPanel events={scope.events} ctx={scope.ctx} selected={state.sel} onSelect={(e) => update((s) => ({ ...s, sel: e }))} />
         )}
       </SubTabPanel>
     </>
@@ -483,135 +466,6 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
       >
         <HierTable hierarchy="Price group · event" columns={EVENT_COLS} rows={eventRows(latestFirst, e, onSelect)} defaultSort={{ key: 'dates', dir: 'desc' }} exportTitle="Promo Shopper Impact" maxHeight={480} />
       </TableCard>
-    </>
-  );
-}
-
-// ---------------------------------------------------------------- C · Executive snapshot
-
-const promoPrice = (e: number, ctx: EventCtx) => {
-  const r = derive(eventAgg(EVENTS[e], ctx), DEFAULT_BASIS).avgRetail;
-  if (r.ea !== null) return `$${r.ea.toFixed(2)}`;
-  return r.lb !== null ? `$${r.lb.toFixed(2)} / lb` : '—';
-};
-
-function SnapshotPanel({ events, ctx, weights, rangeLabel, onOpen }: { events: number[]; ctx: EventCtx; weights: 'current' | 'proposed'; rangeLabel: string; onOpen: (e: number) => void }) {
-  const months = useMemo(() => hotBuyMonths(events), [events]);
-  const [picked, setPicked] = useState('');
-  // The Hot Buy Score (fixed 4-week pre-period, Net Customer Sales); only the weight set changes it.
-  const scores = useMemo(() => hotBuyScores(events, { ...ctx, level: DEFAULT_CANN_LEVEL }, weights, DEFAULT_BASIS), [events, ctx, weights]);
-  // The month picked here, else the latest month that has ended (the current one is still partial).
-  const month: AdMonth | undefined = months.find((m) => m.key === picked) ?? months.find((m) => m.key !== formatMonth(AS_OF_DAY)) ?? months[0];
-  if (!month)
-    return (
-      <>
-        <EmptyState>No Hot Buys start in {rangeLabel} for the current filters, so there is no executive snapshot. Try a longer period or clear a filter.</EmptyState>
-        <PrivacyNotes ctx={ctx} full={false} />
-      </>
-    );
-  const list = [...month.events].sort((a, b) => (scores.get(b)?.score ?? -1) - (scores.get(a)?.score ?? -1) || EVENTS[a].start - EVENTS[b].start);
-  const results = resultsOf(scores, month.events);
-  const avg = averageScore(scores, month.events);
-  const verdicts = verdictCounts(results);
-  const reexecute = verdicts.find(({ verdict }) => verdict.id === 'reexecute')?.n ?? 0;
-  return (
-    <>
-      <div className="panel-controls">
-        <Select className="month-picker" label="Ad month" value={month.key} options={months.map((m) => ({ value: m.key, label: `${m.label} (${m.events.length} Hot Buy${m.events.length === 1 ? '' : 's'})` }))} onChange={setPicked} />
-      </div>
-      <section className="card executive-overview" aria-label="Monthly Hot Buy readout">
-        <div className="executive-overview-copy">
-          <span className="executive-kicker">Monthly readout · {month.label}</span>
-          <h3>
-            {reexecute} of {month.events.length} Hot Buys are ready to re-execute
-          </h3>
-          <p>Use the verdict mix to decide what to repeat, refine or reconsider. Cards below are ranked by Hot Buy Score.</p>
-          <ScoreChip />
-        </div>
-        <div className="executive-average" aria-label={`Average Hot Buy Score ${avg === null ? 'not available' : Math.round(avg)} of 100`}>
-          <span>Average score</span>
-          <strong>{avg === null ? '—' : Math.round(avg)}</strong>
-          <small>of 100</small>
-        </div>
-        <div className="executive-verdicts" aria-label="Verdict distribution">
-          {verdicts.map(({ verdict, n }) => {
-            const share = month.events.length > 0 ? n / month.events.length : 0;
-            return (
-              <div key={verdict.id} className={`executive-verdict executive-verdict-${verdict.id}`}>
-                <div className="executive-verdict-head">
-                  <span className={`verdict-chip verdict-${verdict.id}`}>{verdict.label}</span>
-                  <b>{n}</b>
-                </div>
-                <div className="executive-verdict-track" aria-hidden="true">
-                  <span style={{ width: `${share * 100}%` }} />
-                </div>
-                <span>{pct(share, 0)} of the month</span>
-              </div>
-            );
-          })}
-        </div>
-        <p className="executive-method-note">
-          {SCORE_WINDOW_NOTE} {SCORE_MARGIN_NOTE}
-        </p>
-      </section>
-      <PrivacyNotes ctx={ctx} full={false} />
-      <section aria-label="Executive snapshot">
-        <div className="snapshot-head">
-          <div>
-            <h3 className="secondary-title">
-              Ranked Hot Buys <SettingTags block="snapshot" />
-            </h3>
-            <p className="snapshot-head-sub">Highest score first · select a card to review the event detail</p>
-          </div>
-          <BlockSettings block="snapshot" />
-        </div>
-        <div className="shopper-grid snapshot-grid">
-          {list.map((e, rank) => {
-            const s = scores.get(e);
-            const part = (id: string) => s?.parts.find((p) => p.id === id)?.value ?? null;
-            const name = PRICE_GROUPS[EVENTS[e].pg].name;
-            return (
-              <button
-                key={e}
-                type="button"
-                className={`card snapshot-card hot-buy-card${s ? ` hot-buy-card-${s.verdict.id}` : ''}`}
-                data-event={e}
-                onClick={() => onOpen(e)}
-                aria-label={`Rank ${rank + 1}, ${name}, ${EVENTS[e].id}: Hot Buy Score ${s?.score ?? 'none'}${s ? `, ${s.verdict.label}` : ''}. Open in Event detail.`}
-              >
-                <span className="snapshot-rank">#{rank + 1}</span>
-                <header>
-                  <h4 title={name}>{name}</h4>
-                  <p>
-                    <span className="card-price">{promoPrice(e, ctx)}</span> · {EVENTS[e].id} · {eventDates(EVENTS[e])}
-                  </p>
-                </header>
-                <ScoreInline s={s} />
-                <dl>
-                  <div>
-                    <dt>Sales Lift</dt>
-                    <dd>{pctChange(part('salesLift'))}</dd>
-                  </div>
-                  <div>
-                    <dt>Unit Lift</dt>
-                    <dd>{pctChange(part('unitLift'))}</dd>
-                  </div>
-                  <div>
-                    <dt>Net Incremental GM $</dt>
-                    <dd title={s?.netIncGm === undefined ? undefined : signedMoney(s.netIncGm ?? null)}>{moneyCompact(s?.netIncGm ?? null)}</dd>
-                  </div>
-                  <div>
-                    <dt>New-to-Category</dt>
-                    <dd>{pct(part('newToCat'))}</dd>
-                  </div>
-                </dl>
-                <span className="card-open">Review event detail →</span>
-              </button>
-            );
-          })}
-        </div>
-        <p className="table-note">Sales Lift, Unit Lift and New-to-Category are the score inputs (vs. the 4 weeks before, the method's fixed pre-period). Net Incremental GM $ is not part of the score (#19).</p>
-      </section>
     </>
   );
 }
