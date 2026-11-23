@@ -161,7 +161,7 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
                           <b>
                             Subtab {pr.label} · {pr.name}
                           </b>{' '}
-                          <span className="chip status-proposed">{PROPOSAL_CHIP}</span> {pr.question} {pr.description} <i>What to look at: {pr.look}</i>
+                          <span className={`chip ${pr.proposal ? 'status-proposed' : 'neutral'}`}>{pr.proposal ? PROPOSAL_CHIP : 'Current view (default)'}</span> {pr.question} {pr.description} <i>What to look at: {pr.look}</i>
                         </li>
                       ))}
                     </ul>

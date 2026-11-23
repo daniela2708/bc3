@@ -3,6 +3,8 @@ import { useRef, type ReactNode } from 'react';
 export interface SubTabItem<T extends string> {
   id: T;
   label: string;
+  /** Draws a separator before this tab (e.g. between the current view and the proposals). */
+  divider?: boolean;
 }
 
 /**
@@ -35,7 +37,8 @@ export function SubTabs<T extends string>({
       <div className="subtabs" role="tablist" aria-label={label}>
         {tabs.map((t) => {
           const selected = t.id === value;
-          return (
+          return [
+            t.divider && <span key={`${t.id}-divider`} className="subtab-divider" role="presentation" aria-hidden="true" />,
             <button
               key={t.id}
               ref={(el) => {
@@ -59,8 +62,8 @@ export function SubTabs<T extends string>({
               }}
             >
               {t.label}
-            </button>
-          );
+            </button>,
+          ];
         })}
       </div>
       {aside && <span className="subtabs-aside">{aside}</span>}

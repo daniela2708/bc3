@@ -15,15 +15,16 @@ import { EVENTS, PROMO_LABEL } from '../data/promos';
 import { baselineText } from '../lib/baseline';
 import { eventOptions } from '../lib/eventPick';
 import { INTENSITY, INTENSITY_CHIP, intensityBand } from '../lib/fatigue';
+import { effectiveTime } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
 import { count, moneyCompact, moneyUnit, pct, pctChange, pts, signedMoney } from '../lib/format';
 import { averageScore, hotBuyScores, resultsOf } from '../lib/hotBuyScore';
 import { DEFAULT_BASIS, DEFAULT_CANN_LEVEL, derive, eventAgg, type EventCtx } from '../lib/metrics';
-import { SCORE_MARGIN_NOTE, SCORE_WINDOW_NOTE, verdictCountText } from '../lib/scoring';
+import { SCORE_MARGIN_NOTE, SCORE_WINDOW_NOTE, verdictCountText, verdictCounts, type ScoreResult } from '../lib/scoring';
 import { getScope } from '../lib/selectors';
 import { deriveShopper, eventShopper, REPEAT_WINDOW_DAYS, shopperOf, type ShopperMetrics } from '../lib/shopper';
 import { alsoBoughtCategories, brandShare, buyerSources, categoryIntensity, multiItemBaskets, NEW_METRIC_CHIP, NEW_METRIC_INFO, sameAdPromos } from '../lib/shopperDetail';
-import { categorySummary, hotBuyMonths, nextSubTab, openInEventDetail, PROPOSAL_CHIP, PROPOSALS, type AdMonth, type Proposal } from '../lib/shopperProposals';
+import { categorySummary, hotBuyMonths, nextSubTab, openInEventDetail, PROPOSAL_CHIP, PROPOSALS, subTabLabel, type AdMonth, type Proposal } from '../lib/shopperProposals';
 import { VIEW_INFO } from '../lib/viewInfo';
 import { BlockSettings, EmptyState, eventDates, SettingTags, ViewControls } from './common';
 
@@ -75,15 +76,15 @@ function PrivacyNotes({ ctx, full = true }: { ctx: EventCtx; full?: boolean }) {
 }
 
 /** Every event as a table row (B's table). */
-function eventRows(list: { e: number; m: ShopperMetrics }[], selected: number, onSelect: (e: number) => void): HierRow[] {
+function eventRows(list: { e: number; m: ShopperMetrics }[], selected = -1, onSelect?: (e: number) => void): HierRow[] {
   return list.map(({ e, m }) => ({
     id: `e${e}`,
     label: PRICE_GROUPS[EVENTS[e].pg].name,
     sub: `${EVENTS[e].id} · ${PROMO_LABEL[EVENTS[e].type]}`,
     cells: { dates: eventDates(EVENTS[e]), buyers: count(m.buyers), basketLift: <Var value={m.txnsChange} kind="pct" />, basket: moneyUnit(m.basket), spend: <Var value={m.spendChange} kind="pct" />, upb: m.upb?.toFixed(1) ?? '—', ntc: pct(m.newToCat), trips: count(m.catTrips), txn: count(m.storeTxns), repeat: pct(m.repeatRate) },
     sort: { label: PRICE_GROUPS[EVENTS[e].pg].name, dates: EVENTS[e].start, buyers: m.buyers, basketLift: m.txnsChange, basket: m.basket, spend: m.spendChange, upb: m.upb, ntc: m.newToCat, trips: m.catTrips, txn: m.storeTxns, repeat: m.repeatRate },
-    onSelect: () => onSelect(e),
-    selected: e === selected,
+    onSelect: onSelect ? () => onSelect(e) : undefined,
+    selected: onSelect ? e === selected : undefined,
   }));
 }
 
@@ -122,9 +123,9 @@ function TableCard({ label, title, sub, tags = true, children }: { label: string
 const ID = 'shopper';
 
 /**
- * Promo Shopper Impact: three layout proposals for review, as subtabs at the top of the view (URL `sp`, default A):
- * A Category summary, B Event detail, C Executive snapshot. Only the active panel renders. Club card and T-log
- * aggregates only.
+ * Promo Shopper Impact: subtabs at the top of the view (URL `sp`): the current view (default) and three layout proposals
+ * for review, A Category summary, B Event detail and C Executive snapshot. Only the active panel renders. Club card
+ * and T-log aggregates only.
  */
 export default function ShopperView() {
   const { state, update } = useFilters();
@@ -137,15 +138,18 @@ export default function ShopperView() {
       <Heading />
       <div className="subtabs-head">
         <SubTabs<Proposal>
-          tabs={PROPOSALS.map((p) => ({ id: p.id, label: `${p.label} · ${p.name}` }))}
+          tabs={PROPOSALS.map((p, i) => ({ id: p.id, label: subTabLabel(p), divider: p.proposal && !PROPOSALS[i - 1]?.proposal }))}
           value={sp}
           onChange={(v) => update((s) => ({ ...s, sp: v }))}
           next={nextSubTab}
-          label="Layout proposals"
+          label="Promo Shopper Impact layouts"
           idPrefix={ID}
-          aside={<span className="chip status-proposed proposal-chip">{PROPOSAL_CHIP}</span>}
+          aside={<span className="chip status-proposed proposal-chip">A–C · {PROPOSAL_CHIP}</span>}
         />
-        <p className="subtab-desc">{info.description}</p>
+        <p className="subtab-desc">
+          {info.proposal && <span className="subtab-kind">Proposal for review · </span>}
+          {info.description}
+        </p>
         <p className="subtab-look">What to look at: {info.look}</p>
       </div>
       <ViewControls />
@@ -155,6 +159,8 @@ export default function ShopperView() {
             <EmptyState>No promotions start in {scope.range.label} for the current filters.</EmptyState>
             <PrivacyNotes ctx={scope.ctx} full={false} />
           </>
+        ) : sp === 'current' ? (
+          <CurrentPanel events={scope.events} ctx={scope.ctx} range={scope.range} />
         ) : sp === 'A' ? (
           <CategoryPanel events={scope.events} ctx={scope.ctx} range={scope.range} />
         ) : sp === 'B' ? (
@@ -176,6 +182,134 @@ export default function ShopperView() {
   );
 }
 
+// ---------------------------------------------------------------- Current · Event panels (the view as it is today)
+
+const PANEL_LIMIT = 12;
+
+/** Key figures of the period (the current view): the eight workbook KPIs of the view. */
+function periodTiles(m: ShopperMetrics): Tile[] {
+  return [
+    {
+      label: 'Promo Buyer Count',
+      info: 'Club card households that bought the promoted item during the promotion. Household vs. card level per metric is pending; Promo Buyer Count uses households (#16).',
+      value: count(m.buyers),
+      sub: (
+        <>
+          {m.events > 1 && <SumLabel />}
+          {vsUsual(m.buyersChange)}
+        </>
+      ),
+      pending: 16,
+    },
+    { label: 'Avg Basket Size $', info: BASKET_TIP, value: moneyUnit(m.basket), sub: vsUsual(m.basketChange), pending: 16 },
+    { label: 'Promo Buyer Spend Change %', info: "Promo buyers' spend during the event vs. their usual spend.", value: <Var value={m.spendChange} kind="pct" />, pending: 16 },
+    { label: 'Units per Basket', info: 'Average units in transactions that include the promoted item.', value: m.upb === null ? '—' : m.upb.toFixed(1), sub: vsUsual(m.upbChange), pending: 16 },
+    { label: 'New-to-Category Buyers %', info: NTC_TIP, value: pct(m.newToCat), pending: 11 },
+    { label: 'Category Trips', info: 'Trips by promo buyers that included any item in the category, vs. their usual.', value: count(m.catTrips), sub: vsUsual(m.catTripsChange), pending: 16 },
+    { label: 'Transaction Count', info: 'Total store transactions on promo days (store traffic indicator). Days shared by several events count once.', value: count(m.storeTxns), pending: 16 },
+    { label: 'Repeat Purchase Rate %', info: `Level 2 (not MVP). Promo buyers who bought the item again at regular price within ${REPEAT_WINDOW_DAYS} days after the promotion. — until enough days have passed.`, value: pct(m.repeatRate), pending: 16 },
+  ];
+}
+
+function EventCard({ e, m, onOpen }: { e: number; m: ShopperMetrics; onOpen: () => void }) {
+  const ev = EVENTS[e];
+  return (
+    <article className="card snapshot-card shopper-panel">
+      <header>
+        <h4 title={PRICE_GROUPS[ev.pg].name}>{PRICE_GROUPS[ev.pg].name}</h4>
+        <p>
+          {ev.id} · {PROMO_LABEL[ev.type]} · {eventDates(ev)}
+        </p>
+      </header>
+      <dl>
+        <div>
+          <dt>Promo Buyer Count</dt>
+          <dd>{count(m.buyers)}</dd>
+          {vsUsual(m.buyersChange)}
+        </div>
+        <div>
+          <dt>Avg Basket Size $</dt>
+          <dd>{moneyUnit(m.basket)}</dd>
+          {vsUsual(m.basketChange)}
+        </div>
+        <div>
+          <dt>Spend Change %</dt>
+          <dd>
+            <Var value={m.spendChange} kind="pct" />
+          </dd>
+          <span className="vs-usual">vs. their usual</span>
+        </div>
+        <div>
+          <dt>Units per Basket</dt>
+          <dd>{m.upb === null ? '—' : m.upb.toFixed(1)}</dd>
+          {vsUsual(m.upbChange)}
+        </div>
+        <div>
+          <dt>New-to-Category %</dt>
+          <dd>{pct(m.newToCat)}</dd>
+          <span className="vs-usual">no category purchase in 52 wk</span>
+        </div>
+        <div>
+          <dt>Category Trips</dt>
+          <dd>{count(m.catTrips)}</dd>
+          {vsUsual(m.catTripsChange)}
+        </div>
+      </dl>
+      <button type="button" className="btn-link" onClick={onOpen}>
+        Show in {ev.type === 'HB' ? 'Hot Buy' : 'Other Promo'} Performance
+      </button>
+    </article>
+  );
+}
+
+function CurrentPanel({ events, ctx, range }: { events: number[]; ctx: EventCtx; range: { name: string; label: string } }) {
+  const { update } = useFilters();
+  const [showAll, setShowAll] = useState(false);
+  const all = useMemo(() => shopperOf(events, ctx), [events, ctx]);
+  const sorted = useMemo(() => events.map((e) => ({ e, m: deriveShopper(eventShopper(EVENTS[e], ctx)) })).sort((a, b) => EVENTS[b.e].start - EVENTS[a.e].start), [events, ctx]);
+  const open = (e: number) => update((s) => ({ ...s, tab: EVENTS[e].type === 'HB' ? 'hotbuy' : 'other', sel: e, event: -1, time: { ...effectiveTime(s), mode: 'all' } }));
+  const panels = showAll ? sorted : sorted.slice(0, PANEL_LIMIT);
+  return (
+    <>
+      <KeyFigures tags={<SettingTags block="tiles" />} caption={`${range.name} · ${events.length} events · club card households`} tiles={periodTiles(all)} />
+      <ViewSummary>
+        {events.length} promotions starting {range.label}: <b>{count(all.buyers)}</b> promo buyers{events.length > 1 ? ' (sum across events, not unique households)' : ''} spent{' '}
+        <b>
+          <Var value={all.spendChange} kind="pct" />
+        </b>{' '}
+        vs. their usual, with <b>{pct(all.newToCat)}</b> new to the category.
+      </ViewSummary>
+      <PrivacyNotes ctx={ctx} />
+      <section aria-label="Panel per event">
+        <h3 className="secondary-title">
+          One panel per <Term id="event">event</Term>, latest first <SettingTags block="panels" />
+        </h3>
+        <div className="shopper-grid snapshot-grid">
+          {panels.map(({ e, m }) => (
+            <EventCard key={e} e={e} m={m} onOpen={() => open(e)} />
+          ))}
+        </div>
+        {sorted.length > PANEL_LIMIT && (
+          <button type="button" className="btn-outline more-btn" onClick={() => setShowAll((v) => !v)}>
+            {showAll ? `Show the latest ${PANEL_LIMIT}` : `Show all ${sorted.length} events`}
+          </button>
+        )}
+      </section>
+      <TableCard
+        label="All events"
+        title={
+          <>
+            All events <Pending q={16} />
+          </>
+        }
+        sub="The same aggregates for every event, plus Transaction Count and Repeat Purchase Rate %."
+      >
+        <HierTable hierarchy="Price group · event" columns={EVENT_COLS.filter((c) => c.key !== 'basketLift')} rows={eventRows(sorted)} defaultSort={{ key: 'dates', dir: 'desc' }} exportTitle="Promo Shopper Impact" maxHeight={480} />
+      </TableCard>
+    </>
+  );
+}
+
 // ---------------------------------------------------------------- A · Category summary
 
 function CategoryPanel({ events, ctx, range }: { events: number[]; ctx: EventCtx; range: { start: number; end: number; name: string; label: string } }) {
@@ -183,6 +317,8 @@ function CategoryPanel({ events, ctx, range }: { events: number[]; ctx: EventCtx
   const cats = useMemo(() => categorySummary(events, ctx).map((c) => ({ ...c, intensity: categoryIntensity(c.cat, range.start, range.end) })), [events, ctx, range.start, range.end]);
   const byLift = [...cats].sort((a, b) => (b.m.buyersVsPrev ?? -Infinity) - (a.m.buyersVsPrev ?? -Infinity));
   const byIntensity = [...cats].sort((a, b) => (b.intensity ?? -1) - (a.intensity ?? -1));
+  // Both charts of the row share one plot height (layout rule 8); longer lists scroll inside the card.
+  const rowHeight = hbarHeight(Math.min(cats.length, 7), true);
   const bandText = (v: number | null) => {
     const b = intensityBand(v);
     return b === 'flag' ? 'Flag' : b === 'watch' ? 'Watch' : b === 'ok' ? 'OK' : '—';
@@ -215,7 +351,7 @@ function CategoryPanel({ events, ctx, range }: { events: number[]; ctx: EventCtx
           ]}
           table={{ head: ['Category', 'Events', 'Vs. previous week %', 'Vs. same week LY %'], rows: byLift.map((c) => [c.label, c.events.length, pctChange(c.m.buyersVsPrev), pctChange(c.m.buyersVsLy)]) }}
           tableNote={`${PREV_TIP} ${LY_TIP}`}
-          height={hbarHeight(Math.min(byLift.length, 10), true)}
+          height={rowHeight}
           contentHeight={hbarHeight(byLift.length, true)}
         >
           <HBars
@@ -239,8 +375,8 @@ function CategoryPanel({ events, ctx, range }: { events: number[]; ctx: EventCtx
           subtitle={`Average share of the category's items on offer per day · watch ${pct(INTENSITY.watch, 0)}, flag ${pct(INTENSITY.flag, 0)}`}
           table={{ head: ['Category', 'Promo intensity %', 'Band'], rows: byIntensity.map((c) => [c.label, pct(c.intensity), bandText(c.intensity)]) }}
           tableNote={`Item-days with any promotion (any type) in ${range.label} ÷ item-days of the period (every item of the category, whatever the product filters). Watch at ${pct(INTENSITY.watch, 0)} or more, flag at ${pct(INTENSITY.flag, 0)} or more: thresholds from the Promo Hygiene Review (calibrated).`}
-          height={hbarHeight(Math.min(byIntensity.length, 10))}
-          contentHeight={hbarHeight(byIntensity.length)}
+          height={rowHeight}
+          contentHeight={Math.max(rowHeight, hbarHeight(byIntensity.length) + 20)}
         >
           <HBars
             data={byIntensity.map((c) => ({ label: c.label, value: c.intensity ?? 0, tip: [{ label: 'Promo intensity', value: `${pct(c.intensity)} · ${bandText(c.intensity)}` }] }))}
@@ -291,6 +427,10 @@ function CategoryPanel({ events, ctx, range }: { events: number[]; ctx: EventCtx
 }
 
 // ---------------------------------------------------------------- B · Event detail
+
+/** Plot heights of B's two chart rows: every card of a row has the same height (layout rule 8). */
+const B_ROW1 = 240;
+const B_ROW2 = 210;
 
 function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx: EventCtx; selected: number; onSelect: (e: number) => void }) {
   const per = useMemo(() => events.map((e) => ({ e, m: deriveShopper(eventShopper(EVENTS[e], ctx)) })), [events, ctx]);
@@ -353,7 +493,7 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
           ]}
           table={{ head: ['Window', 'Promo buyers', 'Baskets with the item'], rows: phases.map((p) => [p.x, p.buyers === null ? '—' : Math.round(p.buyers), p.baskets === null ? '—' : Math.round(p.baskets)]) }}
           tableNote="Before = the same buyers' usual over the baseline window, scaled to the promo days; after = the 4 weeks after the promo, scaled to the promo days (— until they have passed). Shading: baseline, promo and after windows."
-          height={240}
+          height={B_ROW1}
         >
           <PhaseBars
             data={phases}
@@ -371,7 +511,7 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
           tags={<SettingTags block="panels" />}
           table={{ head: ['Source', 'Share of promo buyers'], rows: sources ? [['New to the category', pct(sources.newToCategory)], ['Already bought the item', pct(sources.existing)], ['Switched from another brand', pct(sources.switched)]] : [] }}
           tableNote="New to the category: no category purchase in the 52-week look-back. Already bought the item: the same buyers' usual count over the baseline window. Switched brand: the rest, buyers of the category who bought another brand before."
-          height={hbarHeight(3)}
+          height={B_ROW1}
         >
           <HBars
             data={
@@ -388,6 +528,8 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
             labelWidth={190}
           />
         </ChartCard>
+      </ChartGrid>
+      <ChartGrid cols={3}>
         <ChartCard
           title="Multi-item baskets"
           titleChip={<NewMetricChip />}
@@ -395,7 +537,7 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
           tags={<SettingTags block="panels" />}
           table={{ head: ['Window', 'Baskets with 2+ units %'], rows: [['Before (usual)', pct(multi.before)], ['During', pct(multi.during)]] }}
           tableNote="From the average units of the promoted items per basket u (club card aggregates): the extra units of a basket are taken as Poisson(u − 1), so the share with 2 or more is 1 − e^−(u − 1)."
-          height={220}
+          height={B_ROW2}
         >
           <SignedColumns
             data={[
@@ -405,32 +547,32 @@ function EventPanel({ events, ctx, selected, onSelect }: { events: number[]; ctx
             format={(v) => pct(v, 0)}
             valueLabel="Baskets with 2+ units"
             neutral
+            labels
           />
         </ChartCard>
         <ChartCard
-          title="Also bought: categories"
+          title="Also bought"
           titleChip={<NewMetricChip />}
-          titleNode={
+          subtitle={
             <>
-              Also bought: categories that <Term id="overIndex">over-index</Term>
+              Top 5 that <Term id="overIndex">over-index</Term> in the event's baskets (100 = as usual)
             </>
           }
-          subtitle="Top 5 categories in the event's baskets vs. all baskets (100 = as usual)"
           table={{ head: ['Category', 'Index'], rows: cats.map((c) => [c.label, c.index]) }}
           tableNote="Index = share of the event's baskets that include the category ÷ its share of all baskets × 100. Basket affinity is simulated in the prototype; production reads it from the Weis T-log baskets."
-          height={hbarHeight(cats.length)}
+          height={B_ROW2}
         >
-          <HBars data={cats.map((c) => ({ label: c.label, value: c.index }))} format={(v) => String(Math.round(v))} valueLabel="Index" labelWidth={170} refs={[{ x: 100, label: 'Average 100' }]} />
+          <HBars data={cats.map((c) => ({ label: c.label, value: c.index }))} format={(v) => String(Math.round(v))} valueLabel="Index" labelWidth={110} refs={[{ x: 100, label: '100 = usual', anchor: 'end' }]} />
         </ChartCard>
         <ChartCard
-          title="Also bought: promotions in the same ad"
+          title="Same-ad promotions"
           titleChip={<NewMetricChip />}
-          subtitle="Other promotions of the same ad week most often in the event's baskets"
+          subtitle="Also bought: the other promotions of the same ad week most often in the event's baskets"
           table={{ head: ['Promotion', 'Event', 'Share of the event baskets'], rows: promos.map((p) => [p.label, EVENTS[p.event].id, pct(p.share)]) }}
           tableNote="Share of the event's baskets that also include the other promotion. Basket affinity is simulated in the prototype; production reads it from the Weis T-log baskets."
-          height={hbarHeight(Math.max(1, promos.length))}
+          height={B_ROW2}
         >
-          <HBars data={promos.map((p) => ({ label: p.label, value: p.share, id: p.event }))} format={(v) => pct(v)} valueLabel="Share of the event baskets" labelWidth={190} />
+          <HBars data={promos.map((p) => ({ label: p.label, value: p.share, id: p.event }))} format={(v) => pct(v)} valueLabel="Share of the event baskets" labelWidth={130} />
         </ChartCard>
       </ChartGrid>
       <TableCard
@@ -478,7 +620,7 @@ function SnapshotPanel({ events, ctx, weights, rangeLabel, onOpen }: { events: n
     {
       label: 'Verdicts',
       info: `How many Hot Buys of the month got each verdict: RE-EXECUTE 85 or more, REFINE TACTIC 70 to 84, RECONSIDER SLOT below 70 (Weis Hot Buy Scoring Framework). ${SCORE_WINDOW_NOTE}`,
-      value: <span className="verdict-counts">{verdictCountText(results)}</span>,
+      value: <VerdictCounts results={results} />,
     },
     {
       label: 'Hot Buy Score',
@@ -542,6 +684,19 @@ function SnapshotPanel({ events, ctx, weights, rangeLabel, onOpen }: { events: n
         <p className="table-note">Sales Lift, Unit Lift and New-to-Category are the score inputs (vs. the 4 weeks before, the method's fixed pre-period). Net Incremental GM $ is not part of the score (#19).</p>
       </section>
     </>
+  );
+}
+
+/** "8 Re-execute · 5 Refine · 2 Reconsider" as three verdict chips with their count (text, not colour alone). */
+function VerdictCounts({ results }: { results: ScoreResult[] }) {
+  return (
+    <span className="verdict-counts" aria-label={verdictCountText(results)}>
+      {verdictCounts(results).map(({ verdict, n }) => (
+        <span key={verdict.id} className={`verdict-count${n === 0 ? ' is-zero' : ''}`}>
+          <b>{n}</b> <span className={`verdict-chip verdict-${verdict.id}`}>{verdict.label}</span>
+        </span>
+      ))}
+    </span>
   );
 }
 

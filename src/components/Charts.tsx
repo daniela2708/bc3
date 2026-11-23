@@ -915,7 +915,10 @@ export function SignedColumns({
   height,
   valueLabel,
   neutral = false,
+  labels = false,
 }: {
+  /** Value labels on top of each column (few columns only). */
+  labels?: boolean;
   data: { x: string; value: number | null; tip?: TipRow[] }[];
   format: (v: number) => string;
   width?: number;
@@ -941,6 +944,7 @@ export function SignedColumns({
         {data.map((d, i) => (
           <Cell key={i} fill={neutral ? C.s1 : (d.value ?? 0) >= 0 ? C.pos : C.neg} />
         ))}
+        {labels && <LabelList dataKey="value" position="top" formatter={(v: number | null) => (v === null ? '—' : format(v))} fontSize={11.5} fontWeight={700} fill="#211e1e" />}
       </Bar>
     </BarChart>
   );

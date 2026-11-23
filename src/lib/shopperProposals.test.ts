@@ -10,14 +10,14 @@ import { categorySummary, DEFAULT_PROPOSAL, hotBuyMonths, parseProposal, PROPOSA
 const ctx: EventCtx = { baselineWeeks: 'byType', level: 'sub', itemMask: null, storeShare: null };
 
 describe('Promo Shopper Impact layout proposals', () => {
-  it('three proposals, A by default; anything else falls back to A', () => {
-    expect(PROPOSALS.map((p) => `${p.id} ${p.name}`)).toEqual(['A Category summary', 'B Event detail', 'C Executive snapshot']);
-    expect(DEFAULT_PROPOSAL).toBe('A');
+  it('the current view by default, then three proposals; anything else falls back to the current view', () => {
+    expect(PROPOSALS.map((p) => `${p.id} ${p.name}`)).toEqual(['current Event panels', 'A Category summary', 'B Event detail', 'C Executive snapshot']);
+    expect(DEFAULT_PROPOSAL).toBe('current');
     expect(parseProposal('B')).toBe('B');
     expect(parseProposal('C')).toBe('C');
-    expect(parseProposal('D')).toBe('A');
-    expect(parseProposal(undefined)).toBe('A');
-    expect(parseProposal('<script>')).toBe('A');
+    expect(parseProposal('D')).toBe('current');
+    expect(parseProposal(undefined)).toBe('current');
+    expect(parseProposal('<script>')).toBe('current');
   });
 
   it('A: one row per category, every event counted once', () => {

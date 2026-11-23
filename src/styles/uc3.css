@@ -801,3 +801,69 @@ button.snapshot-card:focus-visible {
 .defs-subtabs li {
   margin: 4px 0;
 }
+
+/* Subtabs: a thin separator between the current view and the proposals; "Proposal for review ·" before a description. */
+.subtab-divider {
+  align-self: center;
+  width: 1px;
+  height: 22px;
+  margin: 0 6px;
+  background: var(--n3);
+}
+.subtab-kind {
+  font-weight: 700;
+  color: var(--n5);
+}
+/* Verdict counts: the number, then the verdict chip (C strip and tiles). */
+.verdict-counts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: 13px;
+}
+.verdict-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.verdict-count b {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.verdict-count.is-zero {
+  opacity: 0.55;
+}
+/* Cards: one column of blocks with the action pinned to the bottom, so cards of a row line up. */
+.snapshot-card {
+  display: flex;
+  flex-direction: column;
+}
+.snapshot-card > .btn-link,
+.snapshot-card > .card-open {
+  margin-top: auto;
+  align-self: flex-start;
+}
+.snapshot-card header p {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Score in a card: label, number and verdict on one line, full card width; no bar (the number and verdict say it). */
+.snapshot-card .score-badge {
+  display: flex;
+  align-self: stretch;
+  flex-wrap: nowrap;
+}
+.snapshot-card .score-badge-label {
+  white-space: nowrap;
+}
+.snapshot-card .score-badge .track {
+  display: none;
+}
+.snapshot-card .score-badge .verdict-chip {
+  margin-left: auto;
+}
+button.snapshot-card dt {
+  min-height: 0;
+}

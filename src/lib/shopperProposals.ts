@@ -18,6 +18,8 @@ export interface ProposalInfo {
   id: Proposal;
   label: string;
   name: string;
+  /** False for the current view; A, B and C are layout proposals for review. */
+  proposal: boolean;
   /** The question the subtab answers. */
   question: string;
   description: string;
@@ -25,11 +27,22 @@ export interface ProposalInfo {
   look: string;
 }
 
+/** The subtabs in order: the current view, then the three proposals. */
 export const PROPOSALS: ProposalInfo[] = [
+  {
+    id: 'current',
+    label: 'Current',
+    name: 'Event panels',
+    proposal: false,
+    question: 'How did each promotion change its buyers’ behaviour?',
+    description: 'The view as it is today: the period’s key figures, one panel per event with its shopper metrics vs. the same buyers’ usual, and every event in the table.',
+    look: 'Which promotions moved buyers, baskets and spend above their usual?',
+  },
   {
     id: 'A',
     label: 'A',
     name: 'Category summary',
+    proposal: true,
     question: 'How do shoppers respond, by category?',
     description: 'One row and one bar per category: events in the period, Promo Buyer Count, Avg Basket Size $, New-to-Category Buyers %, buyer lift vs. the previous week and last year, and promo intensity.',
     look: 'Which categories gain buyers, and is the lift real vs. last year?',
@@ -38,6 +51,7 @@ export const PROPOSALS: ProposalInfo[] = [
     id: 'B',
     label: 'B',
     name: 'Event detail',
+    proposal: true,
     question: 'What happened to shoppers in one promotion?',
     description: 'Pick an event: its buyers and baskets before, during and after, where the buyers came from, multi-item baskets, what else they bought and every event in the table below.',
     look: 'Did this promotion bring new shoppers and bigger baskets, or just discount existing buyers?',
@@ -46,13 +60,14 @@ export const PROPOSALS: ProposalInfo[] = [
     id: 'C',
     label: 'C',
     name: 'Executive snapshot',
+    proposal: true,
     question: 'How did every Hot Buy of a month do?',
     description: 'Every Hot Buy of one ad month, one card each ordered by Hot Buy Score with its verdict. Click a card to open the event in B.',
     look: 'Which Hot Buys should we run again, refine or reconsider?',
   },
 ];
 
-/** The proposal for a stored or typed value; anything else falls back to the default (A). */
+/** The subtab for a stored or typed value; anything else falls back to the default (the current view). */
 export function parseProposal(v: unknown): Proposal {
   return SUBTAB_IDS.find((id) => id === v) ?? DEFAULT_PROPOSAL;
 }
@@ -67,6 +82,9 @@ export function nextSubTab(current: Proposal, key: string): Proposal | null {
   if (key === 'End') return ids[ids.length - 1];
   return null;
 }
+
+/** Tab text: "Current · Event panels", "A · Category summary", … */
+export const subTabLabel = (p: ProposalInfo) => `${p.label} · ${p.name}`;
 
 /** C → B: clicking a card opens that event in the Event detail subtab. */
 export function openInEventDetail(s: FilterState, event: number): FilterState {
