@@ -18,8 +18,8 @@ import { VIEW_INFO } from '../lib/viewInfo';
 import { columnsOf, EmptyState, fatigueColumn, performanceRows, SettingTags, uomFirst, uomTile, ViewControls } from './common';
 
 const DEFAULT_PG = pgByName('Coca-Cola 12 pk 12 oz Cans').idx;
-// Promo fatigue columns (prototype review, illustrative) right after the promo attributes.
-const COLS = ['dates', 'type', 'depth', 'ad', 'promos52', 'daysSince', 'fatigue', 'avgRetail', 'gross', 'salesLift', 'unitLift', 'incGm', 'netIncGm'];
+// Promo hygiene columns (Promo Hygiene Review thresholds) right after the promo attributes.
+const COLS = ['dates', 'type', 'depth', 'ad', 'promos52', 'daysSince', 'fatigue', 'floor', 'avgRetail', 'gross', 'salesLift', 'unitLift', 'incGm', 'netIncGm'];
 
 export default function HistoryView() {
   const { state, update } = useFilters();

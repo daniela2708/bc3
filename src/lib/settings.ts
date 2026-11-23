@@ -7,11 +7,12 @@
 import { effectiveBaseline, viewBaselineDefault, type BaselineSetting } from './baseline';
 import type { FilterState, TabId } from './filters';
 import { CANN_LEVELS, DEFAULT_BASIS, DEFAULT_CANN_LEVEL } from './metrics';
+import { DEFAULT_WEIGHTS, WEIGHT_SETS } from './scoring';
 
-export type SettingKey = 'baseline' | 'basis' | 'cann';
-export type BlockId = 'tiles' | 'salesChart' | 'unitsChart' | 'bridge' | 'table' | 'runs' | 'liftChart' | 'netIncChart' | 'periodChart' | 'depthCharts' | 'adCharts' | 'heatmap' | 'panels';
+export type SettingKey = 'baseline' | 'basis' | 'cann' | 'weights';
+export type BlockId = 'tiles' | 'salesChart' | 'unitsChart' | 'bridge' | 'table' | 'runs' | 'liftChart' | 'netIncChart' | 'periodChart' | 'depthCharts' | 'adCharts' | 'heatmap' | 'panels' | 'snapshot';
 
-export const SETTING_LABEL: Record<SettingKey, string> = { baseline: 'Baseline window', basis: 'Sales basis', cann: 'Cannibalization level' };
+export const SETTING_LABEL: Record<SettingKey, string> = { baseline: 'Baseline window', basis: 'Sales basis', cann: 'Cannibalization level', weights: 'Weights' };
 
 export interface SettingUse {
   blocks: BlockId[];
@@ -22,9 +23,10 @@ export interface SettingUse {
 /** Per view: the blocks each setting changes. A setting with no entry is not shown in that view. */
 export const AFFECTS: Record<TabId, Partial<Record<SettingKey, SettingUse>>> = {
   hotbuy: {
-    baseline: { blocks: ['tiles', 'salesChart', 'bridge', 'table'], text: 'key figures (Promo Units baseline, Sales / Unit Lift %, Incremental GM $, Net Incremental GM $, Hot Buy Score), the sales vs. baseline chart, the category bridge and the baseline, lift, incremental, cannibalization and net columns of the table.' },
-    basis: { blocks: ['tiles', 'salesChart', 'bridge', 'table'], text: 'key figures (Promo Sales $ order, Sales Lift %, Promo GM $ / %, Incremental GM $, Net Incremental GM $, Hot Buy Score), the sales vs. baseline chart, the category bridge and the sales, lift and margin columns of the table.' },
-    cann: { blocks: ['tiles', 'bridge', 'table'], text: 'the Net Incremental GM $ and Hot Buy Score key figures, the Cannibalization step of the category bridge and the Cannibalized Sales $, Cannibalization Rate %, Net Incremental Sales $, Net Incremental GM $ and Hot Buy Score columns of the table.' },
+    baseline: { blocks: ['tiles', 'salesChart', 'bridge', 'table'], text: 'key figures (Promo Units baseline, Sales / Unit Lift %, Incremental GM $, Net Incremental GM $), the sales vs. baseline chart, the category bridge and the baseline, lift, incremental, cannibalization and net columns of the table.' },
+    basis: { blocks: ['tiles', 'salesChart', 'bridge', 'table'], text: 'key figures (Promo Sales $ order, Sales Lift %, Promo GM $ / %, Incremental GM $, Net Incremental GM $), the sales vs. baseline chart, the category bridge and the sales, lift and margin columns of the table. Not the Hot Buy Score, which uses Net Customer Sales.' },
+    cann: { blocks: ['tiles', 'bridge', 'table'], text: 'the Net Incremental GM $ key figure, the Cannibalization step of the category bridge and the Cannibalized Sales $, Cannibalization Rate %, Net Incremental Sales $ and Net Incremental GM $ columns of the table.' },
+    weights: { blocks: ['tiles', 'table'], text: 'the Hot Buy Score key figure (average and count by verdict) and the Hot Buy Score column of the table. Nothing else.' },
   },
   other: {
     baseline: { blocks: ['tiles', 'salesChart', 'bridge', 'table', 'runs'], text: 'key figures (Promo Units baseline, Sales / Unit Lift %, Incremental GM $, Net Incremental GM $), the sales vs. baseline chart, the category bridge, the baseline, lift, incremental, cannibalization and net columns of the table and the runs of the same promo.' },
@@ -42,7 +44,9 @@ export const AFFECTS: Record<TabId, Partial<Record<SettingKey, SettingUse>>> = {
     cann: { blocks: ['tiles', 'periodChart', 'depthCharts', 'adCharts', 'heatmap', 'table'], text: 'the Net Incremental GM $ key figure, the Net Incremental GM $ of the results by period or week, of the charts by depth band and ad type and of the timing heat map, and the Net Incremental GM $ column of the table.' },
   },
   shopper: {
-    baseline: { blocks: ['tiles', 'panels', 'table'], text: 'the "usual" behaviour of the same buyers (spend change and every vs. usual comparison) in the key figures, the event panels and the table.' },
+    baseline: { blocks: ['tiles', 'panels', 'table', 'snapshot'], text: 'the "usual" behaviour of the same buyers (spend change and every vs. usual comparison) in the key figures, the event panels, the table and the executive snapshot. Not the Hot Buy Score, which uses the method\'s fixed 4-week pre-period.' },
+    // One block only (layout rule 5): this control lives in the executive snapshot header (proposal C).
+    weights: { blocks: ['snapshot'], text: 'the Hot Buy Score of the executive snapshot (proposal C): its key figure and every card. Nothing else.' },
   },
   trend: {
     baseline: { blocks: ['tiles', 'liftChart', 'netIncChart', 'table'], text: 'key figures (Sales / Unit Lift %, Net Incremental GM $), the lift and Net Incremental GM $ charts and the lift, incremental, net and Post-Promo Dip % rows of the runs table.' },
@@ -66,9 +70,10 @@ export const BLOCK_LABEL: Record<BlockId, string> = {
   adCharts: 'Charts by Ad Type / Vehicle',
   heatmap: 'Promotion timing heat map',
   panels: 'Layout proposal (charts and cards)',
+  snapshot: 'Executive snapshot (proposal C)',
 };
 
-const ORDER: SettingKey[] = ['baseline', 'basis', 'cann'];
+const ORDER: SettingKey[] = ['baseline', 'basis', 'cann', 'weights'];
 
 /** "Affects: …" for a control in a view, or undefined when the control is not used there. */
 export function affectsText(tab: TabId, key: SettingKey): string | undefined {
@@ -99,8 +104,13 @@ const baselineDefault = (b: BaselineSetting) => (b === 'byType' ? 'by promo type
 const levelLabel = (id: string) => CANN_LEVELS.find((l) => l.id === id)!.label;
 
 /** The tag of one setting with its active value; highlighted and explicit when it differs from the default. */
-export function activeTag(tab: TabId, key: SettingKey, s: Pick<FilterState, 'baseline' | 'basis' | 'level'>): ActiveTag {
+export function activeTag(tab: TabId, key: SettingKey, s: Pick<FilterState, 'baseline' | 'basis' | 'level' | 'weights'>): ActiveTag {
   const affects = affectsText(tab, key) ?? '';
+  if (key === 'weights') {
+    const label = (id: string) => WEIGHT_SETS.find((w) => w.id === id)!.label;
+    const changed = s.weights !== DEFAULT_WEIGHTS;
+    return { key, affects, changed, text: changed ? `${label(s.weights)} weights (default ${label(DEFAULT_WEIGHTS)})` : `${label(s.weights)} weights` };
+  }
   if (key === 'baseline') {
     const def = viewBaselineDefault(tab);
     const cur = effectiveBaseline(tab, s.baseline);
@@ -116,6 +126,6 @@ export function activeTag(tab: TabId, key: SettingKey, s: Pick<FilterState, 'bas
 }
 
 /** Tags a block shows: one per setting that changes it, none when no setting does. */
-export function tagsFor(tab: TabId, block: BlockId, s: Pick<FilterState, 'baseline' | 'basis' | 'level'>): ActiveTag[] {
+export function tagsFor(tab: TabId, block: BlockId, s: Pick<FilterState, 'baseline' | 'basis' | 'level' | 'weights'>): ActiveTag[] {
   return ORDER.filter((k) => AFFECTS[tab][k]?.blocks.includes(block)).map((k) => activeTag(tab, k, s));
 }

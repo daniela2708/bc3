@@ -234,6 +234,27 @@ function change(items: number[], e: PromoEvent, bw: ReturnType<typeof baselineWi
 }
 
 /**
+ * Category Sales and Category Units lift of an event (Hot Buy Score): the whole category, promoted items included, during
+ * the promo vs. its baseline window scaled to the promo days. Units count only the category items with the promoted
+ * price group's unit of measure (each and pounds are never added). Store shares cancel out in a ratio.
+ */
+export function categoryLifts(e: PromoEvent, ctx: Pick<EventCtx, 'baselineWeeks'>, basis: Basis = DEFAULT_BASIS): { sales: number | null; units: number | null } {
+  const pg = PRICE_GROUPS[e.pg];
+  const end = Math.min(e.end, AS_OF_DAY);
+  const days = end - e.start + 1;
+  const bw = baselineWindow(e, eventBaselineWeeks(e, ctx));
+  const items = CAT_ITEMS[pg.cat];
+  const sameUom = items.filter((i) => ITEMS[i].uom === pg.uom);
+  const p = sums(items, e.start, end);
+  const b = sums(items, bw.from, bw.to);
+  const base = (v: number) => baselineFromWindow(v, bw.days, days);
+  return {
+    sales: basis === 'net' ? lift(p.net, base(b.net)) : lift(p.gross, base(b.gross)),
+    units: lift(sums(sameUom, e.start, end).units, base(sums(sameUom, bw.from, bw.to).units)),
+  };
+}
+
+/**
  * Totals for one event. With `onlyItem`, totals for that SKU only: cannibalization and category change are
  * measured for the price group, so a SKU row carries null there.
  */

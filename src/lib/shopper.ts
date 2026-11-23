@@ -30,6 +30,8 @@ export interface ShopperAgg {
   spend: number;
   usualSpend: number;
   newBuyers: number;
+  /** Promo buyers with no category purchase in the 4 weeks before the event (Hot Buy Score window). */
+  newBuyers4w: number;
   catTrips: number;
   usualCatTrips: number;
   storeTxns: number;
@@ -52,7 +54,7 @@ export interface ShopperAgg {
 }
 
 export function emptyShopper(): ShopperAgg {
-  return { n: 0, buyers: 0, usualBuyers: 0, txns: 0, usualTxns: 0, basketDollars: 0, usualBasketDollars: 0, basketUnits: 0, usualBasketUnits: 0, spend: 0, usualSpend: 0, newBuyers: 0, catTrips: 0, usualCatTrips: 0, storeTxns: 0, repeat: 0, repeatBase: 0, prevBuyers: 0, lyBuyers: 0, lyTyBuyers: 0, afterN: 0, afterBuyers: 0, afterTxns: 0, afterBasketDollars: 0 };
+  return { n: 0, buyers: 0, usualBuyers: 0, txns: 0, usualTxns: 0, basketDollars: 0, usualBasketDollars: 0, basketUnits: 0, usualBasketUnits: 0, spend: 0, usualSpend: 0, newBuyers: 0, newBuyers4w: 0, catTrips: 0, usualCatTrips: 0, storeTxns: 0, repeat: 0, repeatBase: 0, prevBuyers: 0, lyBuyers: 0, lyTyBuyers: 0, afterN: 0, afterBuyers: 0, afterTxns: 0, afterBasketDollars: 0 };
 }
 
 export function addShopper(a: ShopperAgg, b: ShopperAgg): ShopperAgg {
@@ -125,6 +127,8 @@ export function eventShopper(e: PromoEvent, ctx: EventCtx): ShopperAgg {
     spend: buyers * tripsPerBuyer * basket,
     usualSpend: buyers * (1.02 + 0.06 * h(13)) * usualBasket,
     newBuyers: buyers * Math.min(0.4, 0.05 + 0.22 * e.depth + 0.06 * h(14)),
+    // A 4-week look-back finds more buyers "new" to the category than the 52-week one.
+    newBuyers4w: buyers * Math.min(0.7, 0.05 + 0.22 * e.depth + 0.06 * h(14) + 0.12 + 0.1 * h(16)),
     catTrips: buyers * catTripsPer,
     usualCatTrips: buyers * usualCatTripsPer,
     storeTxns,
@@ -148,11 +152,15 @@ export interface ShopperMetrics {
   basket: number | null;
   usualBasket: number | null;
   basketChange: number | null;
+  /** Baskets (transactions) that include the promoted items vs. usual: Basket Lift of the Hot Buy Score. */
+  txnsChange: number | null;
   spendChange: number | null;
   upb: number | null;
   usualUpb: number | null;
   upbChange: number | null;
   newToCat: number | null;
+  /** New-to-Category share with the Hot Buy Score's 4-week look-back. */
+  newToCat4w: number | null;
   catTrips: number;
   usualCatTrips: number;
   catTripsChange: number | null;
@@ -181,11 +189,13 @@ export function deriveShopper(s: ShopperAgg): ShopperMetrics {
     basket,
     usualBasket,
     basketChange: ch(basket, usualBasket),
+    txnsChange: ch(s.txns, s.usualTxns),
     spendChange: spendChange(s.spend, s.usualSpend),
     upb,
     usualUpb,
     upbChange: ch(upb, usualUpb),
     newToCat: newToCategoryPct(s.newBuyers, s.buyers),
+    newToCat4w: newToCategoryPct(s.newBuyers4w, s.buyers),
     catTrips: s.catTrips,
     usualCatTrips: s.usualCatTrips,
     catTripsChange: ch(s.catTrips, s.usualCatTrips),

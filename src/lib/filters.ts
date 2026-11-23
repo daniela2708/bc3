@@ -35,6 +35,7 @@ import { AD_TYPES, DEPTH_BANDS, PROMO_TYPES, type AdType, type DepthBand, type P
 import { DISTRICTS, STORE_BY_ID, STORES } from '../data/stores';
 import { BASELINE_WEEKS, type BaselineWeeks } from './kpis';
 import { CANN_LEVELS, DEFAULT_BASIS, DEFAULT_CANN_LEVEL, type Basis, type CannLevel } from './metrics';
+import { DEFAULT_WEIGHTS, type WeightSet } from './scoring';
 
 // ---------------------------------------------------------------- Views
 
@@ -307,6 +308,8 @@ export interface FilterState {
   baseline: BaselineWeeks | null;
   level: CannLevel;
   basis: Basis;
+  /** Hot Buy Score weight set: Current (in use) or Proposed (pending approval, #19). */
+  weights: WeightSet;
   rollup: Rollup;
   /** Event picked in a table for the charts (-1 = the view's default). */
   sel: number;
@@ -333,6 +336,7 @@ export const DEFAULT_STATE: FilterState = {
   baseline: null,
   level: DEFAULT_CANN_LEVEL,
   basis: DEFAULT_BASIS,
+  weights: DEFAULT_WEIGHTS,
   rollup: 'event',
   sel: -1,
   cols: {},
@@ -461,6 +465,7 @@ export function toQuery(s: FilterState): string {
   if (s.baseline !== null) p.set('bw', String(s.baseline));
   if (s.level !== DEFAULT_CANN_LEVEL) p.set('lv', s.level);
   if (s.basis !== DEFAULT_BASIS) p.set('sb', s.basis);
+  if (s.weights !== DEFAULT_WEIGHTS) p.set('sw', s.weights);
   if (s.rollup !== 'event') p.set('ru', s.rollup);
   if (s.sel >= 0) p.set('sel', String(s.sel));
   const cols = Object.entries(s.cols)
@@ -527,6 +532,7 @@ export function fromQuery(query: string, eventCount: number): FilterState {
   s.baseline = (BASELINE_WEEKS as readonly number[]).includes(bw ?? -1) ? (bw as BaselineWeeks) : null;
   s.level = oneOf(p.get('lv'), LEVELS) ?? DEFAULT_CANN_LEVEL;
   s.basis = p.get('sb') === 'gross' ? 'gross' : DEFAULT_BASIS;
+  s.weights = p.get('sw') === 'proposed' ? 'proposed' : DEFAULT_WEIGHTS;
   s.rollup = oneOf(p.get('ru'), ROLLUPS) ?? 'event';
   s.sel = intIn(p.get('sel'), 0, eventCount - 1) ?? -1;
   const colsRaw = p.get('cols');

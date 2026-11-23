@@ -8,13 +8,14 @@ import { formatDay, shortDay } from '../data/calendar';
 import { CATS, DEPTS, ITEMS, itemCode, PRICE_GROUPS, SUBS } from '../data/products';
 import { AD_LABEL, EVENTS, EVENTS_BY_PG, PROMO_LABEL, type PromoEvent } from '../data/promos';
 import { FUNDING_BEHIND_SCENES, RANDOM_WEIGHT_NOTE } from '../lib/definitions';
-import { daysSincePreviousPromo, FATIGUE_CHIP, FATIGUE_INFO, FATIGUE_LABEL, FATIGUE_RULE, fatigueCheck, fatigueReasons, promosInLast52Weeks } from '../lib/fatigue';
+import { belowFloor, daysSincePreviousPromo, FATIGUE_CHIP, FATIGUE_INFO, FATIGUE_LABEL, FATIGUE_RULE, fatigueCheck, fatigueReasons, FLOOR_LABEL, FLOOR_RULE, floorText, promosInLast52Weeks, WATCH_LABEL } from '../lib/fatigue';
 import { HoverCard } from '../components/HoverCard';
 import type { Rollup } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
 import { count, DASH, money, moneyCompact, moneyTile, numberCompact, pct, pctChange, volume, volumeCompact } from '../lib/format';
 import { BASELINE_PENDING_TEXT, BASELINE_WEEKS, PROPOSED_BASELINE_BY_TYPE, viewBaselineDefault, type BaselineWeeks } from '../lib/baseline';
 import { safeDiv } from '../lib/kpis';
+import { SCORE_METRICS, WEIGHT_SETS, type WeightSet } from '../lib/scoring';
 import { affectsText, barSettings, blockSettings, SETTING_LABEL, tagsFor, type BlockId, type SettingKey } from '../lib/settings';
 import { CANN_LEVELS, derive, eventAgg, sumAggs, type Agg, type Basis, type ByUom, type CannLevel, type EventCtx, type Metrics, type U } from '../lib/metrics';
 
@@ -173,9 +174,10 @@ export const METRIC_COLS: Record<string, MetricCol> = {
 };
 
 /**
- * "Possible promo fatigue" column (Promo History, prototype review, illustrative): per event only; group and total rows
- * stay empty. `liftOf` gives an event's Unit Lift % with the view's baseline and sales basis, so the previous run of the
- * same price group and promo type is measured the same way. Hover or focus on the flag lists the rules it met.
+ * "Possible promo fatigue" column (Promo History; Promo Hygiene Review thresholds): per event only; group and total
+ * rows stay empty. `liftOf` gives an event's Unit Lift % with the view's baseline and sales basis. Shows the flag when the
+ * item is promoted often and its efficiency is in flag, "Watch" when promoted often and in watch. Hover or focus lists
+ * the rules met with the event's values.
  */
 export function fatigueColumn(liftOf: (e: PromoEvent) => number | null): MetricCol {
   const check = (e: PromoEvent) => fatigueCheck(e, pgEvents(e), liftOf);
@@ -187,30 +189,56 @@ export function fatigueColumn(liftOf: (e: PromoEvent) => number | null): MetricC
     title: `${FATIGUE_RULE} ${FATIGUE_INFO}`,
     headExtra: (
       <>
-        <span className="chip status-pending th-chip">{FATIGUE_CHIP}</span>
+        <span className="chip status-proposed th-chip">{FATIGUE_CHIP}</span>
         <InfoTip text={`${FATIGUE_INFO} ${FATIGUE_RULE}`} label="Possible promo fatigue: what it means" below />
       </>
     ),
     cell: (_m, e) => {
       if (!e) return '';
       const c = check(e);
-      if (!c.flagged) return '';
-      const reasons = fatigueReasons(c, shortDay);
+      if (!c.status) return '';
+      const label = c.status === 'fatigue' ? FATIGUE_LABEL : WATCH_LABEL;
+      const reasons = fatigueReasons(c, e.type);
       return (
-        <HoverCard className="flag-cell" label={`${FATIGUE_LABEL}. ${reasons.join(' ')}`} content={<FatigueReasons reasons={reasons} />}>
-          <span className="flag-chip">{FATIGUE_LABEL}</span>
+        <HoverCard className="flag-cell" label={`${label}. ${reasons.join(' ')}`} content={<RulesMet title={label} reasons={reasons} />}>
+          <span className={c.status === 'fatigue' ? 'flag-chip' : 'flag-chip is-watch'}>{label}</span>
         </HoverCard>
       );
     },
-    sort: (_m, e) => (e ? (check(e).flagged ? 1 : 0) : null),
+    sort: (_m, e) => {
+      if (!e) return null;
+      const st = check(e).status;
+      return st === 'fatigue' ? 2 : st === 'watch' ? 1 : 0;
+    },
   };
 }
 
-function FatigueReasons({ reasons }: { reasons: string[] }) {
+/** "Discount below floor" column (check A of the Promo Hygiene Review): per event only. */
+const floorColumn: MetricCol = {
+  key: 'floor',
+  label: 'Discount below floor',
+  group: 'Promo',
+  left: true,
+  title: `${FLOOR_RULE} ${FATIGUE_INFO}`,
+  headExtra: <InfoTip text={`${FLOOR_RULE} Thresholds from the Promo Hygiene Review (calibrated).`} label="Discount below floor: what it means" below />,
+  cell: (_m, e) => {
+    if (!e || !belowFloor(e)) return '';
+    const text = floorText(e);
+    return (
+      <HoverCard className="flag-cell" label={`${FLOOR_LABEL}. ${text}`} content={<RulesMet title={FLOOR_LABEL} reasons={[text]} />}>
+        <span className="flag-chip is-watch">{FLOOR_LABEL}</span>
+      </HoverCard>
+    );
+  },
+  sort: (_m, e) => (e ? (belowFloor(e) ? 1 : 0) : null),
+};
+METRIC_COLS.floor = floorColumn;
+
+function RulesMet({ title, reasons }: { title: string; reasons: string[] }) {
   return (
     <>
       <p>
-        <b>{FATIGUE_LABEL}</b> (illustrative): rules met by this event
+        <b>{title}</b>: rules met by this event
       </p>
       <ul className="hovercard-list">
         {reasons.map((r) => (
@@ -444,7 +472,24 @@ function CannControl() {
   );
 }
 
-const CONTROL: Record<SettingKey, () => ReactNode> = { baseline: BaselineControl, basis: BasisControl, cann: CannControl };
+function WeightsControl() {
+  const { state, update } = useFilters();
+  return (
+    <span className="toggle-group">
+      <span className="toggle-label">
+        Weights{' '}
+        <InfoTip
+          text={`${affectsText(state.tab, 'weights')} Weight set of the Hot Buy Score: ${WEIGHT_SETS.map((w) => `${w.label}, ${w.note}`).join('; ')}. ${SCORE_METRICS.map((m) => `${m.label} ${m.weights.current} / ${m.weights.proposed} %`).join(', ')} (current / proposed).`}
+          label="Weights: what it affects"
+        />
+      </span>
+      <Segmented<WeightSet> small label="Hot Buy Score weights" value={state.weights} onChange={(v) => update((s) => ({ ...s, weights: v }))} options={WEIGHT_SETS.map((w) => ({ value: w.id, label: w.label }))} />
+      <Pending q={19} />
+    </span>
+  );
+}
+
+const CONTROL: Record<SettingKey, () => ReactNode> = { baseline: BaselineControl, basis: BasisControl, cann: CannControl, weights: WeightsControl };
 
 /**
  * "Calculation settings": the controls that change more than one block of the view (layout rule 5). A control that

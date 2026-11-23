@@ -341,6 +341,7 @@
 
 /* Status chips of illustrative items, proposals and new requests. */
 .illustrative-chip,
+.method-chip,
 .proposal-chip,
 .th-chip {
   white-space: nowrap;
@@ -353,7 +354,8 @@
   vertical-align: middle;
   font-weight: 600;
 }
-.kpi-tile .illustrative-chip {
+.kpi-tile .illustrative-chip,
+.kpi-tile .method-chip {
   margin-top: 2px;
   font-size: 10px;
   height: auto;
@@ -388,6 +390,49 @@
   font-size: 11.5px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* Hot Buy Score verdict: always a text chip; the colour repeats it. */
+.verdict-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  border: 1px solid;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.verdict-reexecute {
+  border-color: #9fd0b2;
+  background: #eaf6ee;
+  color: #1f5e3a;
+}
+.verdict-refine {
+  border-color: #e7c98a;
+  background: #fff6e0;
+  color: #7a5200;
+}
+.verdict-reconsider {
+  border-color: #eba7a7;
+  background: #fdecec;
+  color: #a32020;
+}
+.score-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.score-breakdown .score-total td {
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  font-weight: 800;
+}
+.verdict-counts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 /* Hot Buy Score badge on cards (Shopper Impact proposal C). */
@@ -622,4 +667,38 @@ td .lift-band.band-low {
 }
 .proposal-bar .month-picker select {
   min-width: 240px;
+}
+
+/* Executive snapshot header: title and tags, then the block's own control (Weights). */
+.snapshot-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-1);
+}
+
+/* Hot Buy Score method in the KPI definitions dialog. */
+.defs-method {
+  margin: 8px 0 4px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.defs-method th,
+.defs-method td {
+  padding: 3px 8px 3px 0;
+  border-bottom: 1px solid var(--n3);
+  text-align: left;
+  vertical-align: top;
+}
+.defs-method thead th {
+  color: var(--n5);
+  font-weight: 700;
+}
+
+/* "Watch" and "Below floor": same chip as the fatigue flag, neutral tone; the text carries the meaning. */
+.flag-chip.is-watch {
+  border-color: var(--n3);
+  background: var(--n1);
+  color: var(--dark);
 }

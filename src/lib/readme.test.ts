@@ -24,10 +24,14 @@ describe('workbook naming rules', () => {
     }
     expect(README).toContain('UC3_KPIs_Definitions_and_Mapping.xlsx');
   });
-  it('mentions no meeting dates and no removed question numbers', () => {
+  it('mentions no meeting dates', () => {
     for (const t of texts) {
-      expect(t).not.toMatch(/Nov(ember)? 1[78]|renumbered|#19\b/);
+      expect(t).not.toMatch(/Nov(ember)? 1[78]|renumbered/);
     }
+  });
+  it('cites only question numbers that are in the open questions list', () => {
+    const ids = new Set(OPEN_QUESTIONS.map((q) => q.id));
+    for (const t of texts) for (const m of t.matchAll(/#(\d+)\b/g)) expect(ids.has(Number(m[1])), `#${m[1]}`).toBe(true);
   });
   it('uses only the tracker status values', () => {
     for (const q of OPEN_QUESTIONS) {

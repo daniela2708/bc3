@@ -12,8 +12,8 @@ import { useFilters } from '../lib/filterStore';
 import { moneyAxis, moneyCompact, moneyTile, moneyUnit, pct, pctChange, signedMoney, signedMoneyTile, volumeCompact } from '../lib/format';
 import { baselineText } from '../lib/baseline';
 import { FUNDING_BEHIND_SCENES, RANDOM_WEIGHT_NOTE } from '../lib/definitions';
-import { averageScore, hotBuyScores } from '../lib/hotBuyScore';
-import { criteriaText, SCORE_METHOD } from '../lib/scoring';
+import { averageScore, hotBuyScores, resultsOf } from '../lib/hotBuyScore';
+import { SCORE_MARGIN_NOTE, SCORE_METHOD, SCORE_WINDOW_NOTE, verdictCountText } from '../lib/scoring';
 import { CANN_LEVELS, derive, eventAgg, sumAggs } from '../lib/metrics';
 import { SALES_COLUMNS } from '../lib/series';
 import { ALL_EVENTS, bridgeEvent, bridgeSteps, chartEvent, eventOptions, selectedInTable } from '../lib/eventPick';
@@ -24,13 +24,14 @@ import { PromoWindowCard } from './PromoWindowCard';
 import { RunsCompare } from './RunsCompare';
 
 
-const HB_COLS = ['dates', 'gross', 'net', 'units', 'baseSales', 'baseUnits', 'incSales', 'incUnits', 'salesLift', 'unitLift', 'gm', 'gmPct', 'baseGm', 'incGm', 'netGm', 'catIncSales', 'catIncGm', 'cannSales', 'cannRate', 'netIncSales', 'netIncGm'];
+// Net Incremental GM $ sits right after the Hot Buy Score: margin is shown next to the score, not inside it (#19).
+const HB_COLS = ['netIncGm', 'dates', 'gross', 'net', 'units', 'baseSales', 'baseUnits', 'incSales', 'incUnits', 'salesLift', 'unitLift', 'gm', 'gmPct', 'baseGm', 'incGm', 'netGm', 'catIncSales', 'catIncGm', 'cannSales', 'cannRate', 'netIncSales'];
 const HB_HIDDEN = ['dates', 'net', 'catIncGm', 'netGm', 'incSales'];
 // Same layout as Hot Buy Performance (workbook); the extra KPI columns start hidden in the column chooser.
 const OTHER_COLS = ['type', 'dates', 'gross', 'net', 'units', 'baseSales', 'baseUnits', 'incSales', 'incUnits', 'salesLift', 'unitLift', 'gm', 'gmPct', 'baseGm', 'incGm', 'netGm', 'catIncSales', 'catIncGm', 'cannSales', 'cannRate', 'netIncSales', 'netIncGm'];
 const OTHER_HIDDEN = ['dates', 'net', 'netGm', 'incSales', 'cannRate', 'netIncSales'];
-/** Hot Buy Score column (illustrative); its cells are filled per event after the rows are built (withEventColumn). */
-const SCORE_COL: MetricCol = { key: 'score', label: 'Hot Buy Score', group: 'Score', title: `Illustrative. ${SCORE_METHOD}`, cell: () => null, sort: () => null };
+/** Hot Buy Score column with its verdict; its cells are filled per event after the rows are built (withEventColumn). */
+const SCORE_COL: MetricCol = { key: 'score', label: 'Hot Buy Score', group: 'Score', title: SCORE_METHOD, cell: () => null, sort: () => null };
 
 export function PerformanceView({ variant }: { variant: 'hotbuy' | 'other' }) {
   const { state, update } = useFilters();
@@ -44,8 +45,9 @@ export function PerformanceView({ variant }: { variant: 'hotbuy' | 'other' }) {
   /** The selected event when the user picked "All events" in the bridge (see eventPick.ts). */
   const [allAt, setAllAt] = useState<number | null>(null);
 
-  // Hot Buy Score (illustrative): each Hot Buy ranked against the other Hot Buys of the selection.
-  const scores = useMemo(() => (hb ? hotBuyScores(scope.events, scope.ctx, basis) : new Map()), [hb, scope.events, scope.ctx, basis]);
+  // Hot Buy Score (Weis Hot Buy Scoring Framework): fixed 4-week pre-period; only the weight set changes it.
+  const weights = state.weights;
+  const scores = useMemo(() => (hb ? hotBuyScores(scope.events, scope.ctx, weights, basis) : new Map()), [hb, scope.events, scope.ctx, weights, basis]);
   const built = useMemo(
     () =>
       performanceRows({
@@ -153,10 +155,10 @@ export function PerformanceView({ variant }: { variant: 'hotbuy' | 'other' }) {
       ? [
           {
             label: 'Hot Buy Score',
-            info: `Average of the Hot Buys in the selection. ${SCORE_METHOD} Criteria and weights: ${criteriaText()}.`,
+            info: `Average of the Hot Buys in the selection, 0–100, and how many got each verdict. ${SCORE_WINDOW_NOTE} ${SCORE_MARGIN_NOTE} ${SCORE_METHOD}`,
             chip: <ScoreChip info={false} />,
             value: avgScore === null ? '—' : String(Math.round(avgScore)),
-            sub: <>average of {scores.size} · scale 0–100</>,
+            sub: <span className="verdict-counts">{verdictCountText(resultsOf(scores))}</span>,
           } satisfies Tile,
         ]
       : []),

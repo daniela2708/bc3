@@ -16,13 +16,13 @@ import { effectiveTime } from '../lib/filters';
 import { useFilters } from '../lib/filterStore';
 import { count, moneyUnit, pct, pctChange } from '../lib/format';
 import { DEFAULT_BASIS, DEFAULT_CANN_LEVEL, type EventCtx } from '../lib/metrics';
-import { averageScore, hotBuyScores } from '../lib/hotBuyScore';
-import type { ScoreResult } from '../lib/scoring';
+import { averageScore, hotBuyScores, resultsOf } from '../lib/hotBuyScore';
+import { SCORE_MARGIN_NOTE, SCORE_WINDOW_NOTE, verdictCountText, type ScoreResult } from '../lib/scoring';
 import { getScope } from '../lib/selectors';
 import { deriveShopper, eventShopper, REPEAT_WINDOW_DAYS, shopperOf, type ShopperMetrics } from '../lib/shopper';
 import { categorySummary, DEFAULT_PROPOSAL, hotBuyMonths, PROPOSAL_CHIP, PROPOSALS, type AdMonth, type Proposal } from '../lib/shopperProposals';
 import { VIEW_INFO } from '../lib/viewInfo';
-import { EmptyState, eventDates, SettingTags, ViewControls } from './common';
+import { BlockSettings, EmptyState, eventDates, SettingTags, ViewControls } from './common';
 
 const SUM_LABEL = 'Sum across events (not unique households)';
 const SUM_TIP = 'Each event counts its own buyers. A household that bought in two events counts twice, so this total is not a count of unique households. Unique households across events would need the club card data itself, which the dashboard does not hold (aggregates only).';
@@ -135,8 +135,11 @@ export default function ShopperView() {
   const all = useMemo(() => shopperOf(scope.events, scope.ctx), [scope]);
   const cats = useMemo(() => (proposal === 'A' ? categorySummary(scope.events, scope.ctx) : []), [proposal, scope]);
   const months = useMemo(() => hotBuyMonths(scope.events), [scope.events]);
-  // C: the Hot Buy Score at the default sales basis and cannibalization level (this view has no control for them).
-  const scores = useMemo(() => (proposal === 'C' ? hotBuyScores(scope.events, { ...scope.ctx, level: DEFAULT_CANN_LEVEL }, DEFAULT_BASIS) : new Map<number, ScoreResult>()), [proposal, scope]);
+  // C: the Hot Buy Score (fixed 4-week pre-period, Net Customer Sales); only the weight set changes it.
+  const scores = useMemo(
+    () => (proposal === 'C' ? hotBuyScores(scope.events, { ...scope.ctx, level: DEFAULT_CANN_LEVEL }, state.weights, DEFAULT_BASIS) : new Map<number, ScoreResult>()),
+    [proposal, scope, state.weights],
+  );
 
   if (scope.events.length === 0)
     return (
@@ -315,7 +318,8 @@ export default function ShopperView() {
 }
 
 function Snapshot({ month, per, scores, ctx, onOpen }: { month: AdMonth; per: { e: number; m: ShopperMetrics }[]; scores: Map<number, ScoreResult>; ctx: EventCtx; onOpen: (e: number) => void }) {
-  const list = month.events.map((e) => ({ e, m: per.find((x) => x.e === e)!.m }));
+  // Cards ordered by score, highest first (unscored last).
+  const list = month.events.map((e) => ({ e, m: per.find((x) => x.e === e)!.m })).sort((a, b) => (scores.get(b.e)?.score ?? -1) - (scores.get(a.e)?.score ?? -1));
   const m = shopperOf(month.events, ctx);
   const avg = averageScore(scores, month.events);
   const tiles: Tile[] = [
@@ -325,22 +329,25 @@ function Snapshot({ month, per, scores, ctx, onOpen }: { month: AdMonth; per: { 
     { label: 'New-to-Category Buyers %', info: 'Share of promo buyers with no category purchase in the 52-week look-back.', value: pct(m.newToCat), pending: 11 },
     {
       label: 'Hot Buy Score',
-      info: 'Average of the month’s Hot Buys. Illustrative: each Hot Buy is ranked against every Hot Buy in the selection, at the default sales basis (Net Customer Sales) and cannibalization level (Subcategory).',
+      info: `Average of the month’s Hot Buys, 0–100, and how many got each verdict (Weis Hot Buy Scoring Framework). ${SCORE_WINDOW_NOTE} ${SCORE_MARGIN_NOTE}`,
       chip: <ScoreChip info={false} />,
       value: avg === null ? '—' : String(Math.round(avg)),
-      sub: 'average · scale 0–100',
+      sub: <span className="verdict-counts">{verdictCountText(resultsOf(scores, month.events))}</span>,
     },
   ];
   return (
     <>
-      <KeyFigures tags={<SettingTags block="tiles" />} caption={`${month.label} · ${month.events.length} Hot Buy${month.events.length === 1 ? '' : 's'} · club card households`} tiles={tiles} />
+      <KeyFigures tags={<SettingTags block="snapshot" />} caption={`${month.label} · ${month.events.length} Hot Buy${month.events.length === 1 ? '' : 's'} · club card households`} tiles={tiles} />
       <p className="privacy-note approval-note" role="note">
         Aggregates only. Individual-level detail requires approval (#16).
       </p>
       <section aria-label="Executive snapshot">
-        <h3 className="secondary-title">
-          Every Hot Buy of {month.label} <SettingTags block="panels" />
-        </h3>
+        <div className="snapshot-head">
+          <h3 className="secondary-title">
+            Every Hot Buy of {month.label}, by Hot Buy Score <SettingTags block="snapshot" />
+          </h3>
+          <BlockSettings block="snapshot" />
+        </div>
         <div className="shopper-grid snapshot-grid">
           {list.map(({ e, m: em }) => (
             <article key={e} className="card snapshot-card">

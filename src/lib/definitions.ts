@@ -5,9 +5,9 @@
  * KPI and the open questions with the assumption the prototype uses. Question numbers and statuses follow the
  * workbook tab "UC #3 - Open Questions". Shown in the KPI definitions dialog and in the README (see readme.ts).
  */
-import { FATIGUE_CHIP, FATIGUE_INFO, FATIGUE_RULE } from './fatigue';
+import { FATIGUE_CHIP, FATIGUE_INFO, FATIGUE_RULE, FLOOR_RULE } from './fatigue';
 import type { TabId } from './filters';
-import { criteriaText, SCORE_CHIP, SCORE_METHOD } from './scoring';
+import { methodText, SCORE_CHIP, SCORE_METHOD } from './scoring';
 import { LIFT_THRESHOLDS, THRESHOLD_CHIP } from './thresholds';
 
 /** The requirements workbook on the Weis SharePoint (opens with a Weis account). A fixed https URL, not user input. */
@@ -421,8 +421,9 @@ export const KPI_DEFINITIONS: KpiDef[] = [
     definition: "Overall rating of a Hot Buy's success built from the core metrics. To be layered on after the core metrics are agreed.",
     formula: "Weighted score of agreed metrics (e.g., Net Incremental GM $, Lift %, Cannibalization Rate %). Weights to be defined.",
     views: ['hotbuy', 'shopper'],
-    note: `${SCORE_CHIP}. Example criteria and weights (one config file, src/lib/scoring.ts): ${criteriaText()}. ${SCORE_METHOD} The margin criterion uses Net Gross Margin (with vendor funding), as the business asked. Shown in Hot Buy Performance (tile, table column) and in the Promo Shopper Impact proposal C.`,
-    status: REVIEW_STATUS,
+    note: `${SCORE_CHIP}. Metrics and weights (one config file, src/lib/scoring.ts): ${methodText()}. ${SCORE_METHOD} The Weights control switches between the Current and Proposed sets. Shown in Hot Buy Performance (tile with the count by verdict, table column with the verdict, Net Incremental GM $ next to it) and in the Promo Shopper Impact proposal C.`,
+    status: `${REVIEW_STATUS} · business method`,
+    pending: 19,
   },
   {
     id: "promos52",
@@ -432,8 +433,8 @@ export const KPI_DEFINITIONS: KpiDef[] = [
     definition: "Number of promo events the same price group had in the 52 weeks before the event started (any promo type).",
     formula: "Count of events of the same price group with a start date in the 364 days before the event's start date",
     views: ['history'],
-    note: 'Promo fatigue column of "Every past promotion". Events before the start of the data (FY2024) are not counted.',
-    status: `${REVIEW_STATUS} · illustrative`,
+    note: 'Promo fatigue column of "Every past promotion" (frequency, check C). Events before the start of the data (FY2024) are not counted.',
+    status: `${REVIEW_STATUS} · business method`,
   },
   {
     id: "daysSince",
@@ -443,19 +444,30 @@ export const KPI_DEFINITIONS: KpiDef[] = [
     definition: "Days between the end of the latest earlier promo of the same price group and the start of this event.",
     formula: "Event start date − end date of the previous event of the same price group (0 when they overlap); — when there is no earlier promo in the data",
     views: ['history'],
-    note: 'Promo fatigue column of "Every past promotion".',
-    status: `${REVIEW_STATUS} · illustrative`,
+    note: 'Promo fatigue column of "Every past promotion" (frequency, check C).',
+    status: `${REVIEW_STATUS} · business method`,
   },
   {
     id: "fatigue",
     name: "Possible Promo Fatigue (flag)",
     unit: "flag",
     priority: "Nice to have",
-    definition: "Flags events whose price group is promoted often and whose lift is low or falling, a sign that shoppers may wait for the deal.",
-    formula: `${FATIGUE_RULE} Example thresholds, configurable in src/lib/fatigue.ts.`,
+    definition: "Flags events whose price group is promoted often and whose extra units per discount point fall below the calibrated flag threshold; \"Watch\" when they fall below the watch threshold.",
+    formula: `${FATIGUE_RULE} Thresholds configurable in src/lib/fatigue.ts.`,
     views: ['history'],
-    note: `${FATIGUE_CHIP}. ${FATIGUE_INFO} Unit Lift % uses the baseline window and sales basis of the view; the flag's tooltip lists the rules each event met.`,
-    status: `${REVIEW_STATUS} · illustrative`,
+    note: `${FATIGUE_CHIP}. ${FATIGUE_INFO} Unit Lift % uses the baseline window and sales basis of the view; the tooltip lists the rules each event met.`,
+    status: `${REVIEW_STATUS} · business method`,
+  },
+  {
+    id: "floor",
+    name: "Discount Below Floor",
+    unit: "flag",
+    priority: "Nice to have",
+    definition: "Flags events whose discount is below the calibrated minimum for their promo type.",
+    formula: `${FLOOR_RULE} Configurable in src/lib/fatigue.ts.`,
+    views: ['history'],
+    note: `Check A of the Promo Hygiene Review. ${FATIGUE_INFO}`,
+    status: `${REVIEW_STATUS} · business method`,
   },
   {
     id: "timing",
@@ -611,6 +623,13 @@ export const OPEN_QUESTIONS: OpenQuestion[] = [
     title: 'Reconciliation',
     assumption:
       'SMEs review first, then technical reconciliation against current reporting; sales reconcile to the Category Performance Report. The target for baseline and cannibalization depends on the Cognira vs. Weis data decision.',
+  },
+  {
+    id: 19,
+    status: 'Open',
+    title: 'Hot Buy Score',
+    assumption:
+      'The prototype scores Hot Buys with the Weis Hot Buy Scoring Framework and the Current weights; the Proposed weights are pending approval (both can be shown with the Weights control). Whether the score applies to price locks and whether margin is added to the method are open; Net Incremental Gross Margin $ is shown next to the score.',
   },
   {
     id: null,

@@ -258,7 +258,7 @@ async function main() {
   const hbTags = await evaluate(tagsOf);
   check(
     'Hot Buy: every affected block shows its tags with the default values',
-    JSON.stringify(hbTags.tiles) === JSON.stringify(['baseline=Baseline 4 wk', 'basis=Net Customer Sales', 'cann=Subcategory level']) && JSON.stringify(hbTags.salesChart) === JSON.stringify(['baseline=Baseline 4 wk', 'basis=Net Customer Sales']) && hbTags.bridge?.length === 3 && hbTags.table?.length === 3,
+    JSON.stringify(hbTags.tiles) === JSON.stringify(['baseline=Baseline 4 wk', 'basis=Net Customer Sales', 'cann=Subcategory level', 'weights=Current weights']) && JSON.stringify(hbTags.salesChart) === JSON.stringify(['baseline=Baseline 4 wk', 'basis=Net Customer Sales']) && hbTags.bridge?.length === 3 && hbTags.table?.length === 4,
     JSON.stringify(hbTags),
   );
   await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Sales basis"] button')].find((b) => b.textContent === 'Gross').click(), 1`);
@@ -442,6 +442,16 @@ async function main() {
     'KPI definitions: the workbook name links to SharePoint in a new tab',
     await evaluate(`(() => { const l = [...document.querySelectorAll('.defs-intro a')].find((x) => x.textContent.trim() === 'UC3_KPIs_Definitions_and_Mapping.xlsx'); return !!l && l.href.startsWith('https://weismarketsinc.sharepoint.com/') && l.target === '_blank' && l.rel.includes('noopener') && l.rel.includes('noreferrer'); })()`),
   );
+  const method = await evaluate(`(() => {
+    const t = document.querySelector('#def-score .defs-method');
+    const rows = t ? [...t.querySelectorAll(':scope > tbody > tr')].map((r) => [...r.children].map((c) => c.textContent)) : [];
+    return { row: !!document.querySelector('#def-score'), table: !!t, rows, verdicts: [...document.querySelectorAll('#def-score .verdict-chip')].map((x) => x.textContent).join('|') };
+  })()`);
+  check(
+    'KPI definitions: Hot Buy Score method table (metric, current and proposed weight, how it scores) and the three verdicts',
+    method.rows.length === 7 && method.rows[0][1] === '35 %' && method.rows[0][2] === '46.5 %' && method.rows[0][3].startsWith('Scaled to the discount d: floor F = d ÷ (1 − d).') && method.rows[2][3].startsWith('Directional') && method.verdicts === 'RE-EXECUTE|REFINE TACTIC|RECONSIDER SLOT',
+    JSON.stringify({ ...method, rows: method.rows.slice(0, 3) }),
+  );
   await evaluate(`document.querySelector('.defs-close').click(), 1`);
 
   // 8. Prototype review: Hot Buy Score, promo fatigue, timing heat map, Run Trend rows, Shopper Impact proposals, notes.
@@ -454,20 +464,82 @@ async function main() {
   };
   await send('Page.navigate', { url: `${base}/?tab=hotbuy` });
   await until(`!!document.querySelector('table.hier .score-cell')`, 'Hot Buy Score column');
-  const score = await evaluate(`(() => {
+  const SCORE_CHIP = 'Scoring method: Weis Hot Buy Scoring Framework · weights pending (#19)';
+  const scoreState = `(() => {
     const heads = [...document.querySelectorAll('table.hier thead th')].map((t) => t.textContent.trim());
-    const values = [...document.querySelectorAll('table.hier tbody tr:not(.sku-row) .score-cell .cell-bar')].map((c) => Number(c.firstChild.textContent));
+    const cells = [...document.querySelectorAll('table.hier tbody tr:not(.sku-row) .score-cell')];
     const tile = [...document.querySelectorAll('.kpi-tile')].find((t) => t.querySelector('.kpi-label').textContent.startsWith('Hot Buy Score'));
-    return { col: heads.some((h) => h.startsWith('Hot Buy Score')), n: values.length, inRange: values.every((v) => Number.isFinite(v) && v >= 0 && v <= 100), tile: tile?.querySelector('.kpi-value').textContent ?? null, tileChip: tile?.textContent.includes('Illustrative scoring · method to be defined with the business') ?? false, tableChip: document.querySelector('.table-card .chart-title').textContent.includes('Illustrative scoring · method to be defined with the business') };
-  })()`);
-  check('Hot Buy Score: column with 0–100 values and a small bar, average tile and the "Illustrative scoring" chip', score.col && score.n > 0 && score.inRange && /^\d{1,3}$/.test(score.tile ?? '') && score.tileChip && score.tableChip, JSON.stringify(score));
-  await hoverAt(`document.querySelector('table.hier tbody tr:not(.total-row) .score-cell')`);
-  const breakdown = await evaluate(`(() => { const h = document.querySelector('.hovercard'); if (!h) return null; return { rows: [...h.querySelectorAll('tbody tr')].map((r) => r.firstChild.textContent + '|' + r.lastChild.textContent.replace(/\\s+/g, ' ').trim()), label: document.querySelector('table.hier tbody tr:not(.total-row) .score-cell').getAttribute('aria-label') }; })()`);
+    return {
+      col: heads.findIndex((h) => h.startsWith('Hot Buy Score')) >= 0 && heads[heads.findIndex((h) => h.startsWith('Hot Buy Score')) + 1]?.startsWith('Net Incremental GM $'),
+      scores: cells.map((c) => Number(c.querySelector('.cell-bar').firstChild.textContent)),
+      verdicts: cells.map((c) => c.querySelector('.verdict-chip')?.textContent ?? ''),
+      labels: cells.map((c) => c.getAttribute('aria-label')),
+      tile: tile?.querySelector('.kpi-value').textContent ?? null,
+      counts: tile?.querySelector('.verdict-counts')?.textContent ?? '',
+      tileChip: tile?.textContent.includes(${JSON.stringify(SCORE_CHIP)}) ?? false,
+      tileTip: tile?.querySelector('.tip-body')?.textContent ?? '',
+      tableChip: document.querySelector('.table-card .chart-title').textContent.includes(${JSON.stringify(SCORE_CHIP)}),
+      weights: ${pressed('Hot Buy Score weights')},
+      inBar: !!document.querySelector('.calc-settings [role=group][aria-label="Hot Buy Score weights"]'),
+      tags: [...document.querySelectorAll('.setting-tag[data-setting="weights"]')].map((t) => (t.classList.contains('is-changed') ? '*' : '') + t.firstChild.textContent),
+      byRow: Object.fromEntries(cells.map((c) => [c.closest('tr').querySelector('.lbl')?.textContent ?? '', Number(c.querySelector('.cell-bar').firstChild.textContent)])),
+    };
+  })()`;
+  const score = await evaluate(scoreState);
+  const VERDICT = { 'RE-EXECUTE': (v) => v >= 85, 'REFINE TACTIC': (v) => v >= 70 && v <= 84, 'RECONSIDER SLOT': (v) => v < 70 };
   check(
-    'Hovering a score shows points and weight per criterion (25 / 30 / 20 / 15 / 10)',
-    !!breakdown && breakdown.rows.length === 5 && ['/ 25', '/ 30', '/ 20', '/ 15', '/ 10'].every((w, i) => breakdown.rows[i].endsWith(w)) && /^Hot Buy Score \d+ of 100 \(illustrative\)\. Unit Lift %/.test(breakdown.label),
+    'Hot Buy Score: whole numbers 0–100 with a text verdict chip that matches the score; Net Incremental GM $ next to it; tile with the count by verdict; method chip',
+    score.col && score.scores.length > 0 && score.scores.every((v, i) => Number.isInteger(v) && v >= 0 && v <= 100 && VERDICT[score.verdicts[i]]?.(v)) && /^\d{1,3}$/.test(score.tile ?? '') && /^\d+ Re-execute · \d+ Refine · \d+ Reconsider$/.test(score.counts) && score.tileChip && score.tableChip,
+    JSON.stringify({ ...score, labels: score.labels.length }),
+  );
+  check(
+    'Hot Buy Score (i): fixed 4-week pre-period and margin not part of the method (#19)',
+    score.tileTip.includes("The score uses the method's fixed 4-week pre-period; the Baseline window setting does not change it.") && score.tileTip.includes('Margin is not part of the current scoring method; whether to add it is open (#19).'),
+    score.tileTip,
+  );
+  check('Weights: "Current" by default in the Calculation settings bar; tile and table show the plain tag', score.weights === 'Current' && score.inBar && score.tags.length === 2 && score.tags.every((t) => t === 'Current weights'), JSON.stringify(score.tags));
+  await hoverAt(`document.querySelector('table.hier tbody tr:not(.total-row) .score-cell')`);
+  const breakdownOf = `(() => { const h = document.querySelector('.hovercard'); if (!h) return null; return { head: [...h.querySelectorAll('thead th')].map((t) => t.textContent).join('|'), rows: [...h.querySelectorAll('tbody tr')].map((r) => [...r.children].map((c) => c.textContent)), notes: [...h.querySelectorAll('.hovercard-note')].map((n) => n.textContent) }; })()`;
+  const breakdown = await evaluate(breakdownOf);
+  check(
+    'Hovering a score shows value, points, weight and contribution per metric (Current 35 / 25 / 15 / 5 / 8 / 7 / 5 %), the total and the margin note',
+    !!breakdown &&
+      breakdown.head === 'Metric|Value|Points|Weight|Adds' &&
+      breakdown.rows.length === 8 &&
+      breakdown.rows.slice(0, 7).map((r) => r[0]).join('|') === 'Sales Lift|Unit Lift|Basket Lift|Cat. Sales Lift|Cat. Trip Lift|New-to-Category|Cat. Units' &&
+      breakdown.rows.slice(0, 7).map((r) => r[3]).join('|') === '35 %|25 %|15 %|5 %|8 %|7 %|5 %' &&
+      breakdown.rows[7][0] === 'Total (rounded)' &&
+      breakdown.notes.some((n) => n.startsWith('Net Incremental Gross Margin $') && n.endsWith('not part of the score (#19).')) &&
+      /^Hot Buy Score \d+ of 100, (RE-EXECUTE|REFINE TACTIC|RECONSIDER SLOT) \(Current weights\)\. Sales Lift /.test(score.labels[0]),
     JSON.stringify(breakdown),
   );
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 });
+  // The Baseline window does not change the score (the method's fixed 4-week pre-period).
+  await send('Page.navigate', { url: `${base}/?tab=hotbuy&bw=13` });
+  await until(`!!document.querySelector('table.hier .score-cell')`, 'Hot Buy Score with a 13-week baseline');
+  const score13 = await evaluate(scoreState);
+  check(
+    'Hot Buy Score does not change with the Baseline window (13 wk vs. default 4 wk), event by event',
+    Object.keys(score.byRow).length === score.scores.length && Object.entries(score.byRow).every(([k, v]) => score13.byRow[k] === v) && score13.counts === score.counts,
+    `${JSON.stringify(score.byRow)} | ${JSON.stringify(score13.byRow)}`,
+  );
+  // Proposed weights: the URL keeps them, the tags are highlighted, the breakdown uses 46.5 / 31 / 10 / 2.5 / 4 / 3.5 / 2.5 %.
+  await send('Page.navigate', { url: `${base}/?tab=hotbuy` });
+  await until(`!!document.querySelector('table.hier .score-cell')`, 'Hot Buy Score column again');
+  await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Hot Buy Score weights"] button')].find((b) => b.textContent === 'Proposed').click(), 1`);
+  await until(`location.search.includes('sw=proposed')`, 'Proposed weights in the URL');
+  await sleep(300);
+  const proposed = await evaluate(scoreState);
+  await hoverAt(`document.querySelector('table.hier tbody tr:not(.total-row) .score-cell')`);
+  const breakdownP = await evaluate(breakdownOf);
+  check(
+    'Weights: Proposed highlights the tag on the tile and the table ("Proposed weights (default Current)") and the breakdown uses the proposed weights',
+    proposed.weights === 'Proposed' && proposed.tags.length === 2 && proposed.tags.every((t) => t === '*Proposed weights (default Current)') && breakdownP?.rows.slice(0, 7).map((r) => r[3]).join('|') === '46.5 %|31 %|10 %|2.5 %|4 %|3.5 %|2.5 %' && /\(Proposed weights\)/.test(proposed.labels[0]),
+    JSON.stringify({ tags: proposed.tags, weights: breakdownP?.rows.map((r) => r[3]) }),
+  );
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 });
+  await send('Page.navigate', { url: `${base}/?tab=hotbuy` });
+  await until(`!!document.querySelector('table.hier .score-cell')`, 'Hot Buy Score column, Current weights');
   await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 });
   const netInfo = await evaluate(`(() => { const t = document.querySelector('.kpi-tile .tip[aria-label="Net Incremental GM $ definition"]')?.closest('.kpi-tile'); const th = [...document.querySelectorAll('table.hier thead th')].find((x) => x.textContent.trim().startsWith('Net Incremental GM $')); return [t?.querySelector('.tip-body')?.textContent ?? '', th?.title ?? '']; })()`);
   check('Net Incremental GM $ (i) and column tooltip say funding is brought in behind the scenes', netInfo.every((t) => t.startsWith('Includes vendor funding. Funding data is brought in behind the scenes even though funding KPIs are not shown.')), JSON.stringify(netInfo));
@@ -490,14 +562,14 @@ async function main() {
       cells: cells.length,
       cellLabel: cells[0]?.getAttribute('aria-label') ?? '',
       empty: heat.querySelectorAll('.heat-cell.is-empty').length > 0,
-      fatigueCols: ['Promos in last 52 weeks', 'Days since previous promo'].every((h) => heads.includes(h)) && heads.some((h) => h.startsWith('Promo fatigue') && h.includes('Definition pending · thresholds to align with Cognira promo fatigue and intensity')),
-      fatigueTip: [...document.querySelectorAll('table.hier thead .th-extra .tip-body')].some((t) => t.textContent.startsWith('Illustrative: flags items promoted often whose lift is low or falling. Cognira has promo fatigue and intensity calculations; thresholds to be aligned. Not part of the Hot Buy Score.')),
+      fatigueCols: ['Promos in last 52 weeks', 'Days since previous promo'].every((h) => heads.includes(h)) && heads.some((h) => h.startsWith('Promo fatigue') && h.includes('Promo Hygiene Review thresholds')) && heads.some((h) => h.startsWith('Discount below floor')),
+      fatigueTip: [...document.querySelectorAll('table.hier thead .th-extra .tip-body')].some((t) => t.textContent.startsWith('Thresholds from the Promo Hygiene Review (calibrated). The fatigue window is not yet calibrated. Not part of the Hot Buy Score.')),
       flags: [...document.querySelectorAll('table.hier tbody .flag-cell')].map((f) => f.getAttribute('aria-label')),
       oldFlag: document.body.textContent.includes('Promoted often</span>') || [...document.querySelectorAll('.flag-chip')].some((f) => f.textContent === 'Promoted often'),
     };
   })()`);
   check('Promo History: timing heat map after the charts and before the table, with chip, legend, labelled and empty cells', hist.order && hist.chip && hist.legend && hist.cells > 0 && /: Sales Lift % [+−-]?\d/.test(hist.cellLabel) && hist.empty, JSON.stringify(hist));
-  check('Promo History: Promos in last 52 weeks, Days since previous promo and the Promo fatigue column with its chip and (i)', hist.fatigueCols && hist.fatigueTip, JSON.stringify(hist));
+  check('Promo History: Promos in last 52 weeks, Days since previous promo, Promo fatigue (chip and (i)) and Discount below floor columns', hist.fatigueCols && hist.fatigueTip, JSON.stringify(hist));
   check('Promo History: the old "Promoted often" flag is gone', !hist.oldFlag);
   const heatCard = `[...document.querySelectorAll('section.chart-card')].find((c) => c.getAttribute('aria-label') === 'Promotion timing heat map')`;
   await shoot(heatCard, 'history-heatmap.png');
@@ -509,21 +581,31 @@ async function main() {
   await sleep(200);
   const heatTable = await evaluate(`[...(${heatCard}).querySelectorAll('th')].map((t) => t.textContent).join('|')`);
   check('Heat map local controls switch rows to Category and colour to Net Incremental GM $; table view lists the 12 months', heat2.rowHead === 'Category' && heat2.legend === 'Avg Net Incremental GM $ per event' && heatTable === 'Category|Events|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec', JSON.stringify({ heat2, heatTable }));
-  // Possible promo fatigue: M&M's Sharing Size (price group 5) has two flagged events in the demo data (frequent and low or falling lift).
-  await send('Page.navigate', { url: `${base}/?tab=history&pg=5` });
-  await until(`document.querySelectorAll('table.hier tbody .flag-cell').length > 0`, 'flagged events');
+  // Promo hygiene: Cheerios Family Size (price group 8) has one "Possible promo fatigue" event and one "Watch" in the demo data.
+  await send('Page.navigate', { url: `${base}/?tab=history&pg=8` });
+  await until(`document.querySelectorAll('table.hier tbody .flag-cell').length > 1`, 'flagged events');
   const fatigue = await evaluate(`[...document.querySelectorAll('table.hier tbody .flag-cell')].map((f) => ({ text: f.textContent, label: f.getAttribute('aria-label') }))`);
-  await hoverAt(`document.querySelector('table.hier tbody .flag-cell')`);
+  await hoverAt(`[...document.querySelectorAll('table.hier tbody .flag-cell')].find((f) => f.textContent === 'Possible promo fatigue')`);
   await until(`!!document.querySelector('.hovercard .hovercard-list li')`, 'fatigue tooltip');
   const fatigueTip = await evaluate(`[...document.querySelectorAll('.hovercard .hovercard-list li')].map((l) => l.textContent)`);
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 });
+  const flagged = fatigue.filter((f) => f.text === 'Possible promo fatigue');
+  const watched = fatigue.filter((f) => f.text === 'Watch');
   check(
-    'Promo History: "Possible promo fatigue" flags; the tooltip lists the frequency and lift rules met with the event values',
-    fatigue.length === 2 &&
-      fatigue.every((f) => f.text === 'Possible promo fatigue' && f.label.startsWith('Possible promo fatigue. Promoted often: ') && /(Low lift: Unit Lift % -?\d+ %|Falling lift: Unit Lift % -?\d+ % vs\. \d+ % in the previous run)/.test(f.label)) &&
-      fatigueTip.some((t) => t.startsWith('Promoted often: ')) &&
-      fatigueTip.some((t) => /^(Low|Falling) lift: Unit Lift % /.test(t)),
+    'Promo History: "Possible promo fatigue" (promoted often + efficiency in flag) and "Watch" (in watch), with the rules met and the event values',
+    flagged.length === 1 &&
+      watched.length === 1 &&
+      flagged[0].label.startsWith('Possible promo fatigue. Promoted often: ') && /Low efficiency: -?\d+\.\d extra units \(%\) per discount point \([^:]+: flag below \d\.\d(, TPR values assumed)?\)/.test(flagged[0].label) &&
+      watched[0].label.startsWith('Watch. Promoted often: ') && /Efficiency to watch: -?\d+\.\d extra units \(%\) per discount point \([^:]+: watch below \d\.\d(, TPR values assumed)?\)/.test(watched[0].label) &&
+      fatigueTip.some((t) => t.startsWith('Promoted often: ') && t.includes('window not yet calibrated')) &&
+      fatigueTip.some((t) => t.startsWith('Low efficiency: ')),
     JSON.stringify({ fatigue, fatigueTip }),
   );
+  // Discount below floor (check A): Weis Quality Paper Towels 6 Rolls (price group 42) has one event under its floor.
+  await send('Page.navigate', { url: `${base}/?tab=history&pg=42` });
+  await until(`[...document.querySelectorAll('table.hier tbody .flag-cell')].some((f) => f.textContent === 'Below floor')`, 'event below the discount floor');
+  const floor = await evaluate(`[...document.querySelectorAll('table.hier tbody .flag-cell')].filter((f) => f.textContent === 'Below floor').map((f) => f.getAttribute('aria-label'))`);
+  check('Promo History: "Below floor" marks an event whose discount is under the calibrated minimum for its type', floor.length >= 1 && floor.every((l) => /^Below floor\. Promo Depth \d+ % is below the (15|10) % floor for /.test(l)), JSON.stringify(floor));
 
   await send('Page.navigate', { url: `${base}/?tab=trend` });
   await until(`!!document.querySelector('.runs-table')`, 'runs side by side');
@@ -575,6 +657,27 @@ async function main() {
   await shootPage('shopper-proposal-b.png');
   const lc = await pick('C');
   check('Shopper Impact: the control switches to proposal C (Executive snapshot) with the Hot Buy Score per card', lc.pressed === 'C · Executive snapshot' && lc.c && !lc.a && !lc.b && lc.approval, JSON.stringify(lc));
+  const snapshotOf = `(() => ({
+    scores: [...document.querySelectorAll('.snapshot-card .score-badge b')].map((b) => Number(b.textContent)),
+    verdicts: [...document.querySelectorAll('.snapshot-card .score-badge .verdict-chip')].map((v) => v.textContent),
+    counts: [...document.querySelectorAll('.kpi-tile')].find((t) => t.querySelector('.kpi-label').textContent.startsWith('Hot Buy Score'))?.querySelector('.verdict-counts')?.textContent ?? '',
+    weights: ${pressed('Hot Buy Score weights')},
+    inHeader: !!document.querySelector('.snapshot-head .block-settings [role=group][aria-label="Hot Buy Score weights"]'),
+    inBar: !!document.querySelector('.calc-settings [role=group][aria-label="Hot Buy Score weights"]'),
+    tags: [...document.querySelectorAll('.setting-tag[data-setting="weights"]')].map((t) => (t.classList.contains('is-changed') ? '*' : '') + t.firstChild.textContent),
+  }))()`;
+  const snap = await evaluate(snapshotOf);
+  check(
+    'Shopper Impact C: cards ordered by score with a verdict chip, count by verdict, Weights in the snapshot header (not in the bar)',
+    snap.scores.length > 0 && snap.scores.every((v, i) => i === 0 || snap.scores[i - 1] >= v) && snap.verdicts.length === snap.scores.length && snap.verdicts.every((v, i) => VERDICT[v]?.(snap.scores[i])) && /^\d+ Re-execute · \d+ Refine · \d+ Reconsider$/.test(snap.counts) && snap.weights === 'Current' && snap.inHeader && !snap.inBar && snap.tags.every((t) => t === 'Current weights'),
+    JSON.stringify(snap),
+  );
+  await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Hot Buy Score weights"] button')].find((b) => b.textContent === 'Proposed').click(), 1`);
+  await sleep(400);
+  const snapP = await evaluate(snapshotOf);
+  check('Shopper Impact C: Proposed weights highlight the snapshot tags', snapP.weights === 'Proposed' && snapP.tags.length > 0 && snapP.tags.every((t) => t === '*Proposed weights (default Current)'), JSON.stringify(snapP.tags));
+  await evaluate(`[...document.querySelectorAll('[role=group][aria-label="Hot Buy Score weights"] button')].find((b) => b.textContent === 'Current').click(), 1`);
+  await sleep(300);
   await shootPage('shopper-proposal-c.png');
   const la2 = await pick('A');
   check('Shopper Impact: back to proposal A', la2.a && !la2.c, JSON.stringify(la2));

@@ -117,6 +117,12 @@ describe('URL state', () => {
     expect(offReason('shopper', 'vb')).toBe(NOT_IN_VIEW);
     expect(offReason('hotbuy', 'vb')).toBeUndefined();
   });
+  it('round-trips the Proposed weights and ignores any other value', () => {
+    expect(fromQuery('sw=proposed', EVENTS.length).weights).toBe('proposed');
+    expect(toQuery(fromQuery('sw=proposed', EVENTS.length))).toMatch(/(^|&)sw=proposed/);
+    for (const q of ['sw=Proposed', 'sw=current', 'sw=proposed2', 'sw=%3Cx%3E', 'sw=']) expect(fromQuery(q, EVENTS.length).weights).toBe('current');
+    expect(toQuery(DEFAULT_STATE)).not.toMatch(/(^|&)sw=/);
+  });
   it('never puts a pasted UPC list in the URL', () => {
     expect(toQuery(state({ codes: [1, 2, 3] }))).not.toMatch(/codes|upc/);
   });

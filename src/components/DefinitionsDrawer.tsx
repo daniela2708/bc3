@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { KPI_DEFINITIONS, kpiStatus, OPEN_QUESTIONS, WORKBOOK_NAME, WORKBOOK_URL } from '../lib/definitions';
-import { SCORE_CRITERIA } from '../lib/scoring';
+import { RULE_TEXT, SCORE_METRICS, VERDICTS } from '../lib/scoring';
 import { sanitizeSearch, SEARCH_MAX, TABS } from '../lib/filters';
 import { GLOSSARY, TERM_IDS } from '../lib/glossary';
 import { OUT_OF_SCOPE_VIEWS, VIEW_INFO } from '../lib/viewInfo';
@@ -80,16 +80,38 @@ export function DefinitionsDrawer({ open, focusId, onClose }: { open: boolean; f
                     {d.definition}
                     {d.note && <span className="defs-note">Prototype: {d.note}</span>}
                     {d.id === 'score' && (
-                      <ul className="defs-criteria" aria-label="Illustrative criteria and weights">
-                        {SCORE_CRITERIA.map((c) => (
-                          <li key={c.id}>
-                            <b>
-                              {c.label} · {c.weight} %
-                            </b>{' '}
-                            {c.description}
-                          </li>
-                        ))}
-                      </ul>
+                      <>
+                        <table className="defs-method" aria-label="Weis Hot Buy Scoring Framework: metrics and weights">
+                          <thead>
+                            <tr>
+                              <th>Metric</th>
+                              <th>Current weight</th>
+                              <th>Proposed weight</th>
+                              <th>How it scores (0–100 points)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {SCORE_METRICS.map((m) => (
+                              <tr key={m.id}>
+                                <th scope="row">
+                                  {m.label}
+                                  <span className="defs-unit"> · {m.measure}</span>
+                                </th>
+                                <td>{m.weights.current} %</td>
+                                <td>{m.weights.proposed} %</td>
+                                <td>{RULE_TEXT[m.rule]}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <ul className="defs-criteria" aria-label="Verdicts">
+                          {VERDICTS.map((v) => (
+                            <li key={v.id}>
+                              <span className={`verdict-chip verdict-${v.id}`}>{v.label}</span> score {v.range}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
                     )}
                   </td>
                   <td>{d.formula}</td>
